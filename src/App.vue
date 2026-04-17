@@ -24,7 +24,7 @@
         </div>
     </header>
 
-    <main class="pt-20 min-h-screen relative z-10">
+    <main class="min-h-screen relative z-10">
         <!-- Главная страница -->
         <div id="page-home" class="page active">
             <div class="shell px-6 py-12">
