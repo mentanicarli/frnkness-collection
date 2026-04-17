@@ -16,7 +16,7 @@
         // ============================================================
         const SUPABASE_URL = 'https://momcakikuivtvxkmgjhx.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I';
-        const DEFAULT_COLOR = { hex: '#B9D57A', glow: 'rgba(185, 213, 122, 0.35)', soft: 'rgba(185, 213, 122, 0.12)' };
+        const DEFAULT_COLOR = { hex: 'rgb(103, 114, 131)', glow: 'rgba(103, 114, 131, 0.32)', soft: 'rgba(103, 114, 131, 0.18)' };
         const SHOW_NEW_RELEASE_PROMO = true;
         const NEW_RELEASE_PROMO_ID = 'p-team';
 
@@ -341,28 +341,31 @@
 
             if (hsl.s < 12) {
                 const neutralLightness = hsl.l > 75
-                    ? 88
+                    ? 90
                     : hsl.l < 30
-                        ? 62
-                        : Math.min(82, Math.max(62, hsl.l + 8));
+                        ? 72
+                        : Math.min(88, Math.max(72, hsl.l + 10));
                 const neutralRgb = hslToRgb(0, 0, neutralLightness);
                 return {
                     hex: `rgb(${neutralRgb.r}, ${neutralRgb.g}, ${neutralRgb.b})`,
-                    glow: `rgba(${neutralRgb.r}, ${neutralRgb.g}, ${neutralRgb.b}, 0.35)`,
-                    soft: `rgba(${neutralRgb.r}, ${neutralRgb.g}, ${neutralRgb.b}, 0.1)`
+                    glow: `rgba(${neutralRgb.r}, ${neutralRgb.g}, ${neutralRgb.b}, 0.24)`,
+                    soft: `rgba(${neutralRgb.r}, ${neutralRgb.g}, ${neutralRgb.b}, 0.14)`
                 };
             }
 
-            if (hsl.l < 25) hsl.l = 45;
-            else if (hsl.l > 75) hsl.l = 55;
-            else hsl.l = Math.min(65, Math.max(45, hsl.l));
-            if (hsl.s < 30) hsl.s = 60;
-            else if (hsl.s > 90) hsl.s = 80;
+            if (hsl.l < 30) hsl.l = 66;
+            else if (hsl.l > 82) hsl.l = 74;
+            else hsl.l = Math.min(76, Math.max(64, hsl.l + 8));
+
+            if (hsl.s < 22) hsl.s = 32;
+            else if (hsl.s > 72) hsl.s = 52;
+            else hsl.s = Math.min(56, Math.max(34, hsl.s - 10));
+
             const finalRgb = hslToRgb(hsl.h, hsl.s, hsl.l);
             return {
                 hex: `rgb(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b})`,
-                glow: `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.4)`,
-                soft: `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.1)`
+                glow: `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.28)`,
+                soft: `rgba(${finalRgb.r}, ${finalRgb.g}, ${finalRgb.b}, 0.14)`
             };
         }
 
@@ -1119,6 +1122,7 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             const page = $('page-' + name);
             if (page) page.classList.add('active');
+            document.body.classList.toggle('release-page', name === 'release');
             window.scrollTo(0, 0);
             if (name === 'home') resetPageAccent();
             if (name === 'home') setTimeout(initStaggerAnimation, 50);

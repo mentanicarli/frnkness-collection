@@ -1,26 +1,26 @@
 ﻿/* ============================================================
            ============================================================ */
 :root {
-    --bg: #050505;
-    --bg-elevated: #0a0a0a;
-    --bg-card: #111111;
-    --bg-panel: rgba(16, 16, 16, 0.75);
-    --fg: #ffffff;
-    --fg-muted: #6a6a6a;
-    --default-accent: #B9D57A;
-    --default-glow: rgba(185, 213, 122, 0.35);
-    --default-soft: rgba(185, 213, 122, 0.12);
+    --bg: #0b0c0e;
+    --bg-elevated: #111317;
+    --bg-card: #171a20;
+    --bg-panel: rgba(18, 20, 24, 0.88);
+    --fg: #ecf1f8;
+    --fg-muted: #94a0b2;
+    --default-accent: #677283;
+    --default-glow: rgba(103, 114, 131, 0.32);
+    --default-soft: rgba(103, 114, 131, 0.24);
     --page-accent: var(--default-accent);
     --page-accent-glow: var(--default-glow);
     --page-accent-soft: var(--default-soft);
     --player-accent: var(--default-accent);
     --player-accent-glow: var(--default-glow);
     --player-accent-soft: var(--default-soft);
-    --border: #1a1a1a;
+    --border: #2f3948;
     --gold: #FFD700;
     --silver: #C0C0C0;
     --bronze: #CD7F32;
-    --surface-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+    --surface-shadow: 0 16px 30px rgba(6, 10, 16, 0.42);
     --shell-max: 1200px;
     --shell-narrow-max: 860px;
     --safe-top: env(safe-area-inset-top, 0px);
@@ -43,11 +43,11 @@ html {
 }
 
 body {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Sora', sans-serif;
     background:
-        radial-gradient(65rem 65rem at 8% -10%, var(--page-accent-soft), transparent 55%),
-        radial-gradient(55rem 55rem at 90% 10%, var(--page-accent-glow), transparent 60%),
-        linear-gradient(160deg, #090909 0%, #050505 45%, #0b0b0b 100%);
+        radial-gradient(58rem 52rem at -2% -14%, rgba(136, 136, 136, 0.06), transparent 56%),
+        radial-gradient(48rem 42rem at 96% 2%, rgba(120, 120, 120, 0.06), transparent 58%),
+        linear-gradient(170deg, #060606 0%, #050505 52%, #0c0c0d 100%);
     color: var(--fg);
     min-height: 100vh;
     min-height: 100dvh;
@@ -58,6 +58,14 @@ body {
     position: relative;
     padding-left: var(--safe-left);
     padding-right: var(--safe-right);
+    transition: background 0.45s ease;
+}
+
+body.release-page {
+    background:
+    radial-gradient(62rem 56rem at 8% -10%, color-mix(in srgb, var(--page-accent-soft) 78%, transparent), transparent 58%),
+    radial-gradient(52rem 46rem at 88% 8%, color-mix(in srgb, var(--page-accent-glow) 52%, transparent), transparent 60%),
+    linear-gradient(170deg, #060606 0%, #050505 52%, #0c0c0d 100%);
 }
 
 body::before {
@@ -65,24 +73,28 @@ body::before {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background-image: radial-gradient(rgba(255, 255, 255, 0.07) 0.6px, transparent 0.6px);
+    background-image: radial-gradient(rgba(236, 241, 248, 0.13) 0.6px, transparent 0.6px);
     background-size: 3px 3px;
-    opacity: 0.1;
+    opacity: 0.06;
     z-index: 1;
 }
 
 body::after {
     content: '';
     position: fixed;
-    width: 32rem;
-    height: 32rem;
-    left: -10rem;
-    top: -12rem;
-    background: radial-gradient(circle, var(--page-accent-glow), transparent 65%);
-    filter: blur(8px);
+    width: 34rem;
+    height: 34rem;
+    left: -7rem;
+    top: -10rem;
+    background: radial-gradient(circle, rgba(104, 104, 104, 0.12), transparent 65%);
+    filter: blur(14px);
     pointer-events: none;
     animation: driftOrb 16s ease-in-out infinite alternate;
     z-index: 1;
+}
+
+body.release-page::after {
+    background: radial-gradient(circle, color-mix(in srgb, var(--page-accent-glow) 72%, rgba(104, 104, 104, 0.12)), transparent 66%);
 }
 
 @keyframes driftOrb {
@@ -140,7 +152,7 @@ header button span,
 header nav button span,
 .release-card h3,
 .release-card p {
-    font-family: 'Space Grotesk', sans-serif !important;
+    font-family: 'Sora', sans-serif !important;
 }
 
 /* Раздел */
@@ -192,12 +204,17 @@ header nav button span,
 /* ============================================================
            ============================================================ */
 header {
-    background: linear-gradient(180deg, rgba(14, 14, 14, 0.84) 0%, rgba(14, 14, 14, 0.52) 100%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    background: linear-gradient(180deg, rgba(10, 11, 14, 0.72) 0%, rgba(10, 11, 14, 0.5) 100%);
+    border-bottom: 1px solid rgba(147, 161, 184, 0.12);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.38);
     contain: layout style;
+    transition: background 0.45s ease;
+}
+
+body.release-page header {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--page-accent-soft) 42%, rgba(10, 11, 14, 0.72)) 0%, rgba(10, 11, 14, 0.5) 100%);
 }
 
 header>div {
@@ -206,17 +223,17 @@ header>div {
 }
 
 .chart-btn {
-    background: transparent !important;
-    color: var(--page-accent) !important;
-    border: 1px solid var(--page-accent) !important;
-    box-shadow: 0 0 0 1px var(--page-accent-soft), 0 4px 12px var(--page-accent-soft) !important;
+    background: linear-gradient(135deg, rgba(30, 33, 39, 0.78), rgba(18, 20, 25, 0.88)) !important;
+    color: rgba(226, 232, 241, 0.92) !important;
+    border: 1px solid rgba(158, 164, 174, 0.28) !important;
+    box-shadow: 0 0 0 1px rgba(98, 104, 115, 0.3), 0 8px 16px rgba(6, 8, 12, 0.42) !important;
 }
 
 .chart-btn:hover {
-    background: transparent !important;
-    color: var(--page-accent) !important;
-    border-color: var(--page-accent) !important;
-    box-shadow: 0 0 0 1px var(--page-accent), 0 6px 20px var(--page-accent-glow) !important;
+    background: linear-gradient(135deg, rgba(36, 39, 46, 0.84), rgba(20, 23, 29, 0.92)) !important;
+    color: #f1f5fb !important;
+    border-color: rgba(182, 189, 201, 0.36) !important;
+    box-shadow: 0 0 0 1px rgba(120, 127, 140, 0.34), 0 10px 22px rgba(6, 8, 12, 0.46) !important;
 }
 
 header::after {
@@ -226,8 +243,8 @@ header::after {
     right: 0;
     bottom: -1px;
     height: 1px;
-    background: linear-gradient(90deg, transparent 0%, var(--page-accent-soft) 20%, var(--page-accent) 50%, var(--page-accent-soft) 80%, transparent 100%);
-    opacity: 0.7;
+    background: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--page-accent) 22%, #ffd8cc) 22%, var(--page-accent) 50%, color-mix(in srgb, var(--page-accent) 22%, #ffd8cc) 78%, transparent 100%);
+    opacity: 0.72;
 }
 
 header nav button {
@@ -243,15 +260,16 @@ header nav button:hover {
 /* ============================================================
            ============================================================ */
 .hero-title {
-    font-family: 'Great Vibes', cursive;
-    font-size: clamp(3.5rem, 10vw, 8rem);
+    font-family: 'Fraunces', serif;
+    font-size: clamp(3.1rem, 9.2vw, 7.1rem);
     color: var(--fg);
-    font-weight: 400;
-    letter-spacing: 0.02em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     position: relative;
     display: inline-block;
     contain: layout style;
-    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.4));
+    line-height: 0.95;
+    filter: drop-shadow(0 8px 24px rgba(8, 12, 18, 0.36));
 }
 
 .hero-title::before {
@@ -263,12 +281,12 @@ header nav button:hover {
     font-size: inherit;
     font-weight: inherit;
     letter-spacing: inherit;
-    background: linear-gradient(135deg, var(--page-accent) 0%, #ffffff 25%, var(--page-accent) 50%, #ffffff 75%, var(--page-accent) 100%);
+    background: linear-gradient(130deg, #ffcdbf 0%, #ffffff 24%, color-mix(in srgb, var(--page-accent) 78%, #ffffff) 56%, #ffffff 78%, #ffcdbf 100%);
     background-size: 200% 200%;
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: heroShimmer 6s ease-in-out infinite;
+    animation: heroShimmer 7s ease-in-out infinite;
     will-change: opacity, background-position;
     pointer-events: none;
 }
@@ -305,8 +323,8 @@ header nav button:hover {
     font-weight: inherit;
     letter-spacing: inherit;
     color: transparent;
-    text-shadow: 0 0 30px var(--page-accent-glow), 0 0 60px var(--page-accent-soft), 0 0 90px rgba(212, 255, 0, 0.08);
-    animation: heroGlow 4.5s ease-in-out infinite alternate;
+    text-shadow: 0 0 14px color-mix(in srgb, var(--page-accent) 22%, #ffffff), 0 0 32px rgba(255, 196, 176, 0.16);
+    animation: heroGlow 5s ease-in-out infinite alternate;
     z-index: -1;
     will-change: opacity, filter;
     pointer-events: none;
@@ -325,16 +343,16 @@ header nav button:hover {
 }
 
 .hero-title:hover::after {
-    text-shadow: 0 0 60px var(--page-accent), 0 0 100px var(--page-accent-glow), 0 0 140px rgba(212, 255, 0, 0.2);
+    text-shadow: 0 0 36px var(--page-accent), 0 0 64px var(--page-accent-glow), 0 0 92px rgba(212, 255, 0, 0.12);
 }
 
 /* ============================================================
            ============================================================ */
 .release-card {
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(180deg, rgba(25, 25, 25, 0.88) 0%, rgba(13, 13, 13, 0.9) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(30, 32, 37, 0.82) 0%, rgba(22, 24, 29, 0.84) 100%);
+    border: 1px solid rgba(156, 160, 168, 0.18);
+    border-radius: 16px;
     position: relative;
     overflow: hidden;
     --card-accent: var(--default-accent);
@@ -362,8 +380,8 @@ header nav button:hover {
 
 .release-card:hover {
     transform: translateY(-6px) scale(1.01);
-    border-color: var(--card-soft);
-    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.66), 0 0 34px var(--card-glow);
+    border-color: color-mix(in srgb, var(--card-accent) 38%, #4a4d54);
+    box-shadow: 0 16px 28px rgba(4, 6, 10, 0.55), 0 0 0 1px color-mix(in srgb, var(--card-accent) 22%, #31343a);
 }
 
 .release-card:active {
@@ -392,9 +410,9 @@ header nav button:hover {
 }
 
 .promo-release-card {
-    background: linear-gradient(135deg, var(--card-soft), rgba(255, 255, 255, 0.03) 45%, rgba(0, 0, 0, 0.2) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 0 40px var(--card-soft);
+    background: rgba(24, 26, 31, 0.86);
+    border: 1px solid rgba(156, 160, 168, 0.2);
+    box-shadow: 0 16px 28px rgba(4, 6, 10, 0.56), 0 0 0 1px color-mix(in srgb, var(--card-accent) 18%, #30343b);
     overflow: hidden;
 }
 
@@ -437,7 +455,7 @@ header nav button:hover {
            ============================================================ */
 .track-row {
     transition: background-color 0.3s ease, transform 0.2s ease;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(141, 156, 179, 0.14);
     position: relative;
     contain: layout style;
     backdrop-filter: blur(2px);
@@ -448,7 +466,7 @@ header nav button:hover {
 }
 
 .track-row:hover {
-    background-color: rgba(255, 255, 255, 0.045);
+    background-color: rgba(140, 153, 176, 0.12);
 }
 
 .track-row:active {
@@ -456,7 +474,7 @@ header nav button:hover {
 }
 
 .track-row.playing {
-    background: linear-gradient(90deg, var(--page-accent-soft) 0%, transparent 100%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--page-accent) 20%, #1a232f) 0%, rgba(24, 31, 42, 0) 70%);
 }
 
 .track-row.playing::before {
@@ -467,7 +485,7 @@ header nav button:hover {
     bottom: 0;
     width: 3px;
     background: var(--page-accent);
-    box-shadow: 0 0 10px var(--page-accent);
+    box-shadow: 0 0 10px var(--page-accent-glow);
     animation: activeTrackLine 1s ease-in-out infinite alternate;
     transition: background 0.5s ease, box-shadow 0.5s ease;
 }
@@ -500,11 +518,11 @@ header nav button:hover {
 .player {
     transform: translateY(calc(100% + 10px));
     transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    background: linear-gradient(to top, rgba(10, 10, 10, 0.98), rgba(10, 10, 10, 0.86));
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.6), 0 -1px 0 var(--player-accent-soft);
+    background: linear-gradient(to top, rgba(21, 27, 36, 0.97), rgba(21, 27, 36, 0.86));
+    backdrop-filter: blur(34px);
+    -webkit-backdrop-filter: blur(34px);
+    border-top: 1px solid rgba(141, 156, 179, 0.18);
+    box-shadow: 0 -12px 24px rgba(7, 11, 17, 0.45), 0 -1px 0 color-mix(in srgb, var(--player-accent) 28%, #2d3848);
     contain: layout style;
     padding-bottom: var(--safe-bottom);
 }
@@ -515,8 +533,8 @@ header nav button:hover {
 
 .progress-container {
     position: relative;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.1);
+    height: 4px;
+    background: rgba(141, 153, 176, 0.26);
     cursor: pointer;
     overflow: visible;
     top: -2px;
@@ -527,7 +545,7 @@ header nav button:hover {
     background: var(--player-accent);
     position: relative;
     transition: width 0.1s linear, background-color 0.5s ease;
-    box-shadow: 0 0 15px var(--player-accent-glow);
+    box-shadow: 0 0 16px rgba(46, 211, 173, 0.36);
     border-radius: 2px;
 }
 
@@ -539,7 +557,7 @@ header nav button:hover {
     transform: translateY(-50%) scale(0);
     width: 12px;
     height: 12px;
-    background: #fff;
+    background: #f8fbff;
     border-radius: 50%;
     box-shadow: 0 0 10px var(--player-accent);
     transition: transform 0.2s ease;
@@ -557,7 +575,7 @@ header nav button:hover {
 
 #play-pause-btn.playing-state {
     background: var(--fg);
-    box-shadow: 0 0 0 0 var(--player-accent-glow);
+    box-shadow: 0 0 0 0 rgba(46, 211, 173, 0.35);
     animation: pulseGlow 2s infinite;
 }
 
@@ -603,7 +621,7 @@ header nav button:hover {
     padding: 6px 14px;
     border-radius: 20px;
     background: transparent;
-    border: 1px solid var(--border);
+    border: 1px solid rgba(126, 138, 163, 0.3);
     color: var(--fg-muted);
     font-size: 12px;
     font-weight: 500;
@@ -673,13 +691,13 @@ header nav button:hover {
 .fullscreen-trigger-btn {
     width: 32px;
     height: 32px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(24, 31, 41, 0.8);
+    border: 1px solid rgba(141, 156, 179, 0.3);
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: #dce5f2;
     transition: all 0.2s ease;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -709,7 +727,7 @@ header nav button:hover {
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: linear-gradient(160deg, #0a0a0a 0%, #050505 50%, #080808 100%);
+    background: linear-gradient(160deg, #141a22 0%, #10161d 50%, #171f29 100%);
     display: flex;
     flex-direction: column;
     opacity: 0;
@@ -729,7 +747,7 @@ header nav button:hover {
     inset: -50px;
     background-size: cover;
     background-position: center;
-    filter: blur(80px) saturate(0.5);
+    filter: blur(84px) saturate(0.58);
     opacity: 0.4;
     transform: scale(1.2);
     transition: background-image 0.5s ease;
@@ -741,7 +759,7 @@ header nav button:hover {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, rgba(5, 5, 5, 0.3) 0%, rgba(5, 5, 5, 0.9) 100%);
+    background: linear-gradient(to bottom, rgba(18, 24, 33, 0.35) 0%, rgba(15, 20, 28, 0.9) 100%);
 }
 
 .fs-main-area {
@@ -842,8 +860,8 @@ header nav button:hover {
     top: 80px;
     bottom: 200px;
     width: 360px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(22, 29, 38, 0.72);
+    border: 1px solid rgba(141, 156, 179, 0.22);
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -866,7 +884,7 @@ header nav button:hover {
 
 .fs-lyrics-header {
     padding: 16px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(141, 156, 179, 0.16);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -885,13 +903,13 @@ header nav button:hover {
     left: 0;
     right: 0;
     padding: clamp(20px, 3vw, 50px) clamp(20px, 5vw, 80px) calc(clamp(30px, 5vw, 70px) + var(--safe-bottom));
-    background: linear-gradient(to top, rgba(5, 5, 5, 0.98) 0%, rgba(5, 5, 5, 0.8) 60%, transparent 100%);
+    background: linear-gradient(to top, rgba(16, 22, 31, 0.98) 0%, rgba(16, 22, 31, 0.82) 60%, transparent 100%);
     z-index: 10;
 }
 
 .fs-progress-container {
     height: 5px;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(141, 153, 176, 0.24);
     border-radius: 3px;
     cursor: pointer;
     margin-bottom: clamp(16px, 2vw, 32px);
@@ -944,13 +962,13 @@ header nav button:hover {
     background: var(--fg);
     color: var(--bg);
     border-radius: 50%;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 24px rgba(8, 12, 18, 0.42);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .fs-play-btn:hover {
     transform: scale(1.08);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px rgba(8, 12, 18, 0.5);
 }
 
 .fs-play-btn.playing {
@@ -992,8 +1010,8 @@ header nav button:hover {
 .fs-header-btn {
     width: 40px;
     height: 40px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(24, 31, 41, 0.84);
+    border: 1px solid rgba(141, 156, 179, 0.26);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -1004,7 +1022,7 @@ header nav button:hover {
 }
 
 .fs-header-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(35, 44, 57, 0.94);
     color: var(--fg);
 }
 
@@ -1036,7 +1054,7 @@ header nav button:hover {
     gap: clamp(6px, 1vw, 12px);
     margin-left: 0;
     padding-left: clamp(8px, 1vw, 16px);
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 1px solid rgba(141, 156, 179, 0.22);
     order: 1;
 }
 
@@ -1045,9 +1063,9 @@ header nav button:hover {
 .lyrics-panel {
     transform: translateX(100%);
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    background: linear-gradient(to left, rgba(10, 10, 10, 0.95) 0%, rgba(17, 17, 17, 0.95) 100%);
-    border-left: 1px solid rgba(255, 255, 255, 0.09);
-    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5), -1px 0 0 var(--player-accent-soft);
+    background: linear-gradient(to left, rgba(22, 29, 38, 0.95) 0%, rgba(19, 25, 33, 0.95) 100%);
+    border-left: 1px solid rgba(141, 156, 179, 0.2);
+    box-shadow: -14px 0 28px rgba(8, 12, 18, 0.42), -1px 0 0 color-mix(in srgb, var(--player-accent) 24%, #2f3a4b);
     contain: layout style;
 }
 
@@ -1124,20 +1142,34 @@ header nav button:hover {
     align-items: center;
     gap: 16px;
     padding: 14px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    transition: background 0.2s, border-color 0.2s, transform 0.2s;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+    border: 0;
+    border-bottom: 1px solid rgba(156, 160, 168, 0.14);
+    border-radius: 0;
+    transition: background-color 0.3s ease, border-color 0.2s, transform 0.2s;
+    background: rgba(22, 24, 30, 0.52);
+    backdrop-filter: blur(2px);
 }
 
 .chart-row:hover {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-    border-color: rgba(255, 255, 255, 0.14);
+    background-color: color-mix(in srgb, var(--page-accent-soft) 52%, rgba(84, 86, 92, 0.2));
+    border-color: rgba(156, 160, 168, 0.2);
     transform: translateY(-1px);
 }
 
 .chart-row:last-child {
     margin-bottom: 0;
+    border-bottom: none;
+}
+
+#chart-list {
+    border: 1px solid rgba(156, 160, 168, 0.16);
+    border-radius: 12px;
+    overflow: hidden;
+    background: rgba(16, 18, 23, 0.38);
+}
+
+#chart-list> :not([hidden])~ :not([hidden]) {
+    margin-top: 0 !important;
 }
 
 .chart-num {
@@ -1234,7 +1266,7 @@ input[type="range"] {
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(141, 153, 176, 0.22);
     height: 4px;
     border-radius: 2px;
 }
@@ -1242,7 +1274,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     margin-top: -4px;
-    background-color: #fff;
+    background-color: #f8fbff;
     height: 10px;
     width: 10px;
     border-radius: 50%;
