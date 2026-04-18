@@ -14,11 +14,11 @@
 
         // ============================================================
         // ============================================================
-        const SUPABASE_URL = 'https://momcakikuivtvxkmgjhx.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I';
+        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
         const DEFAULT_COLOR = { hex: 'rgb(103, 114, 131)', glow: 'rgba(103, 114, 131, 0.32)', soft: 'rgba(103, 114, 131, 0.18)' };
-        const SHOW_NEW_RELEASE_PROMO = true;
-        const NEW_RELEASE_PROMO_ID = 'p-team';
+        const SHOW_NEW_RELEASE_PROMO = import.meta.env.VITE_SHOW_NEW_RELEASE_PROMO === 'true';
+        const NEW_RELEASE_PROMO_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'p-team';
 
         // ============================================================
         // ============================================================
@@ -1660,7 +1660,7 @@
                 state.colorThief = new ColorThief();
             }
 
-            if (window.supabase) {
+            if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
                 state.db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             }
 

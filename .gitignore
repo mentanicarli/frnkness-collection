@@ -2,5 +2,9 @@ node_modules/
 dist/
 .vite/
 
+# Environment variables
+.env.local
+.env.*.local
+
 # local migration temp artifacts
 *_temp.txt

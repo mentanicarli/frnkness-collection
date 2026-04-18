@@ -53,6 +53,8 @@ https://mentanicarli.github.io/pupsiks-saga/
 Текущий стек:
 
 - Vue 3 - UI и реактивность
+- TypeScript - типизация и строгая проверка
+- Pinia - централизованное управление состоянием
 - Vite - сборка и dev-сервер
 - Tailwind CSS - стилизация
 - Supabase - backend для счетчика прослушиваний
@@ -64,6 +66,20 @@ https://mentanicarli.github.io/pupsiks-saga/
 ```text
 src/
 	App.vue
+	components/
+		AppHeader.vue
+		MainPages.vue
+		LyricsAndPlayers.vue
+	stores/
+		appStore.ts
+	utils/
+		helpers.ts
+		colors.ts
+		lyrics.ts
+		database.ts
+	types/
+		index.ts
+	main.ts
 	legacy/
 		app-core.js
 	assets/
@@ -72,12 +88,14 @@ src/
 public/
 	manifest.webmanifest
 
+.env.example
+tsconfig.json
+vite.config.ts
+
 audio/
 images/
 lyrics/
 lyrics-books/
-
-vite.config.js
 ```
 
 ## Быстрый старт
@@ -93,10 +111,13 @@ npm install
 npm run dev
 ```
 
+Создайте файл .env.local на основе .env.example перед запуском.
+
 ### Сборка
 
 ```bash
 npm run build
+npm run typecheck
 npm run preview
 ```
 
@@ -118,13 +139,11 @@ npm run preview
 - Проект не рассчитан на масштабирование
 - Нет системы авторизации
 - Supabase используется только для счетчика прослушиваний
-- Ключи Supabase находятся на клиенте (небезопасно для production)
 - Часть логики находится в legacy-слое
 
 ## Roadmap
 
-- Полная декомпозиция src/legacy/app-core.js на Vue-компоненты
-- Перенос конфигурации в .env
+- Полный перенос runtime-логики из legacy/app-core.js в typed Vue-модули
 - Кеширование аудио для оффлайн-режима
 - Улучшение архитектуры плеера
 - Оптимизация загрузки медиа
@@ -138,6 +157,13 @@ npm run preview
 
 Рекомендуется вынести URL и API KEY в переменные окружения (.env).
 
+Используется конфигурация через Vite env:
+
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_ANON_KEY
+- VITE_SHOW_NEW_RELEASE_PROMO
+- VITE_NEW_RELEASE_PROMO_ID
+
 ## История изменений
 
 ### v1.4
@@ -147,9 +173,10 @@ npm run preview
 - Новая метрика на странице альбомов: кол-во прослушиваний альбома (считается как сумма прослушиваний всех треков)
 - Добавлен режим «Поток» для непрерывного случайного воспроизведения
 
+
 ### v1.3
 
-- Полная миграция проекта с чистого HTML на Vue + Vite
+- Полная миграция проекта с чистого HTML на Vue
 - Второй пакет обновления дизайна
 - Добавлена карточка "Последний релиз"
 
