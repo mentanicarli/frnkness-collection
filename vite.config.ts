@@ -18,6 +18,17 @@ function resolveGithubPagesBase(): string {
 export default defineConfig(() => ({
     plugins: [vue()],
     base: process.env.GITHUB_ACTIONS ? resolveGithubPagesBase() : '/',
+    build: {
+        target: 'es2020',
+        cssCodeSplit: true,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    framework: ['vue', 'pinia']
+                }
+            }
+        }
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),

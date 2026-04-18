@@ -1,4 +1,4 @@
-﻿export function initLegacyApp() {
+export function initLegacyApp(deps = {}) {
     if (window.__legacyAppInitialized) return;
     window.__legacyAppInitialized = true;
 
@@ -14,128 +14,88 @@
 
         // ============================================================
         // ============================================================
-        const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-        const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-        const DEFAULT_COLOR = { hex: 'rgb(103, 114, 131)', glow: 'rgba(103, 114, 131, 0.32)', soft: 'rgba(103, 114, 131, 0.18)' };
-        const SHOW_NEW_RELEASE_PROMO = import.meta.env.VITE_SHOW_NEW_RELEASE_PROMO === 'true';
-        const NEW_RELEASE_PROMO_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'p-team';
+        const {
+            config = {},
+            shared = {},
+            utils = {}
+        } = deps;
 
-        // ============================================================
-        // ============================================================
-        const releases = {
-            'most-venture-poopsicks': {
-                type: 'album',
-                title: 'Most Venture Poopsicks / Last Over V',
-                year: '2025',
-                cover: 'images/album1-cover.jpg',
-                audioPath: 'audio/album1/',
-                lyricsPath: 'lyrics/album1/',
-                lyricsBookPath: 'lyrics-books/album1-lyrics.pdf',
-                tracks: [
-                    { num: 1, title: 'POOPSICKS', file: 'poopsicks.mp3', lyricsFile: '01-poopsicks.txt' },
-                    { num: 2, title: 'BACK TO POOPSICKS 2', file: 'back-to-poopsicks-2.mp3', lyricsFile: '02-back-to-poopsicks-2.txt' },
-                    { num: 3, title: 'Macan-Walker', file: 'macan-walker.mp3', lyricsFile: '03-macan-walker.txt' },
-                    { num: 4, title: 'BORDOVIY SALON', file: 'bordoviy-salon.mp3', lyricsFile: '04-bordoviy-salon.txt' },
-                    { num: 5, title: 'Classica Ryazanki / Lost Memory (ft. twizzyRRich)', file: 'classica-ryazanki.mp3', lyricsFile: '05-classica-ryazanki.txt' }
-                ]
+        const {
+            SUPABASE_URL = '',
+            SUPABASE_ANON_KEY = '',
+            SHOW_NEW_RELEASE_PROMO = false,
+            NEW_RELEASE_PROMO_ID = '',
+            releases = {}
+        } = config;
+
+        const {
+            DEFAULT_COLOR = { hex: 'rgb(103, 114, 131)', glow: 'rgba(103, 114, 131, 0.32)', soft: 'rgba(103, 114, 131, 0.18)' },
+            runtimeState = {},
+            runtimeCaches = {}
+        } = shared;
+
+        const {
+            formatTime = (seconds) => {
+                if (isNaN(seconds)) return '0:00';
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
             },
-            'disinvolto': {
-                type: 'single',
-                title: 'Disinvolto: Danilovsky',
-                year: '2025',
-                cover: 'images/single1-cover.jpg',
-                audioPath: 'audio/singles/',
-                lyricsPath: 'lyrics/singles/',
-                lyricsBookPath: 'lyrics-books/disinvolto-lyrics.pdf',
-                videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-                tracks: [{ num: 1, title: 'Disinvolto: Danilovsky', file: 'disinvolto.mp3', lyricsFile: 'disinvolto.txt' }]
+            throttle = (func, limit) => {
+                let inThrottle;
+                return function (...args) {
+                    if (!inThrottle) {
+                        func.apply(this, args);
+                        inThrottle = true;
+                        setTimeout(() => inThrottle = false, limit);
+                    }
+                };
             },
-            'six-senses-pupsiks': {
-                type: 'album',
-                title: 'Six Senses of Pupsiks',
-                year: '2025',
-                cover: 'images/album2-cover.jpg',
-                audioPath: 'audio/album2/',
-                lyricsPath: 'lyrics/album2/',
-                lyricsBookPath: 'lyrics-books/album2-lyrics.pdf',
-                tracks: [
-                    { num: 1, title: "still ballin'", file: 'still-ballin.mp3', lyricsFile: '01-still-ballin.txt' },
-                    { num: 2, title: "Hulk's Reflections", file: 'hulks-reflections.mp3', lyricsFile: '02-hulks-reflections.txt' },
-                    { num: 3, title: 'World Most Monkey', file: 'world-most-monkey.mp3', lyricsFile: '03-world-most-monkey.txt' },
-                    { num: 4, title: 'Young, Fresh and Tatarin', file: 'young-fresh-tatarin.mp3', lyricsFile: '04-young-fresh-tatarin.txt' },
-                    { num: 5, title: 'ПАПА', file: 'papa.mp3', lyricsFile: '05-papa.txt' },
-                    { num: 6, title: 'monologue about the daily routine', file: 'monologue.mp3', lyricsFile: '06-monologue.txt' }
-                ]
+            debounce = (func, delay) => {
+                let timer;
+                return function (...args) {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => func.apply(this, args), delay);
+                };
             },
-            'nypupsoids': {
-                type: 'single',
-                title: 'nypupsoids',
-                year: '2025',
-                cover: 'images/single2-cover.jpg',
-                audioPath: 'audio/singles/',
-                lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: 'nypupsoids', file: 'nypupsoids.mp3', lyricsFile: 'nypupsoids.txt' }]
+            parseLRC = (text) => {
+                return text.split('\n').map(line => {
+                    const m = line.match(/\[(\d{2}):(\d{2})(?:\.|:)(\d{2})?\](.*)/);
+                    if (m) {
+                        return {
+                            time: parseInt(m[1]) * 60 + parseInt(m[2]) + (m[3] ? parseInt(m[3]) / 100 : 0),
+                            text: m[4] || ''
+                        };
+                    }
+                    return null;
+                }).filter(Boolean).sort((a, b) => a.time - b.time);
             },
-            'thermoland': {
-                type: 'single',
-                title: 'thermoland',
-                year: '2026',
-                cover: 'images/single3-cover.jpg',
-                audioPath: 'audio/singles/',
-                lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: 'thermoland', file: 'thermoland.mp3', lyricsFile: 'thermoland.txt' }]
-            },
-            'boxik': {
-                type: 'single',
-                title: 'какой тебе боксик?',
-                year: '2026',
-                cover: 'images/single4-cover.jpg',
-                audioPath: 'audio/singles/',
-                lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: 'какой тебе боксик?', file: 'boxik.mp3', lyricsFile: 'boxik.txt' }]
-            },
-            'p-team': {
-                type: 'single',
-                title: 'P-Team',
-                year: '2026',
-                cover: 'images/single5-cover.jpg',
-                audioPath: 'audio/singles/',
-                lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: 'P-Team', file: 'p-team.mp3', lyricsFile: 'p-team.txt' }]
+            parseTrackKey = (key) => {
+                if (typeof key !== 'string') return null;
+                const legacyMatch = key.match(/^(.*)--(\d+)$/);
+                if (legacyMatch) {
+                    const releaseId = legacyMatch[1];
+                    const oneBased = parseInt(legacyMatch[2], 10);
+                    const trackIndex = oneBased - 1;
+                    if (Number.isInteger(trackIndex) && trackIndex >= 0) {
+                        return { releaseId, trackIndex };
+                    }
+                    return null;
+                }
+                const modernMatch = key.match(/^(.*)-(\d+)$/);
+                if (modernMatch) {
+                    const releaseId = modernMatch[1];
+                    const trackIndex = parseInt(modernMatch[2], 10);
+                    if (Number.isInteger(trackIndex) && trackIndex >= 0) {
+                        return { releaseId, trackIndex };
+                    }
+                }
+                return null;
             }
-        };
+        } = utils;
 
-        // ============================================================
-        // ============================================================
-        const state = {
-            currentRelease: null,
-            currentReleaseId: null,
-            currentTrackIndex: 0,
-            isPlaying: false,
-            trackCounted: false,
-            trackCountPending: false,
-            fsLyricsOpen: false,
-            currentCoverSlot: 'a',
-            animationInProgress: false,
-            parsedLyrics: [],
-            lyricsNodes: { regular: [], fullscreen: [] },
-            currentLyricIndex: -1,
-            flowModeActive: false,
-            lyricsMode: 'karaoke',
-            preferredLyricsMode: 'karaoke',
-            currentLyricsTrackIndex: null,
-            currentLyricsPlainText: '',
-            currentLyricsLrcRaw: '',
-            lyricsIndex: [],
-            lyricsIndexReady: false,
-            lyricsIndexPromise: null,
-            colorThief: null,
-            db: null
-        };
-
-        const colorCache = {};
-        const colorPromiseCache = {};
-        const releasePlayCountCache = {};
+        const state = runtimeState;
+        const { colorCache = {}, colorPromiseCache = {}, releasePlayCountCache = {} } = runtimeCaches;
 
         // ============================================================
         // ============================================================
@@ -145,41 +105,52 @@
          */
         const $ = id => document.getElementById(id);
 
-        /**
-         *Раздел
-         */
-        function formatTime(seconds) {
-            if (isNaN(seconds)) return '0:00';
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        /**
-         *Раздел
-         */
-        function throttle(func, limit) {
-            let inThrottle;
-            return function (...args) {
-                if (!inThrottle) {
-                    func.apply(this, args);
-                    inThrottle = true;
-                    setTimeout(() => inThrottle = false, limit);
-                }
-            };
-        }
-
-        function debounce(func, delay) {
-            let timer;
-            return function (...args) {
-                clearTimeout(timer);
-                timer = setTimeout(() => func.apply(this, args), delay);
-            };
-        }
-
         // ============================================================
         // ============================================================
         const dom = {};
+        const perf = {
+            lastProgressPercent: -1,
+            lastSecond: -1,
+            searchCache: new Map(),
+            preloadedAudio: new Set()
+        };
+
+        function runWhenIdle(fn) {
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(fn, { timeout: 800 });
+            } else {
+                setTimeout(fn, 16);
+            }
+        }
+
+        function preloadTrackMetadata(releaseId, trackIndex) {
+            const release = releases[releaseId];
+            const track = release && release.tracks[trackIndex];
+            if (!release || !track) return;
+
+            const src = release.audioPath + track.file;
+            if (perf.preloadedAudio.has(src)) return;
+            if (perf.preloadedAudio.size > 14) {
+                const oldest = perf.preloadedAudio.values().next().value;
+                if (oldest) perf.preloadedAudio.delete(oldest);
+            }
+
+            const probe = new Audio();
+            probe.preload = 'metadata';
+            probe.src = src;
+            perf.preloadedAudio.add(src);
+        }
+
+        function warmupVisibleReleaseAssets() {
+            runWhenIdle(() => {
+                const firstItems = Object.values(releases).slice(0, 5);
+                firstItems.forEach((release) => {
+                    const img = new Image();
+                    img.decoding = 'async';
+                    img.src = release.cover;
+                });
+            });
+        }
 
         function cacheDomElements() {
             dom.audio = $('audio-player');
@@ -527,7 +498,7 @@
                         <button class="release-card promo-release-card text-left rounded-xl p-5 transition-all group relative w-full" data-id="${NEW_RELEASE_PROMO_ID}" data-fixed-accent="true" onclick="App.openRelease('${NEW_RELEASE_PROMO_ID}')">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                                 <div class="w-full sm:w-44 aspect-square rounded-xl overflow-hidden bg-[var(--bg)] shadow-lg flex-shrink-0">
-                                    <img src="${promo.cover}" alt="${promo.title}" class="card-image w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+                                    <img src="${promo.cover}" alt="${promo.title}" class="card-image w-full h-full object-cover" loading="lazy" decoding="async" fetchpriority="low" onerror="this.style.display='none'">
                                 </div>
                                 <div class="flex-1 min-w-0 flex flex-col gap-4">
                                     <div class="promo-badge text-sm sm:text-[0.95rem]">последний релиз</div>
@@ -562,7 +533,7 @@
                 const card = `
                     <button class="release-card text-left rounded-xl p-4 transition-all group relative" data-id="${id}" onclick="App.openRelease('${id}')">
                         <div class="aspect-square rounded-lg overflow-hidden mb-4 bg-[var(--bg)] shadow-lg">
-                            <img src="${r.cover}" alt="${r.title}" class="card-image w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+                            <img src="${r.cover}" alt="${r.title}" class="card-image w-full h-full object-cover" loading="lazy" decoding="async" fetchpriority="low" onerror="this.style.display='none'">
                         </div>
                         <h3 class="font-semibold text-[var(--fg)] group-hover:text-[var(--card-accent)] transition-colors line-clamp-2 relative z-10">${r.title}</h3>
                         <p class="text-xs text-[var(--fg-muted)] mt-1 relative z-10">${meta} • ${r.year}</p>
@@ -693,11 +664,11 @@
 
             state.lyricsIndexPromise = (async () => {
                 const entries = [];
-                const jobs = [];
+                const tasks = [];
 
                 Object.entries(releases).forEach(([releaseId, release]) => {
                     release.tracks.forEach((track, trackIndex) => {
-                        jobs.push((async () => {
+                        tasks.push(async () => {
                             const { txt, lrc } = await fetchTrackLyrics(release, track);
                             if (txt) {
                                 txt.split('\n').forEach(line => {
@@ -730,11 +701,21 @@
                                     });
                                 });
                             }
-                        })());
+                        });
                     });
                 });
 
-                await Promise.all(jobs);
+                const concurrency = 4;
+                let pointer = 0;
+                const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+                    while (pointer < tasks.length) {
+                        const taskIndex = pointer;
+                        pointer += 1;
+                        await tasks[taskIndex]();
+                    }
+                });
+
+                await Promise.all(workers);
                 state.lyricsIndex = entries;
                 state.lyricsIndexReady = true;
             })();
@@ -749,6 +730,10 @@
         function searchCatalog(query) {
             const normalized = normalizeSearchText(query);
             if (!normalized) return [];
+
+            const cacheKey = `${normalized}|${state.lyricsIndexReady ? 1 : 0}|${state.lyricsIndex.length}`;
+            const cached = perf.searchCache.get(cacheKey);
+            if (cached) return cached;
 
             const results = [];
 
@@ -790,7 +775,14 @@
                     });
             }
 
-            return results.slice(0, 40);
+            const output = results.slice(0, 28);
+            perf.searchCache.set(cacheKey, output);
+            if (perf.searchCache.size > 45) {
+                const firstKey = perf.searchCache.keys().next().value;
+                perf.searchCache.delete(firstKey);
+            }
+
+            return output;
         }
 
         function handleSearchInput(value) {
@@ -800,6 +792,7 @@
 
             if (!query || state.lyricsIndexReady || state.lyricsIndexPromise) return;
             ensureLyricsIndex().then(() => {
+                perf.searchCache.clear();
                 if (!dom.searchInput) return;
                 const freshQuery = normalizeSearchText(dom.searchInput.value);
                 if (!freshQuery) return;
@@ -919,29 +912,6 @@
             playTrackByRef(nextRef.releaseId, nextRef.trackIndex, direction);
         }
 
-        function parseTrackKey(key) {
-            if (typeof key !== 'string') return null;
-            const legacyMatch = key.match(/^(.*)--(\d+)$/);
-            if (legacyMatch) {
-                const releaseId = legacyMatch[1];
-                const oneBased = parseInt(legacyMatch[2], 10);
-                const trackIndex = oneBased - 1;
-                if (Number.isInteger(trackIndex) && trackIndex >= 0) {
-                    return { releaseId, trackIndex };
-                }
-                return null;
-            }
-            const modernMatch = key.match(/^(.*)-(\d+)$/);
-            if (modernMatch) {
-                const releaseId = modernMatch[1];
-                const trackIndex = parseInt(modernMatch[2], 10);
-                if (Number.isInteger(trackIndex) && trackIndex >= 0) {
-                    return { releaseId, trackIndex };
-                }
-            }
-            return null;
-        }
-
         async function getReleasePlayCount(releaseId) {
             const release = releases[releaseId];
             if (!release || release.type !== 'album') return 0;
@@ -980,7 +950,7 @@
             updatePageAccent(r.cover);
 
             if (dom.releaseCover) {
-                dom.releaseCover.innerHTML = `<img src="${r.cover}" alt="${r.title}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full bg-[var(--bg-card)] flex items-center justify-center\\'><span class=\\'text-[var(--fg-muted)]\\'>Нет обложки</span></div>'">`;
+                dom.releaseCover.innerHTML = `<img src="${r.cover}" alt="${r.title}" class="w-full h-full object-cover" loading="eager" fetchpriority="high" decoding="async" onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full bg-[var(--bg-card)] flex items-center justify-center\\'><span class=\\'text-[var(--fg-muted)]\\'>Нет обложки</span></div>'">`;
             }
             if (dom.releaseTitle) dom.releaseTitle.textContent = r.title;
             if (dom.releaseMeta) dom.releaseMeta.textContent = `${r.type === 'album' ? 'Альбом' : 'Сингл'} • ${r.year}`;
@@ -1070,7 +1040,7 @@
             if (dom.playerTrack) dom.playerTrack.textContent = track.title;
 
             dom.playerCover.innerHTML = `
-                <img src="${state.currentRelease.cover}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+                <img src="${state.currentRelease.cover}" class="w-full h-full object-cover" loading="eager" fetchpriority="high" decoding="async" onerror="this.style.display='none'">
                 <div class="cover-overlay">
                     <button onclick="event.stopPropagation(); App.openFsPlayer()" class="fullscreen-trigger-btn" aria-label="Открыть на весь экран">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1093,6 +1063,11 @@
             updatePlayerAccent(state.currentRelease.cover);
             updatePageAccent(state.currentRelease.cover);
             updateFlowButtonState();
+
+            if (state.currentReleaseId) {
+                const nextIndex = (index + 1) % state.currentRelease.tracks.length;
+                preloadTrackMetadata(state.currentReleaseId, nextIndex);
+            }
 
             dom.audio.play().then(() => {
                 state.isPlaying = true;
@@ -1270,15 +1245,26 @@
         function setupAudioEvents() {
             dom.audio.addEventListener('timeupdate', () => {
                 if (!dom.audio.duration) return;
-                const progress = (dom.audio.currentTime / dom.audio.duration) * 100;
-                if (dom.progress) dom.progress.style.width = progress + '%';
-                if (dom.fsProgress) dom.fsProgress.style.width = progress + '%';
-                const cur = formatTime(dom.audio.currentTime);
-                if ($('time-current')) $('time-current').textContent = cur;
-                if (dom.fsTimeCurrent) dom.fsTimeCurrent.textContent = cur;
+                const currentTime = dom.audio.currentTime;
+                const progress = (currentTime / dom.audio.duration) * 100;
+                const roundedProgress = Math.round(progress * 5) / 5;
+                if (roundedProgress !== perf.lastProgressPercent) {
+                    perf.lastProgressPercent = roundedProgress;
+                    if (dom.progress) dom.progress.style.width = roundedProgress + '%';
+                    if (dom.fsProgress) dom.fsProgress.style.width = roundedProgress + '%';
+                }
+
+                const currentSecond = Math.floor(currentTime);
+                if (currentSecond !== perf.lastSecond) {
+                    perf.lastSecond = currentSecond;
+                    const cur = formatTime(currentTime);
+                    if ($('time-current')) $('time-current').textContent = cur;
+                    if (dom.fsTimeCurrent) dom.fsTimeCurrent.textContent = cur;
+                }
+
                 updateKaraoke();
                 const threshold = Math.min(30, Math.max(10, dom.audio.duration * 0.5));
-                if (dom.audio.currentTime >= threshold && !state.trackCounted && !state.trackCountPending) {
+                if (currentTime >= threshold && !state.trackCounted && !state.trackCountPending) {
                     incrementPlayCount();
                 }
             });
@@ -1363,7 +1349,7 @@
                 : tracks.map((t, i) => `
                     <div class="chart-row cursor-pointer group" onclick="App.playChart('${t.releaseId}', ${t.trackIndex})">
                         <div class="chart-num ${i < 3 ? `top-${i + 1}` : ''}">${i + 1}</div>
-                        <div class="chart-cover"><img src="${t.cover}" alt="" loading="lazy"></div>
+                        <div class="chart-cover"><img src="${t.cover}" alt="" loading="lazy" decoding="async" fetchpriority="low"></div>
                         <div class="chart-info"><div class="chart-title">${t.title}</div><div class="chart-artist">frnk ness</div></div>
                         <div class="chart-plays"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>${t.plays}</div>
                     </div>
@@ -1380,25 +1366,54 @@
 
         function updateKaraoke() {
             if (state.lyricsMode !== 'karaoke' || !state.parsedLyrics.length) return;
-            let newIndex = -1;
-            for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
-                if (dom.audio.currentTime >= state.parsedLyrics[i].time) {
-                    newIndex = i;
-                    break;
+
+            const currentTime = dom.audio.currentTime;
+            let newIndex = state.currentLyricIndex;
+
+            if (newIndex === -1) {
+                for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
+                    if (currentTime >= state.parsedLyrics[i].time) {
+                        newIndex = i;
+                        break;
+                    }
                 }
+            } else {
+                while (newIndex + 1 < state.parsedLyrics.length && currentTime >= state.parsedLyrics[newIndex + 1].time) {
+                    newIndex += 1;
+                }
+
+                while (newIndex > 0 && currentTime < state.parsedLyrics[newIndex].time) {
+                    newIndex -= 1;
+                }
+
+                if (currentTime < state.parsedLyrics[0].time) newIndex = -1;
             }
+
             if (newIndex !== state.currentLyricIndex) {
+                const prevIndex = state.currentLyricIndex;
                 state.currentLyricIndex = newIndex;
                 [
                     { container: dom.lyricsContent, lines: state.lyricsNodes.regular },
                     { container: dom.fsLyricsBody, lines: state.lyricsNodes.fullscreen }
                 ].forEach(({ container, lines }) => {
                     if (!container || !lines.length) return;
-                    lines.forEach(el => el.classList.remove('active'));
+                    if (prevIndex !== -1 && lines[prevIndex]) {
+                        lines[prevIndex].classList.remove('active');
+                    }
                     if (newIndex !== -1 && lines[newIndex]) {
                         const active = lines[newIndex];
                         active.classList.add('active');
-                        container.scrollTop = active.offsetTop - (container.clientHeight / 2) + (active.clientHeight / 2);
+                        const targetTop = active.offsetTop - (container.clientHeight / 2) + (active.clientHeight / 2);
+                        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+                        const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
+                        const distance = Math.abs(container.scrollTop - clampedTop);
+
+                        if (distance > 6) {
+                            container.scrollTo({
+                                top: clampedTop,
+                                behavior: distance > 140 ? 'smooth' : 'auto'
+                            });
+                        }
                     }
                 });
             }
@@ -1543,19 +1558,6 @@
             renderLyricsByMode();
         }
 
-        function parseLRC(text) {
-            return text.split('\n').map(line => {
-                const m = line.match(/\[(\d{2}):(\d{2})(?:\.|:)(\d{2})?\](.*)/);
-                if (m) {
-                    return {
-                        time: parseInt(m[1]) * 60 + parseInt(m[2]) + (m[3] ? parseInt(m[3]) / 100 : 0),
-                        text: m[4] || ''
-                    };
-                }
-                return null;
-            }).filter(Boolean).sort((a, b) => a.time - b.time);
-        }
-
         function seekTo(time) {
             if (dom.audio.duration) {
                 dom.audio.currentTime = time;
@@ -1672,6 +1674,7 @@
             setupAudioEvents();
             setupVolumeControls();
             initParticles();
+            warmupVisibleReleaseAssets();
         }
 
         if (document.readyState === 'loading') {

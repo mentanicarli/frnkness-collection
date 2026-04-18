@@ -3,5 +3,5 @@
  * These will be gradually replaced by TypeScript modules
  */
 
-export function initLegacyApp(): void
+export function initLegacyApp(deps?: any): void
 export const App: any

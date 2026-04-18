@@ -1,54 +1,43 @@
 import { defineStore } from 'pinia'
-import { ref, reactive } from 'vue'
-import type { Release, LyricLine, ColorSet } from '@/types'
-
-const DEFAULT_COLOR: ColorSet = {
-    hex: 'rgb(103, 114, 131)',
-    glow: 'rgba(103, 114, 131, 0.32)',
-    soft: 'rgba(103, 114, 131, 0.18)'
-}
+import { ref, toRef } from 'vue'
+import type { ColorSet } from '@/types'
+import { DEFAULT_COLOR, runtimeCaches, runtimeState } from '@/runtime/sharedState'
 
 export const useAppStore = defineStore('app', () => {
-    // State
-    const currentRelease = ref<Release | null>(null)
-    const currentReleaseId = ref<string | null>(null)
-    const currentTrackIndex = ref(0)
-    const isPlaying = ref(false)
-    const trackCounted = ref(false)
-    const trackCountPending = ref(false)
-    const fsLyricsOpen = ref(false)
-    const currentCoverSlot = ref<'a' | 'b'>('a')
-    const animationInProgress = ref(false)
+    // Shared runtime state (single source of truth)
+    const currentRelease = toRef(runtimeState, 'currentRelease')
+    const currentReleaseId = toRef(runtimeState, 'currentReleaseId')
+    const currentTrackIndex = toRef(runtimeState, 'currentTrackIndex')
+    const isPlaying = toRef(runtimeState, 'isPlaying')
+    const trackCounted = toRef(runtimeState, 'trackCounted')
+    const trackCountPending = toRef(runtimeState, 'trackCountPending')
+    const fsLyricsOpen = toRef(runtimeState, 'fsLyricsOpen')
+    const currentCoverSlot = toRef(runtimeState, 'currentCoverSlot')
+    const animationInProgress = toRef(runtimeState, 'animationInProgress')
+    const parsedLyrics = toRef(runtimeState, 'parsedLyrics')
+    const currentLyricIndex = toRef(runtimeState, 'currentLyricIndex')
+    const lyricsMode = toRef(runtimeState, 'lyricsMode')
+    const preferredLyricsMode = toRef(runtimeState, 'preferredLyricsMode')
+    const currentLyricsTrackIndex = toRef(runtimeState, 'currentLyricsTrackIndex')
+    const currentLyricsPlainText = toRef(runtimeState, 'currentLyricsPlainText')
+    const currentLyricsLrcRaw = toRef(runtimeState, 'currentLyricsLrcRaw')
+    const lyricsIndexReady = toRef(runtimeState, 'lyricsIndexReady')
+    const lyricsIndex = toRef(runtimeState, 'lyricsIndex')
+    const flowModeActive = toRef(runtimeState, 'flowModeActive')
+    const searchOpen = toRef(runtimeState, 'searchOpen')
 
-    // Lyrics state
-    const parsedLyrics = ref<LyricLine[]>([])
-    const currentLyricIndex = ref(-1)
-    const lyricsMode = ref<'text' | 'karaoke'>('karaoke')
-    const preferredLyricsMode = ref<'text' | 'karaoke'>('karaoke')
-    const currentLyricsTrackIndex = ref<number | null>(null)
-    const currentLyricsPlainText = ref('')
-    const currentLyricsLrcRaw = ref('')
-    const lyricsIndexReady = ref(false)
-    const lyricsIndex = ref<any[]>([])
-
-    // Flow mode
-    const flowModeActive = ref(false)
-
-    // Search
-    const searchOpen = ref(false)
-
-    // Caching
-    const colorCache = reactive<Record<string, [number, number, number]>>({})
-    const colorPromiseCache = reactive<Record<string, Promise<[number, number, number]>>>({})
-    const releasePlayCountCache = reactive<Record<string, number>>({})
+    // Shared caches
+    const colorCache = runtimeCaches.colorCache
+    const colorPromiseCache = runtimeCaches.colorPromiseCache
+    const releasePlayCountCache = runtimeCaches.releasePlayCountCache
 
     // UI state
     const pageAccentColor = ref(DEFAULT_COLOR)
     const playerAccentColor = ref(DEFAULT_COLOR)
 
     // Supabase client
-    const dbClient = ref<any>(null)
-    const colorThief = ref<any>(null)
+    const dbClient = toRef(runtimeState, 'db')
+    const colorThief = toRef(runtimeState, 'colorThief')
 
     // Setters
     const setCurrentTrack = (releaseId: string, trackIndex: number) => {
