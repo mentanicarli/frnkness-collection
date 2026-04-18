@@ -11,8 +11,16 @@
                     ness collection</span>
             </button>
             <nav class="hidden sm:flex items-center gap-4 text-sm text-[var(--fg-muted)]">
+                <button id="search-toggle-btn"
+                    class="chart-btn header-animated-btn flex items-center justify-center px-3.5 py-2.5 rounded-full hover:scale-105 transition-all duration-300"
+                    aria-label="Поиск">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
                 <button onclick="App.showPage('chart')"
-                    class="chart-btn flex items-center gap-2 px-6 py-2.5 text-sm tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300">
+                    class="chart-btn header-animated-btn flex items-center gap-2 px-6 py-2.5 text-sm tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="20" x2="18" y2="10"></line>
                         <line x1="12" y1="20" x2="12" y2="4"></line>
@@ -22,7 +30,21 @@
                 </button>
             </nav>
         </div>
+        <div id="header-search-panel" class="header-search-panel">
+            <div class="header-search-inner">
+                <div class="header-search-input-wrap">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="7"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input id="global-search" type="search" placeholder="Искать трек, альбом или строку из текста..." aria-label="Глобальный поиск">
+                </div>
+                <div id="search-results" class="header-search-results"></div>
+            </div>
+        </div>
     </header>
+
+    <div id="search-backdrop" class="search-backdrop" onclick="App.toggleSearchPanel(false)"></div>
 
     <main class="min-h-screen relative z-10">
         <!-- Главная страница -->
@@ -32,6 +54,18 @@
                     <h1 class="hero-title mb-6">Pupsiks Saga</h1>
                     <p class="text-[var(--fg-muted)] text-lg max-w-xl leading-relaxed">Полная коллекция релизов frnk
                         ness про компанию Пупсиков. Альбомы, синглы и тексты песен в одном месте.</p>
+                    <div class="mt-8 flex flex-wrap items-center gap-3">
+                        <button id="flow-mode-btn" onclick="App.toggleFlowMode()"
+                            class="chart-btn flow-btn flex items-center gap-2 px-7 py-3 text-base tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300 shadow-lg shadow-black/30"
+                            aria-pressed="false" aria-label="Включить поток">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 7h6m0 0L7 4m3 3L7 10" />
+                                <path d="M20 17h-6m0 0 3-3m-3 3 3 3" />
+                                <path d="M4 17c3.5 0 5.5-3 8-7s4.5-7 8-7" />
+                            </svg>
+                            <span id="flow-mode-label">Поток</span>
+                        </button>
+                    </div>
                 </section>
                 <section id="home-promo" class="mb-10 stagger-item"></section>
                 <section class="mb-16 stagger-item" style="animation-delay: 0.1s;">
@@ -42,9 +76,9 @@
                     <h2 class="text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-8">Синглы</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="singles-grid"></div>
                 </section>
-                <section class="mt-4 pb-0 text-center stagger-item" style="animation-delay: 0.25s;">
+                <section class="mt-2 pb-0 text-center stagger-item" style="animation-delay: 0.25s;">
                     <p class="text-[10px] sm:text-xs text-[var(--fg-muted)]/30 leading-relaxed">
-                        Версия: v1.3 • Разработчик: mentanicarli
+                        Версия: v1.4
                     </p>
                 </section>
             </div>
@@ -89,6 +123,7 @@
                         <p class="text-[var(--page-accent)] text-sm font-medium mb-4 tracking-wide lowercase">frnk ness
                         </p>
                         <p id="release-meta" class="text-sm text-[var(--fg-muted)] tracking-wide"></p>
+                        <p id="release-plays" class="hidden text-sm text-[var(--fg-muted)] tracking-wide mt-2"></p>
                         <div id="download-container" class="mt-6 hidden">
                             <a id="download-lyrics-btn" href="#" download
                                 class="inline-flex items-center gap-2 text-xs tracking-widest uppercase text-[var(--page-accent)] hover:text-black hover:bg-[var(--page-accent)] border border-[var(--page-accent)]/40 rounded-full px-5 py-2.5 transition-all duration-300 group">
@@ -135,6 +170,10 @@
             <div>
                 <h4 id="lyrics-track-title" class="font-semibold text-lg"></h4>
                 <p class="text-sm text-[var(--fg-muted)]">frnk ness</p>
+            </div>
+            <div id="lyrics-mode-switch" class="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 mr-2">
+                <button onclick="App.setLyricsMode('text')" id="lyrics-mode-text" class="px-3 py-1 text-[11px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Обычный текст">Текст</button>
+                <button onclick="App.setLyricsMode('karaoke')" id="lyrics-mode-karaoke" class="px-3 py-1 text-[11px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Караоке">Караоке</button>
             </div>
             <button onclick="App.closeLyrics()"
                 class="flex items-center justify-center w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full text-sm transition-colors"
@@ -185,6 +224,10 @@
                     <div>
                         <h4 id="fs-lyrics-title" class="font-semibold text-sm">Текст песни</h4>
                         <p class="text-xs text-[var(--fg-muted)]">frnk ness</p>
+                    </div>
+                    <div id="fs-lyrics-mode-switch" class="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 mr-2">
+                        <button onclick="App.setLyricsMode('text')" id="fs-lyrics-mode-text" class="px-2.5 py-1 text-[10px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Обычный текст">Текст</button>
+                        <button onclick="App.setLyricsMode('karaoke')" id="fs-lyrics-mode-karaoke" class="px-2.5 py-1 text-[10px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Караоке">Караоке</button>
                     </div>
                     <button onclick="App.toggleFsLyrics()"
                         class="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors">

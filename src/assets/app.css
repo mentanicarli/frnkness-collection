@@ -238,6 +238,214 @@ header>div {
     box-shadow: 0 0 0 1px rgba(120, 127, 140, 0.34), 0 10px 22px rgba(6, 8, 12, 0.46) !important;
 }
 
+#search-toggle-btn.active {
+    border-color: rgba(198, 207, 221, 0.42) !important;
+    box-shadow: 0 0 0 1px rgba(136, 145, 161, 0.34), 0 10px 22px rgba(6, 8, 12, 0.5), 0 0 20px var(--page-accent-soft) !important;
+}
+
+.header-animated-btn {
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+}
+
+.header-animated-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.11) 18%, transparent 36%);
+    transform: translateX(-140%) skewX(-18deg);
+    transition: transform 0.75s ease;
+    pointer-events: none;
+}
+
+.header-animated-btn::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, var(--page-accent-soft), transparent 68%);
+    opacity: 0.62;
+    filter: blur(11px);
+    z-index: -1;
+    pointer-events: none;
+    animation: flowGlow 4.8s ease-in-out infinite;
+}
+
+.header-animated-btn:hover::before {
+    transform: translateX(140%) skewX(-18deg);
+}
+
+.header-animated-btn.active {
+    animation: flowActivePulse 1.8s ease-in-out infinite;
+}
+
+#flow-mode-btn.active {
+    border-color: rgba(198, 207, 221, 0.42) !important;
+    box-shadow: 0 0 0 1px rgba(136, 145, 161, 0.34), 0 10px 22px rgba(6, 8, 12, 0.5), 0 0 20px var(--page-accent-soft) !important;
+    animation: flowActivePulse 1.8s ease-in-out infinite;
+}
+
+#flow-mode-btn {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(41, 45, 53, 0.92), rgba(24, 28, 35, 0.95)) !important;
+    color: rgba(242, 246, 251, 0.98) !important;
+    border: 1px solid rgba(169, 178, 194, 0.3) !important;
+    box-shadow: 0 10px 22px rgba(4, 6, 10, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.03) inset !important;
+    transform: translateZ(0);
+}
+
+.flow-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.12) 18%, transparent 36%);
+    transform: translateX(-140%) skewX(-18deg);
+    transition: transform 0.75s ease;
+    pointer-events: none;
+}
+
+.flow-btn::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: radial-gradient(circle at center, var(--page-accent-soft), transparent 68%);
+    opacity: 0.75;
+    filter: blur(12px);
+    z-index: -1;
+    pointer-events: none;
+    animation: flowGlow 4.5s ease-in-out infinite;
+}
+
+.flow-btn:hover::before {
+    transform: translateX(140%) skewX(-18deg);
+}
+
+#flow-mode-btn:hover {
+    border-color: rgba(211, 219, 231, 0.42) !important;
+    box-shadow: 0 14px 26px rgba(4, 6, 10, 0.54), 0 0 0 1px rgba(255, 255, 255, 0.04) inset, 0 0 18px var(--page-accent-soft) !important;
+}
+
+.flow-btn.active::after {
+    opacity: 0.95;
+    animation-duration: 2.6s;
+}
+
+@keyframes flowGlow {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.55;
+    }
+
+    50% {
+        transform: scale(1.06);
+        opacity: 0.85;
+    }
+}
+
+@keyframes flowActivePulse {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-1px) scale(1.01);
+    }
+}
+
+.header-search-panel {
+    position: absolute;
+    left: clamp(12px, 3vw, 48px);
+    right: clamp(12px, 3vw, 48px);
+    top: calc(100% + 10px);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px) scale(0.98);
+    transform-origin: top right;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s;
+    pointer-events: none;
+    z-index: 60;
+}
+
+.header-search-panel.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.search-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 12, 0.28);
+    backdrop-filter: blur(3.5px) saturate(115%);
+    -webkit-backdrop-filter: blur(3.5px) saturate(115%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    z-index: 35;
+}
+
+.search-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.header-search-inner {
+    background: linear-gradient(150deg, rgba(17, 20, 26, 0.96) 0%, rgba(13, 16, 22, 0.98) 100%);
+    border: 1px solid rgba(145, 153, 169, 0.24);
+    border-radius: 16px;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(96, 104, 118, 0.24);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    padding: 12px;
+}
+
+.header-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(145, 153, 169, 0.2);
+    border-radius: 12px;
+    background: rgba(25, 29, 37, 0.75);
+    color: var(--fg-muted);
+    padding: 0 12px;
+}
+
+.header-search-input-wrap:focus-within {
+    border-color: color-mix(in srgb, var(--page-accent) 64%, #98a5bd);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--page-accent-soft) 45%, transparent);
+}
+
+#global-search {
+    width: 100%;
+    height: 42px;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--fg);
+    font-size: 14px;
+}
+
+#global-search::placeholder {
+    color: color-mix(in srgb, var(--fg-muted) 88%, #8894a7);
+}
+
+.header-search-results {
+    margin-top: 10px;
+    max-height: min(56vh, 460px);
+    overflow-y: auto;
+    padding-right: 2px;
+}
+
 header::after {
     content: '';
     position: absolute;
@@ -520,11 +728,11 @@ header nav button:hover {
 .player {
     transform: translateY(calc(100% + 10px));
     transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    background: linear-gradient(to top, rgba(21, 27, 36, 0.97), rgba(21, 27, 36, 0.86));
+    background: linear-gradient(180deg, rgba(11, 13, 18, 0.98) 0%, rgba(8, 10, 14, 0.97) 100%);
     backdrop-filter: blur(34px);
     -webkit-backdrop-filter: blur(34px);
-    border-top: 1px solid rgba(141, 156, 179, 0.18);
-    box-shadow: 0 -12px 24px rgba(7, 11, 17, 0.45), 0 -1px 0 color-mix(in srgb, var(--player-accent) 28%, #2d3848);
+    border-top: 1px solid rgba(130, 144, 166, 0.2);
+    box-shadow: 0 -14px 30px rgba(3, 5, 9, 0.7), 0 -1px 0 rgba(115, 129, 150, 0.22), 0 0 0 1px rgba(60, 68, 82, 0.3);
     contain: layout style;
     padding-bottom: var(--safe-bottom);
 }
@@ -540,7 +748,7 @@ header nav button:hover {
 .progress-container {
     position: relative;
     height: 4px;
-    background: rgba(141, 153, 176, 0.26);
+    background: rgba(78, 89, 109, 0.45);
     cursor: pointer;
     overflow: visible;
     top: -2px;
@@ -551,7 +759,7 @@ header nav button:hover {
     background: var(--player-accent);
     position: relative;
     transition: width 0.1s linear, background-color 0.5s ease;
-    box-shadow: 0 0 16px rgba(46, 211, 173, 0.36);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--player-accent) 35%, transparent);
     border-radius: 2px;
 }
 
@@ -577,11 +785,16 @@ header nav button:hover {
     position: relative;
     z-index: 2;
     transition: transform 0.1s ease, background-color 0.2s ease;
+    background: linear-gradient(145deg, rgba(29, 34, 43, 0.96), rgba(19, 23, 31, 0.96)) !important;
+    color: var(--fg) !important;
+    border: 1px solid rgba(139, 152, 173, 0.28);
+    box-shadow: 0 8px 16px rgba(4, 6, 10, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 #play-pause-btn.playing-state {
-    background: var(--fg);
-    box-shadow: 0 0 0 0 rgba(46, 211, 173, 0.35);
+    background: linear-gradient(145deg, rgba(211, 221, 235, 0.94), rgba(168, 179, 196, 0.92)) !important;
+    color: #06080c !important;
+    box-shadow: 0 0 0 0 rgba(46, 211, 173, 0.35), 0 10px 20px rgba(6, 8, 12, 0.5);
     animation: pulseGlow 2s infinite;
 }
 
@@ -1082,6 +1295,8 @@ header nav button:hover {
 #lyrics-content,
 .fs-lyrics-body {
     scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .lrc-line {
@@ -1092,11 +1307,12 @@ header nav button:hover {
     color: var(--fg-muted);
     opacity: 0.6;
     transform: scale(1);
-    transition: all 0.3s ease;
+    transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
     cursor: pointer;
     border-left: 3px solid transparent;
     padding-left: 12px;
     margin-left: -12px;
+    will-change: color, opacity;
 }
 
 .lrc-line:hover {
@@ -1121,11 +1337,12 @@ header nav button:hover {
     line-height: 1.6;
     color: var(--fg-muted);
     opacity: 0.5;
-    transition: all 0.3s ease;
+    transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
     cursor: pointer;
     border-left: 3px solid transparent;
     padding-left: 14px;
     margin-left: -14px;
+    will-change: color, opacity;
 }
 
 .fs-lrc-line:hover {
@@ -1402,7 +1619,7 @@ a:focus-visible {
 
     #page-home .shell {
         width: min(100%, calc(100% - 20px));
-        padding: 24px 0;
+        padding: 24px 0 6px;
     }
 
     .hero-title {

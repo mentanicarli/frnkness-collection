@@ -120,12 +120,22 @@
             parsedLyrics: [],
             lyricsNodes: { regular: [], fullscreen: [] },
             currentLyricIndex: -1,
+            flowModeActive: false,
+            lyricsMode: 'karaoke',
+            preferredLyricsMode: 'karaoke',
+            currentLyricsTrackIndex: null,
+            currentLyricsPlainText: '',
+            currentLyricsLrcRaw: '',
+            lyricsIndex: [],
+            lyricsIndexReady: false,
+            lyricsIndexPromise: null,
             colorThief: null,
             db: null
         };
 
         const colorCache = {};
         const colorPromiseCache = {};
+        const releasePlayCountCache = {};
 
         // ============================================================
         // ============================================================
@@ -156,6 +166,14 @@
                     inThrottle = true;
                     setTimeout(() => inThrottle = false, limit);
                 }
+            };
+        }
+
+        function debounce(func, delay) {
+            let timer;
+            return function (...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => func.apply(this, args), delay);
             };
         }
 
@@ -207,7 +225,23 @@
             dom.releaseCover = $('release-cover');
             dom.releaseTitle = $('release-title');
             dom.releaseMeta = $('release-meta');
+            dom.releasePlays = $('release-plays');
+            dom.flowModeBtn = $('flow-mode-btn');
+            dom.flowModeLabel = $('flow-mode-label');
             dom.homePromo = $('home-promo');
+            dom.searchInput = $('global-search');
+            dom.searchResults = $('search-results');
+            dom.searchPanel = $('header-search-panel');
+            dom.searchToggle = $('search-toggle-btn');
+            dom.searchBackdrop = $('search-backdrop');
+            dom.albumsSection = dom.albumsGrid ? dom.albumsGrid.closest('section') : null;
+            dom.singlesSection = dom.singlesGrid ? dom.singlesGrid.closest('section') : null;
+            dom.lyricsModeSwitch = $('lyrics-mode-switch');
+            dom.lyricsModeText = $('lyrics-mode-text');
+            dom.lyricsModeKaraoke = $('lyrics-mode-karaoke');
+            dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch');
+            dom.fsLyricsModeText = $('fs-lyrics-mode-text');
+            dom.fsLyricsModeKaraoke = $('fs-lyrics-mode-karaoke');
         }
 
         // ============================================================
@@ -496,7 +530,7 @@
                                     <img src="${promo.cover}" alt="${promo.title}" class="card-image w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
                                 </div>
                                 <div class="flex-1 min-w-0 flex flex-col gap-4">
-                                    <div class="promo-badge">Новый релиз</div>
+                                    <div class="promo-badge text-sm sm:text-[0.95rem]">последний релиз</div>
                                     <div>
                                         <h3 class="promo-title text-2xl sm:text-3xl font-semibold transition-colors line-clamp-2 relative z-10">${promo.title}</h3>
                                         <p class="text-sm text-[var(--fg-muted)] mt-2 relative z-10">${promo.tracks.length} трек${promo.tracks.length === 1 ? '' : promo.tracks.length < 5 ? 'а' : 'ов'} • ${promo.year}</p>
@@ -557,6 +591,262 @@
             });
         }
 
+        function normalizeSearchText(value) {
+            return (value || '').toString().toLowerCase().trim();
+        }
+
+        function escapeHtml(value) {
+            return (value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function setSearchMode(active) {
+            return active;
+        }
+
+        function toggleSearchPanel(forceState = null) {
+            if (!dom.searchPanel) return;
+            const shouldOpen = forceState === null
+                ? !dom.searchPanel.classList.contains('open')
+                : Boolean(forceState);
+
+            dom.searchPanel.classList.toggle('open', shouldOpen);
+            if (dom.searchToggle) dom.searchToggle.classList.toggle('active', shouldOpen);
+            if (dom.searchBackdrop) dom.searchBackdrop.classList.toggle('open', shouldOpen);
+            document.body.classList.toggle('search-open', shouldOpen);
+
+            if (shouldOpen && dom.searchInput) {
+                requestAnimationFrame(() => dom.searchInput.focus());
+            }
+        }
+
+        function renderSearchResults(results, query) {
+            if (!dom.searchResults) return;
+
+            const normalized = normalizeSearchText(query);
+            if (!normalized) {
+                dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-muted)]/85">Введите запрос, чтобы искать по релизам, трекам и строкам из текстов.</p>';
+                setSearchMode(false);
+                return;
+            }
+
+            setSearchMode(true);
+
+            if (!results.length) {
+                dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-muted)]">Ничего не найдено. Попробуйте другой запрос.</p>';
+                return;
+            }
+
+            const labels = {
+                release: 'Альбом/релиз',
+                track: 'Трек',
+                lyric: 'Строка из текста'
+            };
+
+            const html = results.map(item => {
+                const badge = labels[item.type] || 'Результат';
+                const line = item.line ? `<p class="text-xs text-[var(--fg-muted)]/85 mt-1 line-clamp-2">${escapeHtml(item.line)}</p>` : '';
+                const trackTitle = item.trackTitle ? `<p class="text-xs text-[var(--fg-muted)] mt-1">${escapeHtml(item.trackTitle)}</p>` : '';
+                return `
+                    <button class="w-full text-left rounded-xl border border-white/8 bg-[var(--bg-card)]/55 hover:bg-[var(--bg-card)]/80 transition-colors p-4 mb-2"
+                        onclick="App.openSearchResult('${item.type}', '${item.releaseId}', ${item.trackIndex ?? -1}, ${item.time ?? -1})">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-[var(--fg)] truncate">${escapeHtml(item.title)}</p>
+                                ${trackTitle}
+                                ${line}
+                            </div>
+                            <span class="text-[10px] uppercase tracking-wider text-[var(--fg-muted)]/80 flex-shrink-0">${badge}</span>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+
+            dom.searchResults.innerHTML = `<div class="pb-2"><p class="text-xs uppercase tracking-widest text-[var(--fg-muted)] mb-3">Результаты: ${results.length}</p>${html}</div>`;
+        }
+
+        async function fetchTrackLyrics(release, track) {
+            const base = track.lyricsFile.replace(/\.[^/.]+$/, '');
+            let txt = '';
+            let lrc = '';
+
+            try {
+                const txtRes = await fetch(release.lyricsPath + track.lyricsFile);
+                if (txtRes.ok) txt = await txtRes.text();
+            } catch { }
+
+            try {
+                const lrcRes = await fetch(release.lyricsPath + base + '.lrc');
+                if (lrcRes.ok) lrc = await lrcRes.text();
+            } catch { }
+
+            return { txt, lrc };
+        }
+
+        async function ensureLyricsIndex() {
+            if (state.lyricsIndexReady) return;
+            if (state.lyricsIndexPromise) return state.lyricsIndexPromise;
+
+            state.lyricsIndexPromise = (async () => {
+                const entries = [];
+                const jobs = [];
+
+                Object.entries(releases).forEach(([releaseId, release]) => {
+                    release.tracks.forEach((track, trackIndex) => {
+                        jobs.push((async () => {
+                            const { txt, lrc } = await fetchTrackLyrics(release, track);
+                            if (txt) {
+                                txt.split('\n').forEach(line => {
+                                    const clean = line.trim();
+                                    if (!clean) return;
+                                    entries.push({
+                                        releaseId,
+                                        releaseTitle: release.title,
+                                        trackIndex,
+                                        trackTitle: track.title,
+                                        line: clean,
+                                        normalized: normalizeSearchText(clean),
+                                        time: -1
+                                    });
+                                });
+                            }
+
+                            if (lrc) {
+                                parseLRC(lrc).forEach(item => {
+                                    const clean = (item.text || '').trim();
+                                    if (!clean) return;
+                                    entries.push({
+                                        releaseId,
+                                        releaseTitle: release.title,
+                                        trackIndex,
+                                        trackTitle: track.title,
+                                        line: clean,
+                                        normalized: normalizeSearchText(clean),
+                                        time: item.time
+                                    });
+                                });
+                            }
+                        })());
+                    });
+                });
+
+                await Promise.all(jobs);
+                state.lyricsIndex = entries;
+                state.lyricsIndexReady = true;
+            })();
+
+            try {
+                await state.lyricsIndexPromise;
+            } finally {
+                state.lyricsIndexPromise = null;
+            }
+        }
+
+        function searchCatalog(query) {
+            const normalized = normalizeSearchText(query);
+            if (!normalized) return [];
+
+            const results = [];
+
+            Object.entries(releases).forEach(([releaseId, release]) => {
+                if (normalizeSearchText(release.title).includes(normalized)) {
+                    results.push({ type: 'release', releaseId, title: release.title, trackIndex: -1, line: '', time: -1 });
+                }
+
+                release.tracks.forEach((track, trackIndex) => {
+                    const titleMatch = normalizeSearchText(track.title).includes(normalized);
+                    if (titleMatch) {
+                        results.push({
+                            type: 'track',
+                            releaseId,
+                            title: release.title,
+                            trackTitle: track.title,
+                            trackIndex,
+                            line: '',
+                            time: -1
+                        });
+                    }
+                });
+            });
+
+            if (state.lyricsIndexReady) {
+                state.lyricsIndex
+                    .filter(item => item.normalized.includes(normalized))
+                    .slice(0, 20)
+                    .forEach(item => {
+                        results.push({
+                            type: 'lyric',
+                            releaseId: item.releaseId,
+                            title: item.releaseTitle,
+                            trackTitle: item.trackTitle,
+                            trackIndex: item.trackIndex,
+                            line: item.line,
+                            time: item.time
+                        });
+                    });
+            }
+
+            return results.slice(0, 40);
+        }
+
+        function handleSearchInput(value) {
+            const query = normalizeSearchText(value);
+            const baseResults = searchCatalog(query);
+            renderSearchResults(baseResults, query);
+
+            if (!query || state.lyricsIndexReady || state.lyricsIndexPromise) return;
+            ensureLyricsIndex().then(() => {
+                if (!dom.searchInput) return;
+                const freshQuery = normalizeSearchText(dom.searchInput.value);
+                if (!freshQuery) return;
+                renderSearchResults(searchCatalog(freshQuery), freshQuery);
+            });
+        }
+
+        function initGlobalSearch() {
+            if (!dom.searchInput) return;
+            const onInput = debounce(e => handleSearchInput(e.target.value), 180);
+            dom.searchInput.addEventListener('input', onInput);
+
+            if (dom.searchToggle) {
+                dom.searchToggle.addEventListener('click', e => {
+                    e.stopPropagation();
+                    toggleSearchPanel();
+                });
+            }
+
+            if (dom.searchPanel) {
+                dom.searchPanel.addEventListener('click', e => e.stopPropagation());
+            }
+
+            document.addEventListener('click', () => toggleSearchPanel(false));
+            renderSearchResults([], '');
+        }
+
+        function openSearchResult(type, releaseId, trackIndex, time = -1) {
+            if (!releases[releaseId]) return;
+
+            toggleSearchPanel(false);
+
+            openRelease(releaseId);
+
+            if (type === 'release' || trackIndex < 0) return;
+
+            setTimeout(() => {
+                playTrack(trackIndex, 'fade');
+                if (type === 'lyric') {
+                    showLyrics(trackIndex);
+                    if (Number.isFinite(time) && time >= 0) {
+                        seekTo(time);
+                    }
+                }
+            }, 120);
+        }
+
         /**
          *Раздел
          */
@@ -565,6 +855,116 @@
             const rect = card.getBoundingClientRect();
             card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
             card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+        }
+
+        function getAllTrackRefs() {
+            return Object.entries(releases).flatMap(([releaseId, release]) =>
+                release.tracks.map((_, trackIndex) => ({ releaseId, trackIndex }))
+            );
+        }
+
+        function isSameTrackRef(a, b) {
+            return Boolean(a && b && a.releaseId === b.releaseId && a.trackIndex === b.trackIndex);
+        }
+
+        function pickRandomTrackRef(excludeRef = null) {
+            const refs = getAllTrackRefs().filter(ref => !excludeRef || !isSameTrackRef(ref, excludeRef));
+            if (!refs.length) return null;
+            return refs[Math.floor(Math.random() * refs.length)];
+        }
+
+        function updateFlowButtonState() {
+            if (dom.flowModeBtn) {
+                dom.flowModeBtn.classList.toggle('active', state.flowModeActive);
+                dom.flowModeBtn.setAttribute('aria-pressed', String(state.flowModeActive));
+                dom.flowModeBtn.setAttribute('aria-label', state.flowModeActive ? 'Остановить поток' : 'Включить поток');
+            }
+            if (dom.flowModeLabel) {
+                dom.flowModeLabel.textContent = state.flowModeActive ? 'Поток' : 'Поток';
+            }
+        }
+
+        function playTrackByRef(releaseId, trackIndex, direction = 'fade') {
+            const release = releases[releaseId];
+            if (!release || !release.tracks[trackIndex]) return;
+            state.currentRelease = release;
+            state.currentReleaseId = releaseId;
+            playTrack(trackIndex, direction);
+        }
+
+        function startFlowMode() {
+            const nextRef = pickRandomTrackRef();
+            if (!nextRef) return;
+            state.flowModeActive = true;
+            updateFlowButtonState();
+            playTrackByRef(nextRef.releaseId, nextRef.trackIndex, 'fade');
+        }
+
+        function stopFlowMode() {
+            state.flowModeActive = false;
+            updateFlowButtonState();
+        }
+
+        function toggleFlowMode() {
+            if (state.flowModeActive) stopFlowMode();
+            else startFlowMode();
+        }
+
+        function playFlowNext(direction = 'next') {
+            const currentRef = state.currentReleaseId !== null
+                ? { releaseId: state.currentReleaseId, trackIndex: state.currentTrackIndex }
+                : null;
+            const nextRef = pickRandomTrackRef(currentRef);
+            if (!nextRef) return;
+            playTrackByRef(nextRef.releaseId, nextRef.trackIndex, direction);
+        }
+
+        function parseTrackKey(key) {
+            if (typeof key !== 'string') return null;
+            const legacyMatch = key.match(/^(.*)--(\d+)$/);
+            if (legacyMatch) {
+                const releaseId = legacyMatch[1];
+                const oneBased = parseInt(legacyMatch[2], 10);
+                const trackIndex = oneBased - 1;
+                if (Number.isInteger(trackIndex) && trackIndex >= 0) {
+                    return { releaseId, trackIndex };
+                }
+                return null;
+            }
+            const modernMatch = key.match(/^(.*)-(\d+)$/);
+            if (modernMatch) {
+                const releaseId = modernMatch[1];
+                const trackIndex = parseInt(modernMatch[2], 10);
+                if (Number.isInteger(trackIndex) && trackIndex >= 0) {
+                    return { releaseId, trackIndex };
+                }
+            }
+            return null;
+        }
+
+        async function getReleasePlayCount(releaseId) {
+            const release = releases[releaseId];
+            if (!release || release.type !== 'album') return 0;
+            if (releasePlayCountCache[releaseId] !== undefined) return releasePlayCountCache[releaseId];
+            if (!state.db) return 0;
+
+            try {
+                const { data, error } = await state.db.from('play_counts').select('track_key, plays');
+                if (error) throw error;
+
+                let total = 0;
+                (data || []).forEach(item => {
+                    const parsed = parseTrackKey(item.track_key);
+                    if (!parsed || parsed.releaseId !== releaseId) return;
+                    total += Number(item.plays) || 0;
+                });
+
+                releasePlayCountCache[releaseId] = total;
+                return total;
+            } catch (e) {
+                console.warn('Release play count load failed:', e);
+                return 0;
+            }
         }
 
         /**
@@ -584,6 +984,10 @@
             }
             if (dom.releaseTitle) dom.releaseTitle.textContent = r.title;
             if (dom.releaseMeta) dom.releaseMeta.textContent = `${r.type === 'album' ? 'Альбом' : 'Сингл'} • ${r.year}`;
+            if (dom.releasePlays) {
+                dom.releasePlays.classList.toggle('hidden', r.type !== 'album');
+                dom.releasePlays.textContent = r.type === 'album' ? 'Счетчик прослушиваний загружается...' : '';
+            }
 
             if (dom.downloadContainer) {
                 if (r.lyricsBookPath && dom.downloadBtn) {
@@ -602,6 +1006,13 @@
                     if (dom.videoIframe) dom.videoIframe.src = '';
                     dom.videoContainer.classList.add('hidden');
                 }
+            }
+
+            if (r.type === 'album' && dom.releasePlays) {
+                getReleasePlayCount(id).then(total => {
+                    if (state.currentReleaseId !== id || !dom.releasePlays) return;
+                    dom.releasePlays.textContent = `Прослушиваний альбома: ${total}`;
+                });
             }
 
             renderTracklist();
@@ -681,6 +1092,7 @@
             updateFullscreen(track.title, state.currentRelease.cover, direction);
             updatePlayerAccent(state.currentRelease.cover);
             updatePageAccent(state.currentRelease.cover);
+            updateFlowButtonState();
 
             dom.audio.play().then(() => {
                 state.isPlaying = true;
@@ -727,6 +1139,10 @@
          *Раздел
          */
         function nextTrack() {
+            if (state.flowModeActive) {
+                playFlowNext('next');
+                return;
+            }
             if (state.currentRelease) {
                 playTrack((state.currentTrackIndex + 1) % state.currentRelease.tracks.length, 'next');
             }
@@ -879,12 +1295,22 @@
         async function incrementPlayCount() {
             if (!state.currentReleaseId || !state.db || state.trackCounted || state.trackCountPending) return;
             state.trackCountPending = true;
+            const releaseId = state.currentReleaseId;
             try {
                 const { error } = await state.db.rpc('increment_play_count', {
-                    track_key_input: `${state.currentReleaseId}-${state.currentTrackIndex}`
+                    track_key_input: `${releaseId}-${state.currentTrackIndex}`
                 });
                 if (error) throw error;
                 state.trackCounted = true;
+                delete releasePlayCountCache[releaseId];
+                if (state.currentReleaseId === releaseId && state.currentRelease && state.currentRelease.type === 'album' && dom.releasePlays) {
+                    dom.releasePlays.textContent = 'Счетчик прослушиваний обновляется...';
+                    getReleasePlayCount(releaseId).then(total => {
+                        if (state.currentReleaseId === releaseId && dom.releasePlays) {
+                            dom.releasePlays.textContent = `Прослушиваний альбома: ${total}`;
+                        }
+                    });
+                }
                 if ($('page-chart') && $('page-chart').classList.contains('active')) renderChart();
             } catch (e) {
                 console.warn('Play count update failed:', e);
@@ -904,29 +1330,6 @@
                 dom.chartList.innerHTML = '<p class="text-center text-[var(--fg-muted)] mt-10">Ошибка загрузки.</p>';
                 return;
             }
-            const parseTrackKey = key => {
-                if (typeof key !== 'string') return null;
-                const legacyMatch = key.match(/^(.*)--(\d+)$/);
-                if (legacyMatch) {
-                    const releaseId = legacyMatch[1];
-                    const oneBased = parseInt(legacyMatch[2], 10);
-                    const trackIndex = oneBased - 1;
-                    if (Number.isInteger(trackIndex) && trackIndex >= 0) {
-                        return { releaseId, trackIndex };
-                    }
-                    return null;
-                }
-                const modernMatch = key.match(/^(.*)-(\d+)$/);
-                if (modernMatch) {
-                    const releaseId = modernMatch[1];
-                    const trackIndex = parseInt(modernMatch[2], 10);
-                    if (Number.isInteger(trackIndex) && trackIndex >= 0) {
-                        return { releaseId, trackIndex };
-                    }
-                }
-                return null;
-            };
-
             const tracksMap = new Map();
             (data || []).forEach(item => {
                 const parsed = parseTrackKey(item.track_key);
@@ -976,7 +1379,7 @@
         // ============================================================
 
         function updateKaraoke() {
-            if (!state.parsedLyrics.length) return;
+            if (state.lyricsMode !== 'karaoke' || !state.parsedLyrics.length) return;
             let newIndex = -1;
             for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
                 if (dom.audio.currentTime >= state.parsedLyrics[i].time) {
@@ -999,6 +1402,69 @@
                     }
                 });
             }
+        }
+
+        // ============================================================
+        // ============================================================
+
+        function updateLyricsModeControls(hasKaraoke) {
+            [dom.lyricsModeSwitch, dom.fsLyricsModeSwitch].forEach(el => {
+                if (!el) return;
+                el.classList.toggle('hidden', !hasKaraoke);
+                el.classList.toggle('flex', hasKaraoke);
+            });
+
+            const textActiveClasses = ['bg-white/10', 'text-[var(--fg)]'];
+            const textInactiveClasses = ['text-[var(--fg-muted)]'];
+            const karaokeActiveClasses = ['bg-white/10', 'text-[var(--fg)]'];
+            const karaokeInactiveClasses = ['text-[var(--fg-muted)]'];
+
+            [dom.lyricsModeText, dom.fsLyricsModeText].forEach(btn => {
+                if (!btn) return;
+                btn.classList.toggle(textActiveClasses[0], state.lyricsMode === 'text');
+                btn.classList.toggle(textActiveClasses[1], state.lyricsMode === 'text');
+                btn.classList.toggle(textInactiveClasses[0], state.lyricsMode !== 'text');
+            });
+
+            [dom.lyricsModeKaraoke, dom.fsLyricsModeKaraoke].forEach(btn => {
+                if (!btn) return;
+                btn.classList.toggle(karaokeActiveClasses[0], state.lyricsMode === 'karaoke');
+                btn.classList.toggle(karaokeActiveClasses[1], state.lyricsMode === 'karaoke');
+                btn.classList.toggle(karaokeInactiveClasses[0], state.lyricsMode !== 'karaoke');
+            });
+        }
+
+        function renderLyricsByMode() {
+            const hasKaraoke = state.parsedLyrics.length > 0;
+            const plainText = state.currentLyricsPlainText || 'Текст не найден';
+
+            if (hasKaraoke && state.lyricsMode === 'karaoke') {
+                const render = l => l.map(x => `<p class="lrc-line" onclick="App.seekTo(${x.time})">${x.text || '...'}</p>`).join('');
+                const renderFs = l => l.map(x => `<p class="fs-lrc-line" onclick="App.seekTo(${x.time})">${x.text || '...'}</p>`).join('');
+                if (dom.lyricsContent) dom.lyricsContent.innerHTML = render(state.parsedLyrics);
+                if (dom.fsLyricsBody) dom.fsLyricsBody.innerHTML = renderFs(state.parsedLyrics);
+                state.lyricsNodes.regular = dom.lyricsContent ? Array.from(dom.lyricsContent.querySelectorAll('.lrc-line')) : [];
+                state.lyricsNodes.fullscreen = dom.fsLyricsBody ? Array.from(dom.fsLyricsBody.querySelectorAll('.fs-lrc-line')) : [];
+                state.currentLyricIndex = -1;
+                updateKaraoke();
+            } else {
+                const html = plainText.split('\n').map(l => `<p class="mb-2">${l || '&nbsp;'}</p>`).join('');
+                if (dom.lyricsContent) dom.lyricsContent.innerHTML = html;
+                if (dom.fsLyricsBody) dom.fsLyricsBody.innerHTML = html;
+                state.lyricsNodes.regular = [];
+                state.lyricsNodes.fullscreen = [];
+                state.currentLyricIndex = -1;
+            }
+
+            updateLyricsModeControls(hasKaraoke);
+        }
+
+        function setLyricsMode(mode) {
+            if (!['text', 'karaoke'].includes(mode)) return;
+            if (mode === 'karaoke' && !state.parsedLyrics.length) return;
+            state.lyricsMode = mode;
+            state.preferredLyricsMode = mode;
+            renderLyricsByMode();
         }
 
         // ============================================================
@@ -1043,43 +1509,38 @@
             const track = state.currentRelease.tracks[index];
             if (!track) return;
 
-            let text = 'Текст не найден';
-            let isLrc = false;
+            let plainText = 'Текст не найден';
+            let lrcText = '';
             const base = track.lyricsFile.replace(/\.[^/.]+$/, "");
+
+            state.currentLyricsTrackIndex = index;
+            state.currentLyricIndex = -1;
 
             try {
                 const res = await fetch(state.currentRelease.lyricsPath + base + '.lrc');
                 if (res.ok) {
-                    text = await res.text();
-                    isLrc = text.includes('[');
+                    lrcText = await res.text();
                 }
             } catch { }
 
-            if (!isLrc) {
-                try {
-                    const res = await fetch(state.currentRelease.lyricsPath + track.lyricsFile);
-                    if (res.ok) text = await res.text();
-                } catch { }
-            }
+            try {
+                const res = await fetch(state.currentRelease.lyricsPath + track.lyricsFile);
+                if (res.ok) plainText = await res.text();
+            } catch { }
 
             if ($('lyrics-track-title')) $('lyrics-track-title').textContent = track.title;
 
-            if (isLrc) {
-                state.parsedLyrics = parseLRC(text);
-                const render = l => l.map(x => `<p class="lrc-line" onclick="App.seekTo(${x.time})">${x.text || '...'}</p>`).join('');
-                const renderFs = l => l.map(x => `<p class="fs-lrc-line" onclick="App.seekTo(${x.time})">${x.text || '...'}</p>`).join('');
-                if (dom.lyricsContent) dom.lyricsContent.innerHTML = render(state.parsedLyrics);
-                if (dom.fsLyricsBody) dom.fsLyricsBody.innerHTML = renderFs(state.parsedLyrics);
-                state.lyricsNodes.regular = dom.lyricsContent ? Array.from(dom.lyricsContent.querySelectorAll('.lrc-line')) : [];
-                state.lyricsNodes.fullscreen = dom.fsLyricsBody ? Array.from(dom.fsLyricsBody.querySelectorAll('.fs-lrc-line')) : [];
+            state.currentLyricsPlainText = plainText;
+            state.currentLyricsLrcRaw = lrcText;
+            state.parsedLyrics = lrcText ? parseLRC(lrcText) : [];
+
+            if (state.parsedLyrics.length && state.preferredLyricsMode === 'karaoke') {
+                state.lyricsMode = 'karaoke';
             } else {
-                state.parsedLyrics = [];
-                const html = text.split('\n').map(l => `<p class="mb-2">${l || '&nbsp;'}</p>`).join('');
-                if (dom.lyricsContent) dom.lyricsContent.innerHTML = html;
-                if (dom.fsLyricsBody) dom.fsLyricsBody.innerHTML = html;
-                state.lyricsNodes.regular = [];
-                state.lyricsNodes.fullscreen = [];
+                state.lyricsMode = 'text';
             }
+
+            renderLyricsByMode();
         }
 
         function parseLRC(text) {
@@ -1126,7 +1587,9 @@
             window.scrollTo(0, 0);
             if (name === 'home') resetPageAccent();
             if (name === 'home') setTimeout(initStaggerAnimation, 50);
+            if (name === 'home' && dom.searchInput) handleSearchInput(dom.searchInput.value);
             if (name === 'chart') renderChart();
+            if (name !== 'home') toggleSearchPanel(false);
         }
 
         function closeMiniPlayer() {
@@ -1151,6 +1614,7 @@
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 if (dom.fsPlayer && dom.fsPlayer.classList.contains('open')) closeFsPlayer();
+                else if (dom.searchPanel && dom.searchPanel.classList.contains('open')) toggleSearchPanel(false);
                 else closeLyrics();
             }
             if (e.key === ' ' && !['BUTTON', 'INPUT'].includes(document.activeElement.tagName)) {
@@ -1165,6 +1629,10 @@
             openRelease,
             handleTrackClick,
             showLyrics,
+            setLyricsMode,
+            toggleFlowMode,
+            startFlowMode,
+            stopFlowMode,
             openFsPlayer,
             closeFsPlayer,
             closeLyrics,
@@ -1178,6 +1646,8 @@
             seekTrackFs,
             showPage,
             playChart,
+            openSearchResult,
+            toggleSearchPanel,
             toggleMute,
             closeMiniPlayer
         };
@@ -1196,6 +1666,8 @@
 
             cacheDomElements();
             renderHome();
+            initGlobalSearch();
+            updateFlowButtonState();
             initStaggerAnimation();
             setupAudioEvents();
             setupVolumeControls();
