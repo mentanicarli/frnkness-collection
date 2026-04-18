@@ -498,7 +498,7 @@ export function initLegacyApp(deps = {}) {
                         <button class="release-card promo-release-card text-left rounded-xl p-5 transition-all group relative w-full" data-id="${NEW_RELEASE_PROMO_ID}" data-fixed-accent="true" onclick="App.openRelease('${NEW_RELEASE_PROMO_ID}')">
                             <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                                 <div class="w-full sm:w-44 aspect-square rounded-xl overflow-hidden bg-[var(--bg)] shadow-lg flex-shrink-0">
-                                    <img src="${promo.cover}" alt="${promo.title}" class="card-image w-full h-full object-cover" loading="lazy" decoding="async" fetchpriority="low" onerror="this.style.display='none'">
+                                    <img src="${promo.cover}" alt="${promo.title}" class="card-image w-full h-full object-cover" loading="eager" decoding="async" fetchpriority="high" onerror="this.style.display='none'">
                                 </div>
                                 <div class="flex-1 min-w-0 flex flex-col gap-4">
                                     <div class="promo-badge text-sm sm:text-[0.95rem]">последний релиз</div>
@@ -528,12 +528,13 @@ export function initLegacyApp(deps = {}) {
                 }
             }
 
-            Object.entries(releases).forEach(([id, r]) => {
+            Object.entries(releases).forEach(([id, r], index) => {
+                const isPriorityCard = index < 6;
                 const meta = r.type === 'album' ? `${r.tracks.length} треков` : 'Сингл';
                 const card = `
                     <button class="release-card text-left rounded-xl p-4 transition-all group relative" data-id="${id}" onclick="App.openRelease('${id}')">
                         <div class="aspect-square rounded-lg overflow-hidden mb-4 bg-[var(--bg)] shadow-lg">
-                            <img src="${r.cover}" alt="${r.title}" class="card-image w-full h-full object-cover" loading="lazy" decoding="async" fetchpriority="low" onerror="this.style.display='none'">
+                            <img src="${r.cover}" alt="${r.title}" class="card-image w-full h-full object-cover" loading="${isPriorityCard ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${index < 4 ? 'high' : 'low'}" onerror="this.style.display='none'">
                         </div>
                         <h3 class="font-semibold text-[var(--fg)] group-hover:text-[var(--card-accent)] transition-colors line-clamp-2 relative z-10">${r.title}</h3>
                         <p class="text-xs text-[var(--fg-muted)] mt-1 relative z-10">${meta} • ${r.year}</p>
@@ -1349,7 +1350,7 @@ export function initLegacyApp(deps = {}) {
                 : tracks.map((t, i) => `
                     <div class="chart-row cursor-pointer group" onclick="App.playChart('${t.releaseId}', ${t.trackIndex})">
                         <div class="chart-num ${i < 3 ? `top-${i + 1}` : ''}">${i + 1}</div>
-                        <div class="chart-cover"><img src="${t.cover}" alt="" loading="lazy" decoding="async" fetchpriority="low"></div>
+                        <div class="chart-cover"><img src="${t.cover}" alt="" loading="${i < 8 ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${i < 3 ? 'high' : 'low'}"></div>
                         <div class="chart-info"><div class="chart-title">${t.title}</div><div class="chart-artist">frnk ness</div></div>
                         <div class="chart-plays"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>${t.plays}</div>
                     </div>

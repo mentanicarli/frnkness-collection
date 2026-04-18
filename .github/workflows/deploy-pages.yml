@@ -32,6 +32,11 @@ jobs:
         run: npm ci
 
       - name: Build project
+        env:
+          VITE_SUPABASE_URL: https://momcakikuivtvxkmgjhx.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I
+          VITE_SHOW_NEW_RELEASE_PROMO: 'true'
+          VITE_NEW_RELEASE_PROMO_ID: p-team
         run: npm run build
 
       - name: Copy static media files
