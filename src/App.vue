@@ -27,7 +27,7 @@
     <main class="min-h-screen relative z-10">
         <!-- Главная страница -->
         <div id="page-home" class="page active">
-            <div class="shell px-6 py-12">
+            <div class="shell px-6 pt-12 pb-2">
                 <section class="mb-20 stagger-item">
                     <h1 class="hero-title mb-6">Pupsiks Saga</h1>
                     <p class="text-[var(--fg-muted)] text-lg max-w-xl leading-relaxed">Полная коллекция релизов frnk
@@ -41,6 +41,11 @@
                 <section class="stagger-item" style="animation-delay: 0.2s;">
                     <h2 class="text-xs tracking-widest uppercase text-[var(--fg-muted)] mb-8">Синглы</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" id="singles-grid"></div>
+                </section>
+                <section class="mt-4 pb-0 text-center stagger-item" style="animation-delay: 0.25s;">
+                    <p class="text-[10px] sm:text-xs text-[var(--fg-muted)]/30 leading-relaxed">
+                        Версия: v1.3 • Разработчик: mentanicarli
+                    </p>
                 </section>
             </div>
         </div>
