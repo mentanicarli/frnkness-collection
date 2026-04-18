@@ -1,4 +1,4 @@
-const VERSION = 'v1.4.0';
+const VERSION = 'v1.4.1';
 const STATIC_CACHE = `static-${VERSION}`;
 const MEDIA_CACHE = `media-${VERSION}`;
 const LYRICS_CACHE = `lyrics-${VERSION}`;

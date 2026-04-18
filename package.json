@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.103.3",
     "pinia": "^3.0.4",
     "vue": "^3.3.0"
   },

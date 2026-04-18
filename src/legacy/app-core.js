@@ -23,6 +23,7 @@ export function initLegacyApp(deps = {}) {
         const {
             SUPABASE_URL = '',
             SUPABASE_ANON_KEY = '',
+            createSupabaseClient = null,
             SHOW_NEW_RELEASE_PROMO = false,
             NEW_RELEASE_PROMO_ID = '',
             releases = {}
@@ -1663,8 +1664,10 @@ export function initLegacyApp(deps = {}) {
                 state.colorThief = new ColorThief();
             }
 
-            if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
-                state.db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            if (SUPABASE_URL && SUPABASE_ANON_KEY && typeof createSupabaseClient === 'function') {
+                state.db = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            } else if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+                state.db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             }
 
             cacheDomElements();

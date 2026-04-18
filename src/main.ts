@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { createClient } from '@supabase/supabase-js'
 import App from './App.vue'
 import './assets/app.css'
 
@@ -20,6 +21,7 @@ const legacyDeps = {
     config: {
         SUPABASE_URL,
         SUPABASE_ANON_KEY,
+        createSupabaseClient: createClient,
         SHOW_NEW_RELEASE_PROMO,
         NEW_RELEASE_PROMO_ID,
         releases
