@@ -1,5 +1,5 @@
 /**
- * Application Type Definitions
+ * Базовые доменные типы приложения.
  */
 
 export interface Track {

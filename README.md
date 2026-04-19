@@ -8,109 +8,80 @@
 
 https://mentanicarli.github.io/pupsiks-saga/
 
-## Текущее состояние (апрель 2026)
+## Возможности
 
-- Приложение в рабочем состоянии: сборка и typecheck проходят
-- Архитектура гибридная: Vue-компоненты + legacy runtime слой
-- Визуальный и аудио-функционал реализован, но core-логика плеера пока не полностью перенесена в typed слой
-
-## Основные возможности
-
-### Плеер
-
-- Мини-плеер с быстрым доступом
-- Полноэкранный режим воспроизведения
+- Мини-плеер и полноэкранный плеер
 - Переключение треков внутри релиза
-- Режим Поток для непрерывного случайного воспроизведения
-- Глобальный поиск по трекам, альбомам и строкам из текстов
+- Режим Поток (случайное непрерывное воспроизведение)
+- Глобальный поиск по трекам, релизам и строкам текста
+- Поддержка текстов в форматах .txt и .lrc
+- Режимы отображения текста: обычный и караоке
+- Чарт по прослушиваниям и суммарные прослушивания альбомов
+- Динамический цветовой акцент на основе обложки
+- PWA (manifest + service worker)
 
-### Тексты песен
-
-- Поддержка .txt и .lrc форматов
-- Переключение между обычным текстом и режимом караоке
-- Синхронная подсветка строк с автопрокруткой
-
-### Статистика
-
-- Чарт треков по количеству прослушиваний
-- Суммарный счетчик прослушиваний для альбомов
-- Хранение данных через Supabase
-
-### Интерфейс
-
-- Динамическая цветовая тема на основе обложки
-- Плавные анимации и переходы
-- Адаптивная верстка для мобильных и desktop
-
-### PWA
-
-- Web App Manifest
-- Service Worker с кэшированием shell/lyrics/media
-- Работа в standalone-режиме после установки
-
-## Технологии и зависимости
+## Технологии
 
 - Vue 3
 - TypeScript (strict)
 - Pinia
 - Vite
 - Supabase (`@supabase/supabase-js`)
-- Tailwind CSS через CDN (подключается в `index.html`)
-- Color Thief через CDN (подключается в `index.html`)
+- Tailwind CSS через CDN в `index.html`
+- Color Thief через CDN в `index.html`
 
 ## Архитектура
 
-Проект мигрирован с полностью статического HTML в Vue, но пока остается гибридным.
+Проект организован в два связанных слоя.
 
-Что уже в typed слое:
+### Vue-слой
 
-- Конфиг релизов и feature-флаги (`src/config.ts`)
-- Shared runtime state (`src/runtime/sharedState.ts`)
-- Pinia store-обертка (`src/stores/appStore.ts`)
-- Утилиты (`src/utils/*`) и типы (`src/types/index.ts`)
+- Компоненты интерфейса: `src/components/*`
+- Корневая композиция: `src/App.vue`, `src/main.ts`
+- Реактивное состояние: `src/runtime/sharedState.ts`
+- Store-адаптер: `src/stores/appStore.ts`
+- Конфиг и данные релизов: `src/config.ts`
+- Утилиты и типы: `src/utils/*`, `src/types/index.ts`
 
-Что пока в legacy-слое:
+### Runtime-слой
 
-- Основной imperative runtime плеера и навигации (`src/legacy/app-core.js`)
-- Глобальный API `window.App`, который вызывается из шаблонов
-- Значительная часть прямых DOM-операций
+- Основной runtime: `src/legacy/app-core.js`
+- Единая точка вызова runtime из Vue: `src/runtime/legacyBridge.ts`
 
-## Структура проекта
+Bridge задает единый контракт вызовов (`window.App`) и отделяет шаблоны Vue от прямых обращений к legacy-API.
+
+## Структура каталогов
 
 ```text
 src/
 	App.vue
+	main.ts
+	config.ts
 	components/
 		AppHeader.vue
 		MainPages.vue
 		LyricsAndPlayers.vue
-	stores/
-		appStore.ts
 	runtime/
 		sharedState.ts
+		legacyBridge.ts
+	stores/
+		appStore.ts
 	utils/
 		helpers.ts
-		colors.ts
 		lyrics.ts
+		colors.ts
 		database.ts
 	types/
 		index.ts
 	legacy/
 		app-core.js
+		app-core.d.ts
 	assets/
 		app.css
-	config.ts
-	main.ts
 
 public/
 	manifest.webmanifest
 	sw.js
-
-.env.example
-index.html
-tsconfig.json
-tsconfig.node.json
-vite.config.ts
 
 audio/
 images/
@@ -118,11 +89,11 @@ lyrics/
 lyrics-books/
 ```
 
-## Быстрый старт
+## Запуск
 
 ### Требования
 
-- Node.js 18+ (рекомендуется 20)
+- Node.js 18+
 
 ### Установка
 
@@ -130,16 +101,18 @@ lyrics-books/
 npm install
 ```
 
-### Настройка окружения
+### Переменные окружения
 
-Скопируйте `.env.example` в `.env.local` и при необходимости укажите свои значения:
+Создайте `.env.local` на основе `.env.example`.
+
+Используемые переменные:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_SHOW_NEW_RELEASE_PROMO`
 - `VITE_NEW_RELEASE_PROMO_ID`
 
-### Запуск и проверка
+### Команды
 
 ```bash
 npm run dev
@@ -148,74 +121,45 @@ npm run build
 npm run preview
 ```
 
-Собранная версия находится в папке `dist`.
+Сборка создается в папке `dist`.
 
-## Деплой (GitHub Pages)
+## PWA и кэширование
 
-Проект рассчитан на деплой через GitHub Actions.
+- Service worker: `public/sw.js`
+- Кэши: app shell, медиа (`audio`, `images`), тексты (`lyrics`)
+- Для GitHub Pages регистрация service worker выполняется через `import.meta.env.BASE_URL` в `src/main.ts`
 
-- Для `username.github.io` используется root base `/`
-- Для project pages используется `/<repo-name>/`
+## Деплой
 
-Базовый путь вычисляется автоматически в `vite.config.ts` при запуске в GitHub Actions.
+Проект рассчитан на GitHub Pages.
+
+`vite.config.ts` автоматически вычисляет `base`:
+
+- `/` для репозиториев вида `username.github.io`
+- `/<repo-name>/` для project pages
 
 ## Конфигурация Supabase
 
-Для работы чарта и счетчиков нужна таблица `play_counts` и RPC-функция `increment_play_count`.
+Для статистики требуется:
 
-Если Supabase недоступен, приложение продолжает работать, но чарт/счетчики будут пустыми.
+- таблица `play_counts`
+- RPC-функция `increment_play_count`
+
+Если Supabase недоступен, интерфейс продолжает работать, а статистика возвращает пустые данные.
 
 ## Ограничения
 
-- Архитектура все еще гибридная (Vue + legacy runtime)
-- Часть UI-событий идет через глобальный `window.App`
-- Нет системы авторизации
-- Нет автотестов (unit/e2e)
-
-## Roadmap
-
-- Перенос player/navigation логики из `src/legacy/app-core.js` в typed Vue/Pinia слой
-- Замена inline обработчиков на события Vue (`@click` и actions)
-- Постепенное сокращение прямых DOM-манипуляций
-- Добавление базового набора unit/e2e тестов
-- Дополнительная оптимизация загрузки медиа
-
-## История изменений
-
-### v1.4
-
-- Добавлен глобальный поиск по трекам и текстам
-- Добавлено переключение между текстом и караоке режимом
-- Добавлена метрика прослушиваний альбомов
-- Добавлен режим Поток
-
-### v1.3
-
-- Основная миграция проекта с HTML на Vue
-- Второй пакет обновления дизайна
-- Добавлена карточка Последний релиз
-
-### v1.2
-
-- Добавлена страница чарта
-- Настроена интеграция счетчика прослушиваний с Supabase
-
-### v1.1
-
-- Добавлена поддержка LRC (караоке)
-- Первое обновление дизайна
-
-### v1.0
-
-- Первый релиз с базовым функционалом
+- Основная логика плеера находится в runtime-слое `src/legacy/app-core.js`
+- Интеграция между слоями идет через `window.App` и bridge
+- Системы авторизации нет
+- Автотесты не добавлены
 
 ## Автор
 
 - frnk ness - музыка и контент
-- mentanicarli - разработчик
+- mentanicarli - разработка
 
 ## Лицензия
 
-Проект распространяется для личного использования.
-Коммерческое использование не предполагается.
+Только личное использование.
 

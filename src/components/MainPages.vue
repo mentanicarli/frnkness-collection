@@ -8,7 +8,7 @@
           <div class="mt-8 flex flex-wrap items-center gap-3">
             <button
               id="flow-mode-btn"
-              onclick="App.toggleFlowMode()"
+              @click="toggleFlowMode"
               class="chart-btn flow-btn flex items-center gap-2 px-7 py-3 text-base tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300 shadow-lg shadow-black/30"
               aria-pressed="false"
               aria-label="Включить поток"
@@ -39,7 +39,7 @@
 
     <div id="page-chart" class="page">
       <div class="shell shell-narrow px-6 py-8">
-        <button onclick="App.showPage('home')" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--page-accent)] transition-colors mb-12 group">
+        <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--page-accent)] transition-colors mb-12 group">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
@@ -55,7 +55,7 @@
 
     <div id="page-release" class="page">
       <div class="shell px-6 py-8">
-        <button onclick="App.showPage('home')" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--page-accent)] transition-colors mb-12 group">
+        <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--page-accent)] transition-colors mb-12 group">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
@@ -114,3 +114,12 @@
     </div>
   </main>
 </template>
+
+<script setup lang="ts">
+import { legacyBridge } from '@/runtime/legacyBridge'
+
+// Страницы и навигация пока управляются legacy runtime,
+// Vue-компонент выступает декларативной оболочкой.
+const showHome = () => legacyBridge.showPage('home')
+const toggleFlowMode = () => legacyBridge.toggleFlowMode()
+</script>

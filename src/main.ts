@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import App from './App.vue'
 import './assets/app.css'
 
-// Import legacy app initialization (will be phased out)
+// Точка входа приложения.
+// Сейчас проект работает в гибридном режиме: Vue + legacy runtime.
 import { initLegacyApp } from './legacy/app-core'
 import { NEW_RELEASE_PROMO_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
@@ -17,6 +18,8 @@ const pinia = createPinia()
 app.use(pinia)
 app.mount('#app')
 
+// Явно передаем зависимости в legacy-слой,
+// чтобы уменьшить скрытые связи через глобальную область.
 const legacyDeps = {
     config: {
         SUPABASE_URL,
@@ -40,8 +43,8 @@ const legacyDeps = {
     }
 }
 
-// Initialize legacy app systems
-// This will be gradually replaced by Pinia stores and Vue components
+// Инициализируем legacy-рантайм после маунта Vue.
+// Это позволяет сохранить текущее поведение во время поэтапной миграции.
 if ('requestIdleCallback' in window) {
     (window as any).requestIdleCallback(() => initLegacyApp(legacyDeps), { timeout: 600 })
 } else {
@@ -50,9 +53,10 @@ if ('requestIdleCallback' in window) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+        // BASE_URL обязателен для корректной работы на GitHub Pages project path.
         const swUrl = `${import.meta.env.BASE_URL}sw.js`
         navigator.serviceWorker.register(swUrl).catch(() => {
-            // Ignore registration failures in unsupported/private browsing contexts.
+            // Ошибку регистрации игнорируем: в private mode/PWA-ограничениях это допустимо.
         })
     })
 }

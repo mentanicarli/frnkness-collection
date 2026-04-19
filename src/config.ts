@@ -1,14 +1,18 @@
 import type { Releases } from '@/types'
 
+// Центральный конфиг приложения:
+// env-переменные, feature flags и реестр релизов.
 const DEFAULT_SUPABASE_URL = 'https://momcakikuivtvxkmgjhx.supabase.co'
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I'
 const rawPromoFlag = import.meta.env.VITE_SHOW_NEW_RELEASE_PROMO
 
+// Fallback-значения нужны для локального запуска, если env не задан.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
 export const SHOW_NEW_RELEASE_PROMO = rawPromoFlag == null ? true : rawPromoFlag.trim().toLowerCase() === 'true'
 export const NEW_RELEASE_PROMO_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'p-team'
 
+// Единый источник данных по дискографии, трекам и путям к медиа/текстам.
 export const releases: Releases = {
     'most-venture-poopsicks': {
         type: 'album',

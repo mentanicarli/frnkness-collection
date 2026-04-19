@@ -1,6 +1,7 @@
 /**
- * Legacy app-core.js type declarations
- * These will be gradually replaced by TypeScript modules
+ * Декларации для legacy runtime.
+ * Нужны, чтобы TypeScript корректно импортировал app-core.js.
+ * В дальнейшем будут заменены типизированными модулями.
  */
 
 export function initLegacyApp(deps?: any): void

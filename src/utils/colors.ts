@@ -1,5 +1,6 @@
 import type { ColorSet } from '@/types'
 
+// Вспомогательные структуры для преобразований между цветовыми моделями.
 export interface HSL {
     h: number
     s: number
@@ -19,7 +20,7 @@ const DEFAULT_COLOR: ColorSet = {
 }
 
 /**
- * Get average color from image
+ * Возвращает усредненный RGB-цвет изображения.
  */
 export function getAverageColorFromImage(img: HTMLImageElement): [number, number, number] {
     const canvas = document.createElement('canvas')
@@ -53,7 +54,7 @@ export function getAverageColorFromImage(img: HTMLImageElement): [number, number
 }
 
 /**
- * RGB to HSL conversion
+ * Конвертирует RGB в HSL.
  */
 export function rgbToHsl(r: number, g: number, b: number): HSL {
     r /= 255
@@ -85,7 +86,7 @@ export function rgbToHsl(r: number, g: number, b: number): HSL {
 }
 
 /**
- * HSL to RGB conversion
+ * Конвертирует HSL обратно в RGB.
  */
 export function hslToRgb(h: number, s: number, l: number): RGB {
     h /= 360
@@ -117,13 +118,13 @@ export function hslToRgb(h: number, s: number, l: number): RGB {
 }
 
 /**
- * Normalize RGB color to suitable accent color
+ * Нормализует цвет обложки в безопасный UI-акцент.
  */
 export function normalizeColor(rgb: [number, number, number]): ColorSet {
     const [r, g, b] = rgb
     let hsl = rgbToHsl(r, g, b)
 
-    // Handle grayscale colors
+    // Для почти серых цветов повышаем контраст, чтобы акцент не был "грязным".
     if (hsl.s < 12) {
         const neutralLightness =
             hsl.l > 75 ? 90 : hsl.l < 30 ? 72 : Math.min(88, Math.max(72, hsl.l + 10))
@@ -135,12 +136,12 @@ export function normalizeColor(rgb: [number, number, number]): ColorSet {
         }
     }
 
-    // Normalize lightness
+    // Нормализуем светлоту для читаемости текста.
     if (hsl.l < 30) hsl.l = 66
     else if (hsl.l > 82) hsl.l = 74
     else hsl.l = Math.min(76, Math.max(64, hsl.l + 8))
 
-    // Normalize saturation
+    // Нормализуем насыщенность, чтобы избежать токсично-ярких акцентов.
     if (hsl.s < 22) hsl.s = 32
     else if (hsl.s > 72) hsl.s = 52
     else hsl.s = Math.min(56, Math.max(34, hsl.s - 10))
@@ -154,7 +155,7 @@ export function normalizeColor(rgb: [number, number, number]): ColorSet {
 }
 
 /**
- * Get dominant color from image URL
+ * Извлекает доминирующий цвет (с кэшем и fallback на средний цвет).
  */
 export async function getDominantColor(
     imageUrl: string,
@@ -205,7 +206,7 @@ export async function getDominantColor(
 }
 
 /**
- * Apply color set to CSS variables
+ * Применяет цветовой набор к CSS-переменным темы.
  */
 export function applyColorToCSSVariables(
     colors: ColorSet,
@@ -218,7 +219,7 @@ export function applyColorToCSSVariables(
 }
 
 /**
- * Reset accent color to default
+ * Сбрасывает акцент к значениям по умолчанию.
  */
 export function resetColorToDefault(
     selector: '--player-accent' | '--page-accent' | '--card-accent' = '--player-accent'

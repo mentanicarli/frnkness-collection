@@ -1,3 +1,12 @@
+/**
+ * Legacy runtime приложения.
+ *
+ * Важно: этот файл содержит основную imperative-логику плеера,
+ * прямую работу с DOM и глобальный API window.App.
+ *
+ * Во Vue-слое доступ к функциям этого файла должен идти через
+ * src/runtime/legacyBridge.ts, чтобы сохранить единые архитектурные границы.
+ */
 export function initLegacyApp(deps = {}) {
     if (window.__legacyAppInitialized) return;
     window.__legacyAppInitialized = true;
@@ -113,7 +122,8 @@ export function initLegacyApp(deps = {}) {
             lastProgressPercent: -1,
             lastSecond: -1,
             searchCache: new Map(),
-            preloadedAudio: new Set()
+            preloadedAudio: new Set(),
+            pendingTrackClickGuard: null
         };
 
         function runWhenIdle(fn) {
@@ -155,6 +165,7 @@ export function initLegacyApp(deps = {}) {
 
         function cacheDomElements() {
             dom.audio = $('audio-player');
+            if (dom.audio) dom.audio.preload = 'auto';
             dom.player = $('player');
             dom.progress = $('progress-bar');
             dom.iconPlay = $('icon-play');
@@ -214,6 +225,30 @@ export function initLegacyApp(deps = {}) {
             dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch');
             dom.fsLyricsModeText = $('fs-lyrics-mode-text');
             dom.fsLyricsModeKaraoke = $('fs-lyrics-mode-karaoke');
+
+            // На touch-устройствах запускаем трек на pointerdown,
+            // чтобы избежать сценария "первый тап только подсветил".
+            if (dom.tracklist && !dom.tracklist.dataset.pointerBound) {
+                dom.tracklist.dataset.pointerBound = 'true';
+                dom.tracklist.addEventListener('pointerdown', (event) => {
+                    if (event.pointerType === 'mouse') return;
+                    const target = event.target;
+                    if (!(target instanceof Element)) return;
+                    if (target.closest('.lyrics-action-btn')) return;
+
+                    const row = target.closest('.track-row');
+                    if (!row) return;
+
+                    const indexRaw = row.getAttribute('data-track-index');
+                    const index = Number(indexRaw);
+                    if (!Number.isInteger(index) || index < 0) return;
+
+                    const now = performance.now();
+                    perf.pendingTrackClickGuard = { index, expiresAt: now + 450 };
+                    handleTrackClick(index, 'pointer');
+                    event.preventDefault();
+                }, { passive: false });
+            }
         }
 
         // ============================================================
@@ -998,7 +1033,7 @@ export function initLegacyApp(deps = {}) {
             if (!dom.tracklist || !state.currentRelease) return;
 
             dom.tracklist.innerHTML = state.currentRelease.tracks.map((t, i) => `
-                <div class="track-row flex items-center gap-5 py-4 px-4 cursor-pointer group" onclick="App.handleTrackClick(${i})">
+                <div class="track-row flex items-center gap-5 py-4 px-4 cursor-pointer group" data-track-index="${i}" onclick="App.handleTrackClick(${i})">
                     <span class="track-num w-6 text-center text-[var(--fg-muted)] text-sm font-mono group-hover:hidden">${String(t.num).padStart(2, '0')}</span>
                     <span class="w-6 text-center hidden group-hover:block">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-[var(--page-accent)]"><path d="M8 5v14l11-7z"/></svg>
@@ -1018,7 +1053,18 @@ export function initLegacyApp(deps = {}) {
         /**
          *Раздел
          */
-        function handleTrackClick(index) {
+        function handleTrackClick(index, source = 'click') {
+            if (source === 'click' && perf.pendingTrackClickGuard) {
+                const now = performance.now();
+                if (perf.pendingTrackClickGuard.index === index && now <= perf.pendingTrackClickGuard.expiresAt) {
+                    perf.pendingTrackClickGuard = null;
+                    return;
+                }
+                if (now > perf.pendingTrackClickGuard.expiresAt) {
+                    perf.pendingTrackClickGuard = null;
+                }
+            }
+
             if (state.currentReleaseId && state.currentTrackIndex === index) {
                 togglePlay();
             } else {
@@ -1071,10 +1117,20 @@ export function initLegacyApp(deps = {}) {
                 preloadTrackMetadata(state.currentReleaseId, nextIndex);
             }
 
-            dom.audio.play().then(() => {
+            const playPromise = dom.audio.play();
+            if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.then(() => {
+                    state.isPlaying = true;
+                    updatePlayPauseIcon();
+                }).catch(err => {
+                    state.isPlaying = false;
+                    updatePlayPauseIcon();
+                    console.log('Play error:', err);
+                });
+            } else {
                 state.isPlaying = true;
                 updatePlayPauseIcon();
-            }).catch(err => console.log('Play error:', err));
+            }
 
             loadLyrics(index);
         }

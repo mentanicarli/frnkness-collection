@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import type { ColorSet, LyricLine, Release } from '@/types'
 
+// Базовый акцент, который используется до вычисления цвета из обложки.
 export const DEFAULT_COLOR: ColorSet = {
     hex: 'rgb(103, 114, 131)',
     glow: 'rgba(103, 114, 131, 0.32)',
@@ -30,10 +31,12 @@ export interface RuntimeState {
     lyricsIndex: Array<Record<string, any>>
     lyricsIndexReady: boolean
     lyricsIndexPromise: Promise<void> | null
+    // Временные any: зависимости приходят из legacy/CDN и будут типизированы позже.
     colorThief: any
     db: any
 }
 
+// Общая реактивная модель состояния для Vue-слоя и legacy runtime.
 export const runtimeState = reactive<RuntimeState>({
     currentRelease: null,
     currentReleaseId: null,
@@ -61,6 +64,7 @@ export const runtimeState = reactive<RuntimeState>({
     db: null
 })
 
+// Кэши вынесены отдельно, чтобы избежать повторных сетевых/CPU-операций.
 export const runtimeCaches = {
     colorCache: reactive<Record<string, [number, number, number]>>({}),
     colorPromiseCache: reactive<Record<string, Promise<[number, number, number]>>>({}),

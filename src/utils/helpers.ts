@@ -1,5 +1,5 @@
 /**
- * Format seconds to MM:SS
+ * Преобразует секунды в формат MM:SS для UI плеера.
  */
 export function formatTime(seconds: number): string {
     if (isNaN(seconds)) return '0:00'
@@ -9,7 +9,7 @@ export function formatTime(seconds: number): string {
 }
 
 /**
- * Throttle function
+ * Ограничивает частоту вызовов функции (throttle).
  */
 export function throttle<T extends (...args: any[]) => any>(
     func: T,
@@ -26,7 +26,7 @@ export function throttle<T extends (...args: any[]) => any>(
 }
 
 /**
- * Debounce function
+ * Откладывает вызов функции до паузы во входящем потоке событий (debounce).
  */
 export function debounce<T extends (...args: any[]) => any>(
     func: T,
@@ -40,14 +40,14 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Normalize search text
+ * Нормализует строку для поиска: lower-case + trim.
  */
 export function normalizeSearchText(value: string): string {
     return (value || '').toString().toLowerCase().trim()
 }
 
 /**
- * Escape HTML special characters
+ * Экранирует спецсимволы HTML перед вставкой в innerHTML.
  */
 export function escapeHtml(value: string): string {
     return (value || '')

@@ -2,7 +2,8 @@ import type { Release, ChartTrack, PlayCountItem } from '@/types'
 import { parseTrackKey } from './lyrics'
 
 /**
- * Get play count for a specific release (album)
+ * Возвращает суммарные прослушивания альбома.
+ * Результат кэшируется по releaseId.
  */
 export async function getReleasePlayCount(
     releaseId: string,
@@ -34,7 +35,7 @@ export async function getReleasePlayCount(
 }
 
 /**
- * Increment play count for a track
+ * Инкрементирует счетчик прослушиваний трека через RPC Supabase.
  */
 export async function incrementPlayCount(
     trackKey: string,
@@ -59,7 +60,7 @@ export async function incrementPlayCount(
 }
 
 /**
- * Get chart data
+ * Загружает чарт треков и агрегирует дубликаты ключей.
  */
 export async function getChartData(
     releases: Record<string, Release>,

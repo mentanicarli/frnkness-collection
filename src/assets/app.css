@@ -2002,4 +2002,109 @@ a:focus-visible {
         transform: none;
         box-shadow: none;
     }
+
+    /* На touch отключаем hover-подсветку строки трека, чтобы тап сразу ощущался как действие play. */
+    .track-row:hover {
+        background-color: transparent;
+    }
+}
+
+/* В standalone PWA используем desktop-поведение караоке и анимаций,
+   даже на мобильной ширине экрана. */
+@media (display-mode: standalone) {
+    .fs-main-area {
+        flex-direction: row;
+        padding: calc(100px + var(--safe-top)) 40px 220px;
+    }
+
+    .fullscreen-player.lyrics-open .fs-cover-container {
+        transform: translateX(-220px);
+    }
+
+    .fs-cover {
+        width: 280px;
+        height: 280px;
+    }
+
+    .fs-track-info {
+        top: calc(24px + var(--safe-top));
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        text-align: center;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    .fs-header-buttons {
+        top: calc(16px + var(--safe-top));
+        right: 36px;
+        gap: 10px;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    .fs-lyrics-panel {
+        position: absolute;
+        right: 40px;
+        top: 80px;
+        bottom: 200px;
+        width: 360px;
+        height: auto;
+        border-radius: 16px;
+        transform: translateX(50px);
+    }
+
+    .fullscreen-player.lyrics-open .fs-lyrics-panel {
+        transform: translateX(0);
+    }
+
+    .fs-lyrics-header {
+        padding: 16px 20px;
+    }
+
+    .fs-lyrics-body {
+        padding: 16px 20px;
+        padding-bottom: 16px;
+    }
+
+    .lrc-line {
+        padding: 10px 0;
+        margin-bottom: 8px;
+        font-size: 18px;
+        line-height: 1.6;
+        opacity: 0.6;
+        transform: scale(1);
+        border-left-width: 3px;
+        padding-left: 12px;
+        margin-left: -12px;
+        transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
+    }
+
+    .lrc-line.active {
+        opacity: 1;
+        transform: scale(1.05);
+        font-weight: 600;
+        margin-left: 0;
+    }
+
+    .fs-lrc-line {
+        padding: 10px 0;
+        margin-bottom: 6px;
+        font-size: 17px;
+        line-height: 1.6;
+        opacity: 0.5;
+        border-left-width: 3px;
+        padding-left: 14px;
+        margin-left: -14px;
+        transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
+    }
+
+    .fs-lrc-line.active {
+        opacity: 1;
+        transform: scale(1.02);
+        font-weight: 600;
+    }
 }

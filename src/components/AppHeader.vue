@@ -3,7 +3,7 @@
     <div
       style="height: 100%; display: flex; align-items: center; justify-content: space-between; padding: clamp(10px, 2vw, 20px) clamp(12px, 3vw, 48px); width: 100%;"
     >
-      <button onclick="App.showPage('home')" class="flex items-center gap-3 group" aria-label="На главную">
+      <button @click="showHome" class="flex items-center gap-3 group" aria-label="На главную">
         <span class="text-lg font-medium tracking-tight text-white/90 group-hover:text-white transition-colors">frnk ness collection</span>
       </button>
       <nav class="hidden sm:flex items-center gap-4 text-sm text-[var(--fg-muted)]">
@@ -18,7 +18,7 @@
           </svg>
         </button>
         <button
-          onclick="App.showPage('chart')"
+          @click="showChart"
           class="chart-btn header-animated-btn flex items-center gap-2 px-6 py-2.5 text-sm tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -49,5 +49,15 @@
     </div>
   </header>
 
-  <div id="search-backdrop" class="search-backdrop" onclick="App.toggleSearchPanel(false)"></div>
+  <div id="search-backdrop" class="search-backdrop" @click="closeSearchPanel"></div>
 </template>
+
+<script setup lang="ts">
+import { legacyBridge } from '@/runtime/legacyBridge'
+
+// Header не содержит бизнес-логики:
+// только проксирует действия пользователя в bridge.
+const showHome = () => legacyBridge.showPage('home')
+const showChart = () => legacyBridge.showPage('chart')
+const closeSearchPanel = () => legacyBridge.toggleSearchPanel(false)
+</script>

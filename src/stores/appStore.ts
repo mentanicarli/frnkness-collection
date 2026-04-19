@@ -4,7 +4,8 @@ import type { ColorSet } from '@/types'
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from '@/runtime/sharedState'
 
 export const useAppStore = defineStore('app', () => {
-    // Shared runtime state (single source of truth)
+    // Проксируем runtimeState в refs:
+    // store выступает адаптером между Vue-компонентами и legacy состоянием.
     const currentRelease = toRef(runtimeState, 'currentRelease')
     const currentReleaseId = toRef(runtimeState, 'currentReleaseId')
     const currentTrackIndex = toRef(runtimeState, 'currentTrackIndex')
@@ -26,20 +27,20 @@ export const useAppStore = defineStore('app', () => {
     const flowModeActive = toRef(runtimeState, 'flowModeActive')
     const searchOpen = toRef(runtimeState, 'searchOpen')
 
-    // Shared caches
+    // Общие кэши вычислений/запросов.
     const colorCache = runtimeCaches.colorCache
     const colorPromiseCache = runtimeCaches.colorPromiseCache
     const releasePlayCountCache = runtimeCaches.releasePlayCountCache
 
-    // UI state
+    // Локальное UI-состояние акцентных цветов.
     const pageAccentColor = ref(DEFAULT_COLOR)
     const playerAccentColor = ref(DEFAULT_COLOR)
 
-    // Supabase client
+    // Ссылки на внешние сервисы, которые инициализируются в runtime.
     const dbClient = toRef(runtimeState, 'db')
     const colorThief = toRef(runtimeState, 'colorThief')
 
-    // Setters
+    // Базовые действия изменения состояния.
     const setCurrentTrack = (releaseId: string, trackIndex: number) => {
         currentReleaseId.value = releaseId
         currentTrackIndex.value = trackIndex

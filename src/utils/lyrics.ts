@@ -2,7 +2,7 @@ import type { LyricLine, TrackRef } from '@/types'
 import type { Releases } from '@/types'
 
 /**
- * Parse LRC format lyrics
+ * Парсит LRC-текст в массив строк с таймкодами.
  */
 export function parseLRC(text: string): LyricLine[] {
     return text
@@ -22,7 +22,9 @@ export function parseLRC(text: string): LyricLine[] {
 }
 
 /**
- * Parse track key (both legacy and modern formats)
+ * Парсит ключ трека в обоих форматах:
+ * legacy: releaseId--trackNumber (1-based)
+ * modern: releaseId-trackNumber (0-based)
  */
 export function parseTrackKey(key: string): TrackRef | null {
     if (typeof key !== 'string') return null
@@ -53,7 +55,7 @@ export function parseTrackKey(key: string): TrackRef | null {
 }
 
 /**
- * Get all track references from releases
+ * Строит плоский список ссылок на все треки из реестра релизов.
  */
 export function getAllTrackRefs(releases: Releases): TrackRef[] {
     return Object.entries(releases).flatMap(([releaseId, release]) =>
@@ -62,14 +64,14 @@ export function getAllTrackRefs(releases: Releases): TrackRef[] {
 }
 
 /**
- * Check if two track references are the same
+ * Сравнивает две ссылки на трек.
  */
 export function isSameTrackRef(a: TrackRef | null, b: TrackRef | null): boolean {
     return Boolean(a && b && a.releaseId === b.releaseId && a.trackIndex === b.trackIndex)
 }
 
 /**
- * Pick random track reference, optionally excluding one
+ * Выбирает случайный трек, опционально исключая текущий.
  */
 export function pickRandomTrackRef(
     releases: Releases,
