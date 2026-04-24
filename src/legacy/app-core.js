@@ -542,13 +542,13 @@ export function initLegacyApp(deps = {}) {
                                         <h3 class="promo-title text-2xl sm:text-3xl font-semibold transition-colors line-clamp-2 relative z-10">${promo.title}</h3>
                                         <p class="text-sm text-[var(--fg-muted)] mt-2 relative z-10">${promo.tracks.length} трек${promo.tracks.length === 1 ? '' : promo.tracks.length < 5 ? 'а' : 'ов'} • ${promo.year}</p>
                                     </div>
-                                    <p class="text-sm text-[var(--fg-muted)] max-w-2xl leading-relaxed relative z-10">Новый сингл P-Team уже доступен. Перейди к релизу и послушай его первым.</p>
+                                    <p class="text-sm text-[var(--fg-muted)] max-w-2xl leading-relaxed relative z-10">Новый сингл уже доступен. Перейди к релизу и послушай его первым.</p>
                                     <div class="flex items-center gap-3">
                                         <span class="promo-cta inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs tracking-widest uppercase font-semibold">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <path d="M8 5v14l11-7z" />
                                             </svg>
-                                            Открыть релиз
+                                            Открыть
                                         </span>
                                     </div>
                                 </div>
@@ -951,7 +951,7 @@ export function initLegacyApp(deps = {}) {
 
         async function getReleasePlayCount(releaseId) {
             const release = releases[releaseId];
-            if (!release || release.type !== 'album') return 0;
+            if (!release) return 0;
             if (releasePlayCountCache[releaseId] !== undefined) return releasePlayCountCache[releaseId];
             if (!state.db) return 0;
 
@@ -992,8 +992,8 @@ export function initLegacyApp(deps = {}) {
             if (dom.releaseTitle) dom.releaseTitle.textContent = r.title;
             if (dom.releaseMeta) dom.releaseMeta.textContent = `${r.type === 'album' ? 'Альбом' : 'Сингл'} • ${r.year}`;
             if (dom.releasePlays) {
-                dom.releasePlays.classList.toggle('hidden', r.type !== 'album');
-                dom.releasePlays.textContent = r.type === 'album' ? 'Счетчик прослушиваний загружается...' : '';
+                dom.releasePlays.classList.remove('hidden');
+                dom.releasePlays.textContent = 'Счетчик прослушиваний загружается...';
             }
 
             if (dom.downloadContainer) {
@@ -1015,10 +1015,10 @@ export function initLegacyApp(deps = {}) {
                 }
             }
 
-            if (r.type === 'album' && dom.releasePlays) {
+            if (dom.releasePlays) {
                 getReleasePlayCount(id).then(total => {
                     if (state.currentReleaseId !== id || !dom.releasePlays) return;
-                    dom.releasePlays.textContent = `Прослушиваний альбома: ${total}`;
+                    dom.releasePlays.textContent = `Прослушиваний ${r.type === 'album' ? 'альбома' : 'сингла'}: ${total}`;
                 });
             }
 
@@ -1321,7 +1321,7 @@ export function initLegacyApp(deps = {}) {
                 }
 
                 updateKaraoke();
-                const threshold = Math.min(30, Math.max(10, dom.audio.duration * 0.5));
+                const threshold = 10;
                 if (currentTime >= threshold && !state.trackCounted && !state.trackCountPending) {
                     incrementPlayCount();
                 }

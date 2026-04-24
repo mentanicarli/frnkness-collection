@@ -10,7 +10,7 @@ const rawPromoFlag = import.meta.env.VITE_SHOW_NEW_RELEASE_PROMO
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
 export const SHOW_NEW_RELEASE_PROMO = rawPromoFlag == null ? true : rawPromoFlag.trim().toLowerCase() === 'true'
-export const NEW_RELEASE_PROMO_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'p-team'
+export const NEW_RELEASE_PROMO_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'faaa'
 
 // Единый источник данных по дискографии, трекам и путям к медиа/текстам.
 export const releases: Releases = {
@@ -98,5 +98,14 @@ export const releases: Releases = {
         audioPath: 'audio/singles/',
         lyricsPath: 'lyrics/singles/',
         tracks: [{ num: 1, title: 'P-Team', file: 'p-team.mp3', lyricsFile: 'p-team.txt' }]
+    },
+    faaa: {
+        type: 'single',
+        title: 'FAAA',
+        year: '2026',
+        cover: 'images/single6-cover.jpg',
+        audioPath: 'audio/singles/',
+        lyricsPath: 'lyrics/singles/',
+        tracks: [{ num: 1, title: 'FAAA', file: 'faaa.mp3', lyricsFile: 'faaa.txt' }]
     }
 }
