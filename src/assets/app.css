@@ -1688,7 +1688,9 @@ a:focus-visible {
     }
 
     .chart-plays {
-        display: none;
+        display: flex;
+        font-size: 11px;
+        gap: 4px;
     }
 
     .player>div:nth-child(2) {
