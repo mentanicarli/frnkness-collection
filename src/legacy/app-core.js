@@ -706,38 +706,22 @@ export function initLegacyApp(deps = {}) {
                 Object.entries(releases).forEach(([releaseId, release]) => {
                     release.tracks.forEach((track, trackIndex) => {
                         tasks.push(async () => {
-                            const { txt, lrc } = await fetchTrackLyrics(release, track);
-                            if (txt) {
-                                txt.split('\n').forEach(line => {
-                                    const clean = line.trim();
-                                    if (!clean) return;
-                                    entries.push({
-                                        releaseId,
-                                        releaseTitle: release.title,
-                                        trackIndex,
-                                        trackTitle: track.title,
-                                        line: clean,
-                                        normalized: normalizeSearchText(clean),
-                                        time: -1
-                                    });
-                                });
-                            }
+                            const { lrc } = await fetchTrackLyrics(release, track);
+                            if (!lrc) return;
 
-                            if (lrc) {
-                                parseLRC(lrc).forEach(item => {
-                                    const clean = (item.text || '').trim();
-                                    if (!clean) return;
-                                    entries.push({
-                                        releaseId,
-                                        releaseTitle: release.title,
-                                        trackIndex,
-                                        trackTitle: track.title,
-                                        line: clean,
-                                        normalized: normalizeSearchText(clean),
-                                        time: item.time
-                                    });
+                            parseLRC(lrc).forEach(item => {
+                                const clean = (item.text || '').trim();
+                                if (!clean) return;
+                                entries.push({
+                                    releaseId,
+                                    releaseTitle: release.title,
+                                    trackIndex,
+                                    trackTitle: track.title,
+                                    line: clean,
+                                    normalized: normalizeSearchText(clean),
+                                    time: item.time
                                 });
-                            }
+                            });
                         });
                     });
                 });
@@ -796,10 +780,13 @@ export function initLegacyApp(deps = {}) {
             });
 
             if (state.lyricsIndexReady) {
+                const seenLyricKeys = new Set();
                 state.lyricsIndex
                     .filter(item => item.normalized.includes(normalized))
-                    .slice(0, 20)
                     .forEach(item => {
+                        const dedupeKey = `${item.releaseId}|${item.trackIndex}|${item.normalized}`;
+                        if (seenLyricKeys.has(dedupeKey)) return;
+                        seenLyricKeys.add(dedupeKey);
                         results.push({
                             type: 'lyric',
                             releaseId: item.releaseId,
@@ -1617,10 +1604,38 @@ export function initLegacyApp(deps = {}) {
         }
 
         function seekTo(time) {
-            if (dom.audio.duration) {
+            if (!Number.isFinite(time) || time < 0) return;
+
+            const applySeek = () => {
                 dom.audio.currentTime = time;
-                if (!state.isPlaying) togglePlay();
+                if (dom.audio.paused) {
+                    const resumePromise = dom.audio.play();
+                    if (resumePromise && typeof resumePromise.then === 'function') {
+                        resumePromise.then(() => {
+                            state.isPlaying = true;
+                            updatePlayPauseIcon();
+                        }).catch(() => {
+                            state.isPlaying = false;
+                            updatePlayPauseIcon();
+                        });
+                    } else {
+                        state.isPlaying = true;
+                        updatePlayPauseIcon();
+                    }
+                }
+            };
+
+            if (dom.audio.readyState >= 1 || Number.isFinite(dom.audio.duration)) {
+                applySeek();
+                return;
             }
+
+            const onMetadata = () => {
+                dom.audio.removeEventListener('loadedmetadata', onMetadata);
+                applySeek();
+            };
+
+            dom.audio.addEventListener('loadedmetadata', onMetadata);
         }
 
         function showLyrics(index) {
