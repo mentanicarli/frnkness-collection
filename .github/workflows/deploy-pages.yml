@@ -46,9 +46,6 @@ jobs:
           cp -r lyrics dist/lyrics
           cp -r lyrics-books dist/lyrics-books
 
-      - name: Enable SPA fallback
-        run: cp dist/index.html dist/404.html
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

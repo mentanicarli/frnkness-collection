@@ -1202,6 +1202,7 @@ export function initLegacyApp(deps = {}) {
             if (dom.fsPlayer) {
                 dom.fsPlayer.classList.add('open');
                 document.body.style.overflow = 'hidden';
+                syncFsPlayerModeState();
             }
         }
 
@@ -1209,8 +1210,7 @@ export function initLegacyApp(deps = {}) {
             if (dom.fsPlayer) {
                 dom.fsPlayer.classList.remove('open');
                 state.fsLyricsOpen = false;
-                dom.fsPlayer.classList.remove('lyrics-open');
-                if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.remove('active');
+                syncFsPlayerModeState();
                 document.body.style.overflow = '';
             }
         }
@@ -1278,10 +1278,17 @@ export function initLegacyApp(deps = {}) {
             if (inactive) inactive.classList.remove('playing');
         }
 
+        function syncFsPlayerModeState() {
+            if (!dom.fsPlayer) return;
+            const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke';
+            dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen);
+            dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen);
+            if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.toggle('active', state.fsLyricsOpen);
+        }
+
         function toggleFsLyrics() {
             state.fsLyricsOpen = !state.fsLyricsOpen;
-            if (dom.fsPlayer) dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen);
-            if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.toggle('active', state.fsLyricsOpen);
+            syncFsPlayerModeState();
         }
 
         // ============================================================
@@ -1444,19 +1451,24 @@ export function initLegacyApp(deps = {}) {
                     if (!container || !lines.length) return;
                     if (prevIndex !== -1 && lines[prevIndex]) {
                         lines[prevIndex].classList.remove('active');
+                        lines[prevIndex].classList.remove('entering');
                     }
                     if (newIndex !== -1 && lines[newIndex]) {
                         const active = lines[newIndex];
                         active.classList.add('active');
-                        const targetTop = active.offsetTop - (container.clientHeight / 2) + (active.clientHeight / 2);
+                        active.classList.add('entering');
+                        requestAnimationFrame(() => {
+                            active.classList.remove('entering');
+                        });
+                        const targetTop = active.offsetTop - (container.clientHeight * 0.4) + (active.clientHeight / 2);
                         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
                         const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
                         const distance = Math.abs(container.scrollTop - clampedTop);
 
-                        if (distance > 6) {
+                        if (distance > 8) {
                             container.scrollTo({
                                 top: clampedTop,
-                                behavior: distance > 140 ? 'smooth' : 'auto'
+                                behavior: 'smooth'
                             });
                         }
                     }
@@ -1525,6 +1537,7 @@ export function initLegacyApp(deps = {}) {
             state.lyricsMode = mode;
             state.preferredLyricsMode = mode;
             renderLyricsByMode();
+            syncFsPlayerModeState();
         }
 
         // ============================================================
