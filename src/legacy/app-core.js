@@ -1208,6 +1208,19 @@ export function initLegacyApp(deps = {}) {
 
         function closeFsPlayer() {
             if (dom.fsPlayer) {
+                const isDesktopKaraoke = window.matchMedia && window.matchMedia('(min-width: 769px)').matches && state.lyricsMode === 'karaoke';
+
+                if (isDesktopKaraoke) {
+                    dom.fsPlayer.classList.add('closing-fs');
+                    window.setTimeout(() => {
+                        dom.fsPlayer.classList.remove('open', 'closing-fs');
+                        state.fsLyricsOpen = false;
+                        syncFsPlayerModeState();
+                        document.body.style.overflow = '';
+                    }, 220);
+                    return;
+                }
+
                 dom.fsPlayer.classList.remove('open');
                 state.fsLyricsOpen = false;
                 syncFsPlayerModeState();
@@ -1540,6 +1553,22 @@ export function initLegacyApp(deps = {}) {
         function setLyricsMode(mode) {
             if (!['text', 'karaoke'].includes(mode)) return;
             if (mode === 'karaoke' && !state.parsedLyrics.length) return;
+
+            const isDesktopFullscreen = window.matchMedia && window.matchMedia('(min-width: 769px)').matches;
+            const isSwitchingFromKaraokeToText = isDesktopFullscreen && state.fsLyricsOpen && state.lyricsMode === 'karaoke' && mode === 'text';
+
+            if (isSwitchingFromKaraokeToText && dom.fsPlayer) {
+                dom.fsPlayer.classList.add('closing-karaoke');
+                window.setTimeout(() => {
+                    state.lyricsMode = mode;
+                    state.preferredLyricsMode = mode;
+                    renderLyricsByMode();
+                    syncFsPlayerModeState();
+                    dom.fsPlayer.classList.remove('closing-karaoke');
+                }, 180);
+                return;
+            }
+
             state.lyricsMode = mode;
             state.preferredLyricsMode = mode;
             renderLyricsByMode();
