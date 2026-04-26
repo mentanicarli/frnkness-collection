@@ -1217,7 +1217,6 @@ export function initLegacyApp(deps = {}) {
 
         function updateFullscreen(title, cover, direction) {
             if (dom.fsTitle) dom.fsTitle.textContent = title;
-            if (dom.fsBg) dom.fsBg.style.backgroundImage = `url(${cover})`;
             if (dom.fsLyricsTitle) dom.fsLyricsTitle.textContent = title;
             animateCover(cover, direction);
         }
@@ -1289,6 +1288,9 @@ export function initLegacyApp(deps = {}) {
         function toggleFsLyrics() {
             state.fsLyricsOpen = !state.fsLyricsOpen;
             syncFsPlayerModeState();
+            if (state.fsLyricsOpen && state.lyricsMode === 'karaoke') {
+                updateKaraoke();
+            }
         }
 
         // ============================================================
@@ -1460,12 +1462,16 @@ export function initLegacyApp(deps = {}) {
                         requestAnimationFrame(() => {
                             active.classList.remove('entering');
                         });
-                        const targetTop = active.offsetTop - (container.clientHeight * 0.4) + (active.clientHeight / 2);
+                        // Center the current line vertically in fullscreen karaoke mode
+                        const isKaraokeMode = container === dom.fsLyricsBody && state.lyricsMode === 'karaoke';
+                        const verticalOffset = isKaraokeMode ? 0.5 : 0.4; // 50% center for karaoke, 40% for text mode
+                        const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2);
                         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
                         const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
                         const distance = Math.abs(container.scrollTop - clampedTop);
+                        const minDistanceToScroll = isKaraokeMode ? 1 : 8;
 
-                        if (distance > 8) {
+                        if (distance > minDistanceToScroll) {
                             container.scrollTo({
                                 top: clampedTop,
                                 behavior: 'smooth'
@@ -1621,6 +1627,9 @@ export function initLegacyApp(deps = {}) {
 
             const applySeek = () => {
                 dom.audio.currentTime = time;
+                if (state.lyricsMode === 'karaoke') {
+                    updateKaraoke();
+                }
                 if (dom.audio.paused) {
                     const resumePromise = dom.audio.play();
                     if (resumePromise && typeof resumePromise.then === 'function') {

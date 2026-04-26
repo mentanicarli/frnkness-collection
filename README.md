@@ -6,7 +6,7 @@
 
 ## Демо
 
-https://mentanicarli.github.io/pupsiks-saga/
+https://frnkness.ru/
 
 ## Возможности
 
@@ -128,15 +128,18 @@ npm run preview
 - Service worker: `public/sw.js`
 - Кэши: app shell, медиа (`audio`, `images`), тексты (`lyrics`)
 - Для GitHub Pages регистрация service worker выполняется через `import.meta.env.BASE_URL` в `src/main.ts`
+- Для GitHub Pages используется относительный `base` в Vite, чтобы ассеты и manifest открывались корректно и на custom domain, и на project pages
+- В `public/404.html` лежит статический fallback для GitHub Pages
 
 ## Деплой
 
-Проект рассчитан на GitHub Pages.
+Проект рассчитан на GitHub Pages и деплоится через GitHub Actions workflow `.github/workflows/deploy-pages.yml`.
 
-`vite.config.ts` автоматически вычисляет `base`:
+Сборка Vite настроена с `base: './'`, поэтому в `dist/index.html` используются относительные пути к ассетам.
 
-- `/` для репозиториев вида `username.github.io`
-- `/<repo-name>/` для project pages
+При публикации на GitHub Pages проверьте, что в Repo Settings → Pages выбран источник из деплоя workflow, а сайт после деплоя отмечен как активный.
+
+Если вы публикуете релиз вручную через branch deploy, убедитесь, что в корне опубликованной директории лежат `index.html` и `404.html`, а все ссылки на ассеты остаются относительными.
 
 ## Конфигурация Supabase
 
