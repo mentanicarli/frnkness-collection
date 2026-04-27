@@ -1004,18 +1004,24 @@ header nav button:hover {
     justify-content: center;
     position: relative;
     z-index: 1;
-    padding: calc(80px + var(--safe-top)) clamp(16px, 4vw, 40px) clamp(160px, 20vh, 220px);
+    padding: 0 clamp(16px, 4vw, 40px);
+    padding-bottom: clamp(160px, 20vh, 220px);
+    padding-top: clamp(100px, 15vh, 140px);
 }
 
 @media (max-width: 768px) {
     .fs-main-area {
-        padding: calc(80px + var(--safe-top)) clamp(8px, 3vw, 20px) clamp(140px, 18vh, 180px);
+        padding: 0 clamp(8px, 3vw, 20px);
+        padding-bottom: clamp(140px, 18vh, 180px);
+        padding-top: clamp(90px, 12vh, 120px);
     }
 }
 
 @media (max-width: 480px) {
     .fs-main-area {
-        padding: calc(70px + var(--safe-top)) clamp(8px, 2vw, 16px) clamp(120px, 15vh, 160px);
+        padding: 0 clamp(8px, 2vw, 16px);
+        padding-bottom: clamp(120px, 15vh, 160px);
+        padding-top: clamp(80px, 10vh, 110px);
     }
 }
 
@@ -1037,12 +1043,16 @@ header nav button:hover {
 }
 
 .fullscreen-player.karaoke-only .fs-main-area {
-    padding: calc(80px + var(--safe-top)) clamp(8px, 3vw, 20px) clamp(140px, 18vh, 180px);
+    padding: 0 clamp(8px, 3vw, 20px);
+    padding-bottom: clamp(140px, 18vh, 180px);
+    padding-top: clamp(60px, 8vh, 90px);
 }
 
 @media (max-width: 480px) {
     .fullscreen-player.karaoke-only .fs-main-area {
-        padding: calc(70px + var(--safe-top)) clamp(8px, 2vw, 16px) clamp(120px, 15vh, 160px);
+        padding: 0 clamp(8px, 2vw, 16px);
+        padding-bottom: clamp(120px, 15vh, 160px);
+        padding-top: clamp(50px, 6vh, 80px);
     }
 }
 
@@ -1389,9 +1399,11 @@ header nav button:hover {
     transform: translateX(-50%);
     text-align: center;
     z-index: 5;
-    transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, width 0.4s ease;
+    transition: left 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, width 0.4s ease, visibility 0.3s ease;
     max-width: calc(100% - 120px);
     padding: 0 clamp(12px, 2vw, 24px);
+    visibility: visible;
+    opacity: 1;
 }
 
 @media (max-width: 480px) {
@@ -1402,27 +1414,43 @@ header nav button:hover {
 }
 
 .fullscreen-player.lyrics-open.karaoke-open .fs-track-info {
-    position: static;
-    left: auto;
-    transform: none;
-    width: 100%;
-    max-width: none;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: calc(16px + var(--safe-top));
+    width: auto;
+    max-width: calc(100% - 120px);
     padding: 0 clamp(16px, 3vw, 32px);
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    margin-bottom: clamp(12px, 2vw, 20px);
     text-align: center;
 }
 
 @media (max-width: 768px) {
     .fullscreen-player.lyrics-open.karaoke-open .fs-track-info {
-        margin-bottom: clamp(8px, 1.5vw, 16px);
+        max-width: calc(100% - 100px);
     }
 }
 
 .fullscreen-player.karaoke-only .fs-track-info {
-    display: none;
+    position: absolute;
+    top: calc(16px + var(--safe-top));
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 100%;
+    padding: 0 clamp(12px, 2vw, 24px);
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 15;
+}
+
+@media (max-width: 480px) {
+    .fullscreen-player.karaoke-only .fs-track-info {
+        top: calc(12px + var(--safe-top));
+    }
 }
 
 .fs-track-title {
@@ -1448,6 +1476,9 @@ header nav button:hover {
     display: flex;
     gap: clamp(6px, 1vw, 10px);
     z-index: 10;
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 @media (max-width: 480px) {
@@ -1455,6 +1486,12 @@ header nav button:hover {
         top: calc(10px + var(--safe-top));
         right: clamp(8px, 2vw, 20px);
     }
+}
+
+.fullscreen-player.karaoke-only .fs-header-buttons {
+    visibility: visible;
+    opacity: 1;
+    z-index: 15;
 }
 
 .fs-header-btn {

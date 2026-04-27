@@ -1295,7 +1295,7 @@ export function initLegacyApp(deps = {}) {
             const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke';
             const isMobileView = !window.matchMedia || !window.matchMedia('(min-width: 769px)').matches;
             const isKaraokeOnlyMode = isMobileView && karaokeOpen;
-            
+
             dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen);
             dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen);
             dom.fsPlayer.classList.toggle('karaoke-only', isKaraokeOnlyMode);
