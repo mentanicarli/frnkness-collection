@@ -2002,6 +2002,49 @@ a:focus-visible {
     }
 }
 
+/* PWA-only: lyrics can be opened only from fullscreen player. */
+@media (display-mode: standalone) {
+    #player #lyrics-btn,
+    #player #lyrics-btn-mobile,
+    #tracklist .lyrics-action-btn {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+}
+
+    /* Karaoke in fullscreen: hide bottom controls/progress area. */
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-controls,
+    .fullscreen-player.open.karaoke-only .fs-controls {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        transform: translateY(16px) !important;
+    }
+
+/* Final fullscreen interaction overrides. */
+.fullscreen-player.open.lyrics-open .fs-header-buttons,
+.fullscreen-player.open.lyrics-open.karaoke-open .fs-header-buttons,
+.fullscreen-player.open.karaoke-only .fs-header-buttons {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 40 !important;
+}
+
+.fullscreen-player.open .fs-header-btn {
+    pointer-events: auto !important;
+}
+
+.fullscreen-player.open.lyrics-open .fs-track-info,
+.fullscreen-player.open.lyrics-open.karaoke-open .fs-track-info,
+.fullscreen-player.open.karaoke-only .fs-track-info {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    z-index: 39 !important;
+}
+
 /* Fullscreen hard-fix overrides (must stay at file end). */
 .fullscreen-player.open:not(.lyrics-open) .fs-main-area {
     padding: 0 !important;
