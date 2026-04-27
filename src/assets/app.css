@@ -1473,7 +1473,7 @@ header nav button:hover {
     display: block;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: clamp(40px, 6vh, 80px) clamp(16px, 3vw, 40px);
+    padding: clamp(88px, 6vh, 80px) clamp(16px, 3vw, 40px);
     scroll-behavior: smooth;
     text-align: left;
     min-height: 0;
