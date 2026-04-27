@@ -30,6 +30,161 @@
     --top-ui-offset: calc(clamp(78px, 10vw, 106px) + var(--safe-top));
 }
 
+/* Mobile browser karaoke override: same behavior as PWA on touch devices. */
+@media (max-width: 768px) and (pointer: coarse) {
+
+    #player #lyrics-btn,
+    #player #lyrics-btn-mobile,
+    #tracklist .lyrics-action-btn {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .fs-main-area {
+        display: flex;
+        flex-direction: column;
+        padding: calc(72px + var(--safe-top)) 20px 200px;
+        gap: 0;
+    }
+
+    .fullscreen-player.lyrics-open .fs-cover-container,
+    .fullscreen-player.lyrics-open.karaoke-open .fs-cover-container {
+        transform: translateX(0) !important;
+        margin: auto;
+        justify-self: auto;
+        align-self: auto;
+    }
+
+    .fs-cover {
+        width: 260px;
+        height: 260px;
+        max-width: 70vw;
+        max-height: 70vw;
+    }
+
+    .fs-track-info {
+        top: calc(10px + var(--safe-top));
+        left: 16px;
+        right: 16px;
+        transform: none;
+        text-align: center;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+    }
+
+    .fullscreen-player.lyrics-open .fs-track-info,
+    .fullscreen-player.lyrics-open.karaoke-open .fs-track-info {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-panel {
+        width: 100%;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateY(0);
+        background: transparent;
+        border: 0;
+    }
+
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
+        display: block;
+        padding: 0 16px;
+        padding-top: calc(24px + var(--safe-top));
+        padding-bottom: 240px;
+        min-height: auto;
+        text-align: left;
+    }
+
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
+        text-align: left;
+        padding-left: 0;
+        margin-left: 0;
+        border-left: 0;
+    }
+}
+
+/* PWA fullscreen karaoke polish. */
+@media (display-mode: standalone) {
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body,
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body {
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: clamp(28px, 5vh, 48px) clamp(16px, 3vw, 36px);
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+        -webkit-mask-composite: source-over;
+        mask-composite: add;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line,
+    .fullscreen-player.open.karaoke-only .fs-lrc-line {
+        width: 100%;
+        max-width: min(860px, 100%);
+        font-size: clamp(30px, 7vw, 44px);
+        line-height: 1.62;
+        letter-spacing: 0;
+        text-align: center;
+        padding: clamp(10px, 1.6vw, 18px) 0;
+        margin: clamp(8px, 1.4vw, 18px) 0;
+        padding-left: 0;
+        margin-left: 0;
+        border-left: 0 !important;
+        opacity: 0.55;
+        transition: opacity 0.26s ease, color 0.26s ease, text-shadow 0.26s ease, transform 0.26s ease;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line.active,
+    .fullscreen-player.open.karaoke-only .fs-lrc-line.active {
+        border-left: 0 !important;
+        padding-left: 0;
+        margin-left: 0;
+        opacity: 1;
+        transform: scale(1.02);
+        text-shadow: 0 0 20px var(--player-accent-glow);
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::before,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::after,
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body::before,
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body::after {
+        content: '';
+        position: sticky;
+        left: 0;
+        right: 0;
+        height: clamp(42px, 8vh, 84px);
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::before,
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body::before {
+        top: 0;
+        margin-bottom: calc(-1 * clamp(42px, 8vh, 84px));
+        background: linear-gradient(to bottom, rgba(10, 11, 14, 0.98), rgba(10, 11, 14, 0));
+        filter: blur(14px);
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::after,
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body::after {
+        bottom: 0;
+        margin-top: calc(-1 * clamp(42px, 8vh, 84px));
+        background: linear-gradient(to top, rgba(10, 11, 14, 0.98), rgba(10, 11, 14, 0));
+        filter: blur(14px);
+    }
+}
+
 /* ============================================================
            ============================================================ */
 *,
@@ -2004,6 +2159,7 @@ a:focus-visible {
 
 /* PWA-only: lyrics can be opened only from fullscreen player. */
 @media (display-mode: standalone) {
+
     #player #lyrics-btn,
     #player #lyrics-btn-mobile,
     #tracklist .lyrics-action-btn {
@@ -2013,14 +2169,14 @@ a:focus-visible {
     }
 }
 
-    /* Karaoke in fullscreen: hide bottom controls/progress area. */
-    .fullscreen-player.open.lyrics-open.karaoke-open .fs-controls,
-    .fullscreen-player.open.karaoke-only .fs-controls {
-        opacity: 0 !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-        transform: translateY(16px) !important;
-    }
+/* Karaoke in fullscreen: hide bottom controls/progress area. */
+.fullscreen-player.open.lyrics-open.karaoke-open .fs-controls,
+.fullscreen-player.open.karaoke-only .fs-controls {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(16px) !important;
+}
 
 /* Final fullscreen interaction overrides. */
 .fullscreen-player.open.lyrics-open .fs-header-buttons,
