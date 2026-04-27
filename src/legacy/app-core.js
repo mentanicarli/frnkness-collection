@@ -1487,7 +1487,8 @@ export function initLegacyApp(deps = {}) {
                             active.classList.remove('entering');
                         });
                         const isKaraokeMode = container === dom.fsLyricsBody && state.lyricsMode === 'karaoke';
-                        if (isKaraokeMode && typeof active.scrollIntoView === 'function') {
+                        const isMobileScreen = window.innerWidth <= 768;
+                        if (isKaraokeMode && typeof active.scrollIntoView === 'function' && !isMobileScreen) {
                             active.scrollIntoView({
                                 block: 'center',
                                 inline: 'nearest',

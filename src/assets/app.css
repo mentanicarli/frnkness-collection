@@ -1243,9 +1243,28 @@ header nav button:hover {
 
 @media (max-width: 768px) {
     .fullscreen-player.lyrics-open.karaoke-open .fs-main-area {
-        grid-template-columns: 1fr;
-        gap: clamp(12px, 2vw, 24px);
-        padding: calc(80px + var(--safe-top)) clamp(8px, 2vw, 16px) clamp(120px, 15vh, 160px);
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+        gap: 0;
+        padding: calc(80px + var(--safe-top)) clamp(8px, 2vw, 16px) 0;
+        align-items: stretch;
+        justify-content: flex-start;
+        height: 100%;
+    }
+
+    .fullscreen-player.lyrics-open.karaoke-open .fs-cover-container {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .fullscreen-player.lyrics-open.karaoke-open .fs-controls {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        transform: translateY(0) !important;
     }
 }
 
@@ -1405,8 +1424,33 @@ header nav button:hover {
     flex: 1;
 }
 
+@media (max-width: 768px) {
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-panel {
+        position: fixed;
+        inset: 0;
+        top: calc(80px + var(--safe-top));
+        bottom: 0;
+        width: 100%;
+        right: 0;
+        left: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        display: flex;
+        flex-direction: column;
+        z-index: 1;
+    }
+}
+
 .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-header {
     display: none;
+}
+
+@media (max-width: 768px) {
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-header {
+        display: none !important;
+    }
 }
 
 .fs-lyrics-header {
@@ -1436,10 +1480,15 @@ header nav button:hover {
     max-height: calc(100dvh - (calc(88px + var(--safe-top)) + 160px));
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
     .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
-        padding: clamp(30px, 4vh, 60px) clamp(12px, 2vw, 24px);
-        max-height: calc(100dvh - (calc(80px + var(--safe-top)) + 140px));
+        padding: clamp(30px, 4vh, 60px) clamp(12px, 2vw, 24px) clamp(30px, 4vh, 60px);
+        max-height: calc(100dvh - calc(80px + var(--safe-top)));
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+        flex: 1;
     }
 }
 
@@ -1767,12 +1816,34 @@ header nav button:hover {
     font-weight: 400;
     font-family: 'Sora', sans-serif;
     transition: all 0.26s ease;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
+        font-size: clamp(18px, 5vw, 28px);
+        padding: clamp(8px, 1.2vw, 12px) 0;
+        padding-left: clamp(12px, 1.8vw, 16px);
+        margin-bottom: clamp(10px, 1.5vw, 16px);
+        line-height: 1.5;
+    }
 }
 
 .fs-lrc-line:hover {
     opacity: 0.75;
     color: var(--fg);
     transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+    .fs-lrc-line:hover {
+        opacity: 0.75;
+        color: var(--fg);
+        transform: none;
+    }
 }
 
 .fs-lrc-line.active {
@@ -1792,6 +1863,15 @@ header nav button:hover {
     transform: translateX(0) scale(1);
     font-weight: 600;
     padding-left: clamp(12px, 2vw, 16px);
+}
+
+@media (max-width: 768px) {
+    .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line.active {
+        transform: none;
+        opacity: 1;
+        border-left: 3px solid var(--player-accent);
+        padding-left: clamp(10px, 1.8vw, 14px);
+    }
 }
 
 .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line.entering {
@@ -2102,10 +2182,14 @@ a:focus-visible {
 
 /* Karaoke in fullscreen: hide bottom controls/progress area. */
 .fullscreen-player.open.lyrics-open.karaoke-open .fs-controls {
+    display: none !important;
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
-    transform: translateY(16px) !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
 }
 
 /* Final fullscreen interaction overrides. */
