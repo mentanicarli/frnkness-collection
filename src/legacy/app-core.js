@@ -1439,16 +1439,13 @@ export function initLegacyApp(deps = {}) {
             if (state.lyricsMode !== 'karaoke' || !state.parsedLyrics.length) return;
 
             const currentTime = dom.audio.currentTime;
-            let newIndex = state.currentLyricIndex;
+            let newIndex;
 
-            if (newIndex === -1) {
-                for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
-                    if (currentTime >= state.parsedLyrics[i].time) {
-                        newIndex = i;
-                        break;
-                    }
-                }
-            } else {
+            // At song start we keep the first line visible and centered.
+            if (currentTime < state.parsedLyrics[0].time) {
+                newIndex = 0;
+            } else if (state.currentLyricIndex >= 0) {
+                newIndex = state.currentLyricIndex;
                 while (newIndex + 1 < state.parsedLyrics.length && currentTime >= state.parsedLyrics[newIndex + 1].time) {
                     newIndex += 1;
                 }
@@ -1456,8 +1453,14 @@ export function initLegacyApp(deps = {}) {
                 while (newIndex > 0 && currentTime < state.parsedLyrics[newIndex].time) {
                     newIndex -= 1;
                 }
-
-                if (currentTime < state.parsedLyrics[0].time) newIndex = -1;
+            } else {
+                newIndex = 0;
+                for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
+                    if (currentTime >= state.parsedLyrics[i].time) {
+                        newIndex = i;
+                        break;
+                    }
+                }
             }
 
             if (newIndex !== state.currentLyricIndex) {
@@ -1479,20 +1482,26 @@ export function initLegacyApp(deps = {}) {
                         requestAnimationFrame(() => {
                             active.classList.remove('entering');
                         });
-                        // Center the current line vertically in fullscreen karaoke mode
                         const isKaraokeMode = container === dom.fsLyricsBody && state.lyricsMode === 'karaoke';
-                        const verticalOffset = isKaraokeMode ? 0.5 : 0.4; // 50% center for karaoke, 40% for text mode
-                        const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2);
-                        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
-                        const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
-                        const distance = Math.abs(container.scrollTop - clampedTop);
-                        const minDistanceToScroll = isKaraokeMode ? 1 : 8;
-
-                        if (distance > minDistanceToScroll) {
-                            container.scrollTo({
-                                top: clampedTop,
+                        if (isKaraokeMode && typeof active.scrollIntoView === 'function') {
+                            active.scrollIntoView({
+                                block: 'center',
+                                inline: 'nearest',
                                 behavior: 'smooth'
                             });
+                        } else {
+                            const verticalOffset = 0.4;
+                            const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2);
+                            const maxTop = Math.max(0, container.scrollHeight - container.clientHeight);
+                            const clampedTop = Math.max(0, Math.min(targetTop, maxTop));
+                            const distance = Math.abs(container.scrollTop - clampedTop);
+
+                            if (distance > 8) {
+                                container.scrollTo({
+                                    top: clampedTop,
+                                    behavior: 'smooth'
+                                });
+                            }
                         }
                     }
                 });
@@ -1540,6 +1549,8 @@ export function initLegacyApp(deps = {}) {
                 if (dom.fsLyricsBody) dom.fsLyricsBody.innerHTML = renderFs(state.parsedLyrics);
                 state.lyricsNodes.regular = dom.lyricsContent ? Array.from(dom.lyricsContent.querySelectorAll('.lrc-line')) : [];
                 state.lyricsNodes.fullscreen = dom.fsLyricsBody ? Array.from(dom.fsLyricsBody.querySelectorAll('.fs-lrc-line')) : [];
+                if (dom.lyricsContent) dom.lyricsContent.scrollTop = 0;
+                if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0;
                 state.currentLyricIndex = -1;
                 updateKaraoke();
             } else {

@@ -30,6 +30,63 @@
     --top-ui-offset: calc(clamp(78px, 10vw, 106px) + var(--safe-top));
 }
 
+/* Final desktop fullscreen positioning tune. */
+@media (min-width: 769px) and (pointer: fine) {
+    .fullscreen-player.open {
+        --fs-cover-size-desktop: clamp(280px, 23vw, 340px);
+    }
+
+    /* 1) Move bottom controls zone slightly lower, still inside viewport. */
+    .fullscreen-player.open .fs-controls {
+        padding: 10px clamp(20px, 4vw, 64px) calc(22px + var(--safe-bottom)) !important;
+    }
+
+    .fullscreen-player.open .fs-progress-container {
+        margin-bottom: 10px !important;
+    }
+
+    /* 2) Cover size and vertical level are identical with and without karaoke. */
+    .fullscreen-player.open:not(.lyrics-open) .fs-cover,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover {
+        width: var(--fs-cover-size-desktop) !important;
+        height: var(--fs-cover-size-desktop) !important;
+    }
+
+    .fullscreen-player.open:not(.lyrics-open) .fs-cover-container {
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
+
+    /* 3) In fullscreen karaoke keep cover + karaoke column vertically centered. */
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-main-area {
+        display: grid !important;
+        grid-template-columns: minmax(300px, 42%) minmax(0, 58%) !important;
+        align-items: center !important;
+        align-content: center !important;
+        justify-content: center !important;
+        gap: clamp(24px, 3vw, 48px) !important;
+        padding: calc(56px + var(--safe-top)) clamp(24px, 4vw, 56px) calc(152px + var(--safe-bottom)) !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover-container {
+        display: flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: none !important;
+        justify-self: center !important;
+        align-self: center !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-panel {
+        align-self: center !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body {
+        max-height: calc(100dvh - (calc(56px + var(--safe-top)) + calc(152px + var(--safe-bottom)))) !important;
+    }
+}
+
 /* Mobile browser karaoke override: same behavior as PWA on touch devices. */
 @media (max-width: 768px) and (pointer: coarse) {
 
@@ -97,7 +154,7 @@
         padding-top: calc(24px + var(--safe-top));
         padding-bottom: 240px;
         min-height: auto;
-        text-align: left;
+        text-align: center;
     }
 
     .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
@@ -2243,6 +2300,163 @@ a:focus-visible {
     z-index: 25 !important;
 }
 
+.fullscreen-player.open .fs-controls {
+    background: linear-gradient(180deg, rgba(11, 13, 18, 0.98) 0%, rgba(8, 10, 14, 0.97) 100%) !important;
+    backdrop-filter: blur(34px) !important;
+    -webkit-backdrop-filter: blur(34px) !important;
+    border-top: 1px solid rgba(130, 144, 166, 0.2) !important;
+    box-shadow: 0 -14px 30px rgba(3, 5, 9, 0.7), 0 -1px 0 rgba(115, 129, 150, 0.22), 0 0 0 1px rgba(60, 68, 82, 0.3) !important;
+}
+
+.fullscreen-player.open .fs-progress-container {
+    position: relative;
+    height: 4px;
+    background: rgba(78, 89, 109, 0.45);
+    cursor: pointer;
+    overflow: visible;
+    top: -2px;
+    border-radius: 2px;
+}
+
+.fullscreen-player.open .fs-progress-bar {
+    background: var(--player-accent);
+    position: relative;
+    transition: width 0.1s linear, background-color 0.5s ease;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--player-accent) 35%, transparent);
+    border-radius: 2px;
+}
+
+.fullscreen-player.open .fs-controls-inner {
+    gap: clamp(8px, 1.5vw, 20px);
+}
+
+.fullscreen-player.open .fs-btn {
+    width: auto;
+    height: auto;
+    padding: 8px;
+    border-radius: 999px;
+    background: transparent;
+    border: none;
+    color: var(--fg-muted);
+    transition: all 0.2s ease;
+}
+
+.fullscreen-player.open .fs-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.fullscreen-player.open #fs-play-btn {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(145deg, rgba(29, 34, 43, 0.96), rgba(19, 23, 31, 0.96)) !important;
+    color: var(--fg) !important;
+    border: 1px solid rgba(139, 152, 173, 0.28);
+    box-shadow: 0 8px 16px rgba(4, 6, 10, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.fullscreen-player.open #fs-play-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.fullscreen-player.open #fs-play-btn.playing {
+    background: linear-gradient(145deg, rgba(211, 221, 235, 0.94), rgba(168, 179, 196, 0.92)) !important;
+    color: #06080c !important;
+    box-shadow: 0 0 0 0 rgba(46, 211, 173, 0.35), 0 10px 20px rgba(6, 8, 12, 0.5);
+    animation: pulseGlow 2s infinite;
+}
+
+@media (min-width: 769px) and (pointer: fine) {
+
+    .fullscreen-player.open.karaoke-only .fs-main-area,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-main-area {
+        display: flex;
+        flex-direction: column;
+        padding: calc(88px + var(--safe-top)) clamp(24px, 4vw, 56px) 220px;
+        gap: 0;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-cover-container,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover-container {
+        display: none !important;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lyrics-panel,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-panel {
+        width: 100%;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        transform: translateY(0);
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lyrics-header,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-header {
+        display: none;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lyrics-body,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: clamp(32px, 6vh, 64px) clamp(24px, 4vw, 56px);
+        min-height: 100%;
+        text-align: center;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lrc-line,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line {
+        width: 100%;
+        max-width: min(920px, 100%);
+        font-size: clamp(32px, 2.15vw, 46px);
+        line-height: 1.62;
+        letter-spacing: 0;
+        text-transform: none;
+        text-align: center;
+        padding: clamp(10px, 1.4vw, 18px) 0;
+        margin: clamp(8px, 1.1vw, 18px) 0;
+        padding-left: 0;
+        margin-left: 0;
+        border-left: 0 !important;
+        opacity: 0.55;
+        transition: opacity 0.26s ease, color 0.26s ease, text-shadow 0.26s ease, transform 0.26s ease;
+        font-family: 'Sora', sans-serif;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lrc-line.active,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line.active {
+        color: var(--page-accent) !important;
+        border-left: 0 !important;
+        text-shadow: 0 0 18px var(--page-accent-glow) !important;
+        opacity: 1;
+        transform: scale(1.02);
+        padding-left: 0;
+        margin-left: 0;
+    }
+
+    .fullscreen-player.open.karaoke-only .fs-lrc-line.entering,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line.entering {
+        opacity: 1;
+        transform: scale(1.02);
+        animation: lyricEntering 0.2s ease-out;
+    }
+}
+
 .fullscreen-player.open.karaoke-only .fs-cover-container {
     display: none !important;
 }
@@ -2911,8 +3125,8 @@ a:focus-visible {
     }
 }
 
-/* Final mobile PWA override: keep fullscreen simple and stable on small screens. */
-@media (display-mode: standalone) and (max-width: 768px) {
+/* Final mobile karaoke override: apply the same mobile behavior in browser and PWA. */
+@media (max-width: 768px) and (pointer: coarse) {
     .fs-main-area {
         display: flex;
         flex-direction: column;
@@ -2973,9 +3187,81 @@ a:focus-visible {
     }
 
     .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
-        text-align: left;
+        text-align: center;
+        max-width: 860px;
+        font-size: clamp(30px, 7vw, 44px);
         padding-left: 0;
         margin-left: 0;
         border-left: 0;
+    }
+}
+
+/* Keep the active karaoke line synced to the release accent everywhere. */
+.lrc-line.active,
+.fs-lrc-line.active,
+.fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line.active,
+.fullscreen-player.karaoke-only .fs-lrc-line.active {
+    color: var(--page-accent) !important;
+    border-left: 0 !important;
+    text-shadow: 0 0 18px var(--page-accent-glow) !important;
+}
+
+/* Final desktop fullscreen karaoke fix: keep cover visible and keep lyrics scroll anchored from top. */
+@media (min-width: 769px) and (pointer: fine) {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-main-area {
+        display: grid !important;
+        grid-template-columns: minmax(280px, 40%) minmax(0, 60%) !important;
+        align-items: center !important;
+        justify-content: stretch !important;
+        gap: clamp(24px, 4vw, 56px) !important;
+        padding: calc(88px + var(--safe-top)) clamp(24px, 4vw, 56px) 220px !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover-container {
+        display: flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transform: translateX(0) !important;
+        justify-self: center !important;
+        align-self: center !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover {
+        width: clamp(240px, 30vw, 340px) !important;
+        height: clamp(240px, 30vw, 340px) !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-panel {
+        position: static !important;
+        width: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body {
+        display: block !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: clamp(42px, 6vh, 92px) clamp(16px, 3vw, 40px) !important;
+        min-height: 0 !important;
+        max-height: calc(100dvh - (calc(88px + var(--safe-top)) + 220px)) !important;
+        text-align: center !important;
+    }
+
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::before,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body::after {
+        content: none !important;
+        display: none !important;
     }
 }
