@@ -1477,6 +1477,7 @@ header nav button:hover {
     scroll-behavior: smooth;
     text-align: left;
     min-height: 0;
+    padding: clamp(100px, 14vh, 140px) clamp(12px, 2vw, 24px) clamp(30px, 4vh, 60px);
     max-height: calc(100dvh - (calc(88px + var(--safe-top)) + 160px));
 }
 
