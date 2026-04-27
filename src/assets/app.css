@@ -2002,6 +2002,63 @@ a:focus-visible {
     }
 }
 
+/* Fullscreen hard-fix overrides (must stay at file end). */
+.fullscreen-player.open:not(.lyrics-open) .fs-main-area {
+    padding: 0 !important;
+}
+
+.fullscreen-player.open:not(.lyrics-open) .fs-cover-container {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 14 !important;
+}
+
+.fullscreen-player.open .fs-track-info,
+.fullscreen-player.open.lyrics-open .fs-track-info,
+.fullscreen-player.open.lyrics-open.karaoke-open .fs-track-info,
+.fullscreen-player.open.karaoke-only .fs-track-info {
+    position: fixed !important;
+    top: calc(14px + var(--safe-top)) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 120px) !important;
+    max-width: 720px !important;
+    text-align: center !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: 24 !important;
+}
+
+.fullscreen-player.open .fs-header-buttons,
+.fullscreen-player.open.lyrics-open .fs-header-buttons,
+.fullscreen-player.open.lyrics-open.karaoke-open .fs-header-buttons,
+.fullscreen-player.open.karaoke-only .fs-header-buttons {
+    position: fixed !important;
+    top: calc(10px + var(--safe-top)) !important;
+    right: clamp(8px, 2.8vw, 20px) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 25 !important;
+}
+
+.fullscreen-player.open.karaoke-only .fs-cover-container {
+    display: none !important;
+}
+
+@media (max-width: 480px) {
+
+    .fullscreen-player.open .fs-track-info,
+    .fullscreen-player.open.lyrics-open .fs-track-info,
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-track-info,
+    .fullscreen-player.open.karaoke-only .fs-track-info {
+        top: calc(10px + var(--safe-top)) !important;
+        width: calc(100% - 96px) !important;
+    }
+}
+
 @media (min-width: 1536px) {
     :root {
         --shell-max: 1380px;
