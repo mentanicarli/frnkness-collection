@@ -18,8 +18,9 @@
           </svg>
         </button>
         <button
-          @click="showChart"
-          @pointerdown="showChartPointerDown"
+          id="header-chart-btn"
+          @click="openChartFromInteraction"
+          @pointerdown="openChartFromInteraction"
           class="chart-btn header-animated-btn flex items-center gap-2 px-6 py-2.5 text-sm tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -59,14 +60,18 @@ import { legacyBridge } from '@/runtime/legacyBridge'
 // Header не содержит бизнес-логики:
 // только проксирует действия пользователя в bridge.
 const showHome = () => legacyBridge.showPage('home')
-const showChart = () => legacyBridge.showPage('chart')
-const showChartPointerDown = (event: PointerEvent) => {
-  // На touch-устройствах первичный pointerdown делает открытие стабильным
-  // и убирает сценарий «каждый второй тап».
-  if (event.pointerType && event.pointerType !== 'mouse') {
+let lastChartOpenAt = 0
+const openChartFromInteraction = (event: MouseEvent | PointerEvent) => {
+  const now = performance.now()
+  if (now - lastChartOpenAt < 250) return
+
+  // На touch/pointer событиях предотвращаем «липкий» второй тап.
+  if (event.type === 'pointerdown') {
     event.preventDefault()
-    showChart()
   }
+
+  lastChartOpenAt = now
+  legacyBridge.showPage('chart')
 }
 const closeSearchPanel = () => legacyBridge.toggleSearchPanel(false)
 </script>

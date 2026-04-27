@@ -123,7 +123,8 @@ export function initLegacyApp(deps = {}) {
             lastSecond: -1,
             searchCache: new Map(),
             preloadedAudio: new Set(),
-            pendingTrackClickGuard: null
+            pendingTrackClickGuard: null,
+            fsLyricsToggleGuardUntil: 0
         };
 
         function runWhenIdle(fn) {
@@ -1071,6 +1072,9 @@ export function initLegacyApp(deps = {}) {
             const track = state.currentRelease.tracks[index];
             if (!track) return;
 
+            // Strict karaoke startup for a new track: begin from line 1.
+            state.karaokeHardStart = true;
+
             dom.audio.src = state.currentRelease.audioPath + track.file;
             if (dom.playerTrack) dom.playerTrack.textContent = track.title;
 
@@ -1208,22 +1212,11 @@ export function initLegacyApp(deps = {}) {
 
         function closeFsPlayer() {
             if (dom.fsPlayer) {
-                const isDesktopKaraoke = window.matchMedia && window.matchMedia('(min-width: 769px)').matches && state.lyricsMode === 'karaoke';
-
-                if (isDesktopKaraoke) {
-                    dom.fsPlayer.classList.add('closing-fs');
-                    window.setTimeout(() => {
-                        dom.fsPlayer.classList.remove('open', 'closing-fs');
-                        state.fsLyricsOpen = false;
-                        syncFsPlayerModeState();
-                        document.body.style.overflow = '';
-                    }, 220);
-                    return;
-                }
-
                 dom.fsPlayer.classList.remove('open');
                 state.fsLyricsOpen = false;
+                perf.fsLyricsToggleGuardUntil = 0;
                 syncFsPlayerModeState();
+                if (dom.fsLyricsToggle && typeof dom.fsLyricsToggle.blur === 'function') dom.fsLyricsToggle.blur();
                 document.body.style.overflow = '';
             }
         }
@@ -1293,18 +1286,28 @@ export function initLegacyApp(deps = {}) {
         function syncFsPlayerModeState() {
             if (!dom.fsPlayer) return;
             const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke';
-            const isMobileView = !window.matchMedia || !window.matchMedia('(min-width: 769px)').matches;
-            const isKaraokeOnlyMode = isMobileView && karaokeOpen;
+            const lyricsVisible = dom.fsPlayer.classList.contains('open') && state.fsLyricsOpen;
 
             dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen);
             dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen);
-            dom.fsPlayer.classList.toggle('karaoke-only', isKaraokeOnlyMode);
-            if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.toggle('active', state.fsLyricsOpen);
+            if (dom.fsLyricsToggle) {
+                dom.fsLyricsToggle.classList.toggle('active', lyricsVisible);
+                dom.fsLyricsToggle.setAttribute('aria-pressed', lyricsVisible ? 'true' : 'false');
+            }
         }
 
         function toggleFsLyrics() {
+            const now = performance.now();
+            if (now < perf.fsLyricsToggleGuardUntil) return;
+            perf.fsLyricsToggleGuardUntil = now + 260;
+
             state.fsLyricsOpen = !state.fsLyricsOpen;
             syncFsPlayerModeState();
+
+            if (dom.fsLyricsToggle && typeof dom.fsLyricsToggle.blur === 'function') {
+                dom.fsLyricsToggle.blur();
+            }
+
             if (state.fsLyricsOpen && state.lyricsMode === 'karaoke') {
                 updateKaraoke();
             }
@@ -1440,9 +1443,10 @@ export function initLegacyApp(deps = {}) {
 
             const currentTime = dom.audio.currentTime;
             let newIndex;
+            const hardStartActive = Boolean(state.karaokeHardStart) && currentTime <= 1.2;
 
             // At song start we keep the first line visible and centered.
-            if (currentTime < state.parsedLyrics[0].time) {
+            if (hardStartActive || currentTime < state.parsedLyrics[0].time) {
                 newIndex = 0;
             } else if (state.currentLyricIndex >= 0) {
                 newIndex = state.currentLyricIndex;
@@ -1506,6 +1510,10 @@ export function initLegacyApp(deps = {}) {
                     }
                 });
             }
+
+            if (state.karaokeHardStart && currentTime > 1.2) {
+                state.karaokeHardStart = false;
+            }
         }
 
         // ============================================================
@@ -1551,8 +1559,33 @@ export function initLegacyApp(deps = {}) {
                 state.lyricsNodes.fullscreen = dom.fsLyricsBody ? Array.from(dom.fsLyricsBody.querySelectorAll('.fs-lrc-line')) : [];
                 if (dom.lyricsContent) dom.lyricsContent.scrollTop = 0;
                 if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0;
-                state.currentLyricIndex = -1;
-                updateKaraoke();
+
+                const shouldHardStart = !Number.isFinite(dom.audio.currentTime) || dom.audio.currentTime <= 1.2;
+                if (shouldHardStart && state.parsedLyrics.length) {
+                    state.currentLyricIndex = 0;
+                    state.karaokeHardStart = true;
+
+                    const firstRegular = state.lyricsNodes.regular[0];
+                    if (firstRegular) {
+                        firstRegular.classList.add('active');
+                    }
+
+                    const firstFullscreen = state.lyricsNodes.fullscreen[0];
+                    if (firstFullscreen) {
+                        firstFullscreen.classList.add('active');
+                        if (typeof firstFullscreen.scrollIntoView === 'function') {
+                            firstFullscreen.scrollIntoView({
+                                block: 'center',
+                                inline: 'nearest',
+                                behavior: 'auto'
+                            });
+                        }
+                    }
+                } else {
+                    state.currentLyricIndex = -1;
+                    state.karaokeHardStart = false;
+                    updateKaraoke();
+                }
             } else {
                 const html = plainText.split('\n').map(l => `<p class="mb-2">${l || '&nbsp;'}</p>`).join('');
                 if (dom.lyricsContent) dom.lyricsContent.innerHTML = html;
@@ -1560,6 +1593,7 @@ export function initLegacyApp(deps = {}) {
                 state.lyricsNodes.regular = [];
                 state.lyricsNodes.fullscreen = [];
                 state.currentLyricIndex = -1;
+                state.karaokeHardStart = false;
             }
 
             updateLyricsModeControls(hasKaraoke);
@@ -1568,21 +1602,6 @@ export function initLegacyApp(deps = {}) {
         function setLyricsMode(mode) {
             if (!['text', 'karaoke'].includes(mode)) return;
             if (mode === 'karaoke' && !state.parsedLyrics.length) return;
-
-            const isDesktopFullscreen = window.matchMedia && window.matchMedia('(min-width: 769px)').matches;
-            const isSwitchingFromKaraokeToText = isDesktopFullscreen && state.fsLyricsOpen && state.lyricsMode === 'karaoke' && mode === 'text';
-
-            if (isSwitchingFromKaraokeToText && dom.fsPlayer) {
-                dom.fsPlayer.classList.add('closing-karaoke');
-                window.setTimeout(() => {
-                    state.lyricsMode = mode;
-                    state.preferredLyricsMode = mode;
-                    renderLyricsByMode();
-                    syncFsPlayerModeState();
-                    dom.fsPlayer.classList.remove('closing-karaoke');
-                }, 180);
-                return;
-            }
 
             state.lyricsMode = mode;
             state.preferredLyricsMode = mode;
