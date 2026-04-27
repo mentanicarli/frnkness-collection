@@ -1290,13 +1290,7 @@ export function initLegacyApp(deps = {}) {
             if (inactive) inactive.classList.remove('playing');
         }
 
-        function syncFsPlayerModeState() {
-            if (!dom.fsPlayer) return;
-            const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke';
-            dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen);
-            dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen);
-            if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.toggle('active', state.fsLyricsOpen);
-        }
+        function syncFsPlayerModeState() { \n            if (!dom.fsPlayer) return; \n            const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke'; \n            const isMobileView = !window.matchMedia || !window.matchMedia('(min-width: 769px)').matches; \n            const isKaraokeOnlyMode = isMobileView && karaokeOpen; \n            \n            dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen); \n            dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen); \n            dom.fsPlayer.classList.toggle('karaoke-only', isKaraokeOnlyMode); \n            if (dom.fsLyricsToggle) dom.fsLyricsToggle.classList.toggle('active', state.fsLyricsOpen); \n }
 
         function toggleFsLyrics() {
             state.fsLyricsOpen = !state.fsLyricsOpen;
