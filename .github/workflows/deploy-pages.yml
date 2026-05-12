@@ -33,18 +33,11 @@ jobs:
 
       - name: Build project
         env:
-          VITE_SUPABASE_URL: https://momcakikuivtvxkmgjhx.supabase.co
-          VITE_SUPABASE_ANON_KEY: sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I
-          VITE_SHOW_NEW_RELEASE_PROMO: 'true'
-          VITE_NEW_RELEASE_PROMO_ID: faaa
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SHOW_NEW_RELEASE_PROMO: ${{ secrets.VITE_SHOW_NEW_RELEASE_PROMO }}
+          VITE_NEW_RELEASE_PROMO_ID: ${{ secrets.VITE_NEW_RELEASE_PROMO_ID }}
         run: npm run build
-
-      - name: Copy static media files
-        run: |
-          cp -r images dist/images
-          cp -r audio dist/audio
-          cp -r lyrics dist/lyrics
-          cp -r lyrics-books dist/lyrics-books
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

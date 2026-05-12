@@ -1,21 +1,29 @@
 {
-  "name": "vue-vite-migration",
+  "name": "frnkness-collection",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
+    "colorthief": "^2.4.0",
     "pinia": "^3.0.4",
     "vue": "^3.3.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.6.0",
-    "@vitejs/plugin-vue": "^4.0.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.0.0",
     "typescript": "^6.0.3",
-    "vite": "^4.5.14"
+    "vite": "^6.0.0",
+    "vite-plugin-pwa": "^1.0.0",
+    "vite-plugin-static-copy": "^3.0.0",
+    "vitest": "^3.0.0"
   }
 }
