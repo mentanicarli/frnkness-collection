@@ -26,8 +26,7 @@ export function initLegacyApp(deps = {}) {
         SUPABASE_URL = '',
         SUPABASE_ANON_KEY = '',
         createSupabaseClient = null,
-        SHOW_NEW_RELEASE_PROMO = false,
-        NEW_RELEASE_PROMO_ID = '',
+        PROMO_RELEASE_ID = '',
         releases = {}
     } = config
 
@@ -149,8 +148,7 @@ export function initLegacyApp(deps = {}) {
         colorCache,
         colorPromiseCache,
         releasePlayCountCache,
-        SHOW_NEW_RELEASE_PROMO,
-        NEW_RELEASE_PROMO_ID,
+        PROMO_RELEASE_ID,
         utils,
         modules: {}
     }

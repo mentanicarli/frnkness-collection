@@ -35,8 +35,6 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SHOW_NEW_RELEASE_PROMO: ${{ secrets.VITE_SHOW_NEW_RELEASE_PROMO }}
-          VITE_NEW_RELEASE_PROMO_ID: ${{ secrets.VITE_NEW_RELEASE_PROMO_ID }}
         run: npm run build
 
       - name: Upload Pages artifact

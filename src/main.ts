@@ -6,7 +6,7 @@ import App from './App.vue'
 import './assets/app.css'
 
 import { initLegacyApp } from './legacy/app-core'
-import { NEW_RELEASE_PROMO_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
+import { PROMO_RELEASE_ID, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
 import { debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
@@ -26,8 +26,7 @@ const legacyDeps = {
         SUPABASE_URL,
         SUPABASE_ANON_KEY,
         createSupabaseClient: createClient,
-        SHOW_NEW_RELEASE_PROMO,
-        NEW_RELEASE_PROMO_ID,
+        PROMO_RELEASE_ID,
         releases
     },
     shared: {

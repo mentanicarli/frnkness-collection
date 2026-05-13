@@ -49,7 +49,7 @@ export function createUiModule(ctx) {
         let albumsHtml = '', singlesHtml = ''
 
         if (dom.homePromo) {
-            const promoId = ctx.SHOW_NEW_RELEASE_PROMO ? ctx.NEW_RELEASE_PROMO_ID : null
+            const promoId = ctx.PROMO_RELEASE_ID
             if (promoId && releases[promoId]) {
                 const promo = releases[promoId]
                 dom.homePromo.innerHTML = `
