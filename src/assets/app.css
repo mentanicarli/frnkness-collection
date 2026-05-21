@@ -1509,7 +1509,7 @@ header nav button:hover {
 
 @media (max-width: 768px) {
     .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
-        padding-top: calc(60px + var(--safe-top)) !important;
+        padding-top: calc(24px + var(--safe-top)) !important;
         padding-right: clamp(12px, 2vw, 24px);
         padding-left: clamp(12px, 2vw, 24px);
         padding-bottom: clamp(120px, 15vh, 160px) !important;
@@ -2216,11 +2216,11 @@ a:focus-visible {
     }
 
     .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
-        text-align: left;
+        text-align: center;
     }
 
     .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
-        text-align: left;
+        text-align: center;
         padding-left: 0;
         margin-left: 0;
         border-left: 0;
