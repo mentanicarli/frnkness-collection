@@ -110,6 +110,14 @@ export function createFullscreenModule(ctx) {
         const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke'
 
         if (!karaokeOpen && dom.fsPlayer.classList.contains('karaoke-open')) {
+            // Сбрасываем position:fixed на панели текстов до снятия класса —
+            // CSS не умеет анимировать position, поэтому сброс должен быть
+            // мгновенным, иначе панель на один paint остаётся поверх экрана.
+            const panel = dom.fsPlayer.querySelector('.fs-lyrics-panel')
+            if (panel) {
+                panel.style.position = ''
+                panel.style.inset = ''
+            }
             dom.fsPlayer.classList.add('no-karaoke-transition')
             requestAnimationFrame(() => {
                 dom.fsPlayer.classList.remove('no-karaoke-transition')
