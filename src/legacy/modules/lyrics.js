@@ -152,13 +152,20 @@ export function createLyricsModule(ctx) {
         ctx.modules.fullscreen.syncFsPlayerModeState()
     }
 
+    function isHtmlPayload(res, text) {
+        const contentType = (res?.headers?.get('content-type') || '').toLowerCase()
+        if (contentType.includes('text/html')) return true
+        return /<!doctype html|<html|<head|<link|<body/i.test(text || '')
+    }
+
     async function loadLyrics(index) {
         if (!state.currentRelease) return
         const track = state.currentRelease.tracks[index]
         if (!track) return
 
         const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        let plainText = 'Текст не найден'
+        const missingText = 'Текст будет позже...'
+        let plainText = missingText
         let lrcText = ''
 
         state.currentLyricsTrackIndex = index
@@ -166,12 +173,18 @@ export function createLyricsModule(ctx) {
 
         try {
             const res = await fetch(state.currentRelease.lyricsPath + base + '.lrc')
-            if (res.ok) lrcText = await res.text()
+            if (res.ok) {
+                const text = await res.text()
+                if (!isHtmlPayload(res, text)) lrcText = text
+            }
         } catch { }
 
         try {
             const res = await fetch(state.currentRelease.lyricsPath + track.lyricsFile)
-            if (res.ok) plainText = await res.text()
+            if (res.ok) {
+                const text = await res.text()
+                if (!isHtmlPayload(res, text) && text.trim()) plainText = text
+            }
         } catch { }
 
         const lyricsTrackTitle = document.getElementById('lyrics-track-title')

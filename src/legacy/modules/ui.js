@@ -51,13 +51,13 @@ export function createUiModule(ctx) {
         if (dom.homePromo) {
             const ANNOUNCE_COVER = 'images/album3-cover.jpg'
             dom.homePromo.innerHTML = `
-                <div class="release-card promo-release-card text-left rounded-xl p-5 relative w-full" data-fixed-accent="true" style="cursor: default;">
+                <div class="release-card promo-release-card text-left rounded-xl p-5 relative w-full" data-fixed-accent="true" onclick="App.openRelease('born-to-be-deluxe')" style="cursor: pointer;">
                     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                         <div class="w-full sm:w-44 aspect-square rounded-xl overflow-hidden bg-[var(--bg)] shadow-lg flex-shrink-0">
                             <img src="${ANNOUNCE_COVER}" alt="Born to be Deluxe" class="card-image w-full h-full object-cover" loading="eager" decoding="async" fetchpriority="high" onerror="this.style.display='none'">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col gap-4">
-                            <div class="promo-badge text-sm sm:text-[0.95rem]">скоро...</div>
+                            <div class="promo-badge text-sm sm:text-[0.95rem]">последний релиз</div>
                             <div>
                                 <h3 class="promo-title text-2xl sm:text-3xl font-semibold line-clamp-2 relative z-10">Born to be Deluxe</h3>
                             </div>
@@ -168,16 +168,7 @@ export function createUiModule(ctx) {
 
     function renderTracklist() {
         if (!dom.tracklist || !state.currentRelease) return
-        const isUpcoming = !!state.currentRelease.upcoming
         dom.tracklist.innerHTML = state.currentRelease.tracks.map((t, i) => {
-            if (isUpcoming) {
-                return `
-                    <div class="track-row flex items-center gap-5 py-4 px-4 opacity-40 pointer-events-none" style="cursor: default;" data-track-index="${i}">
-                        <span class="track-num w-6 text-center text-[var(--fg-muted)] text-sm font-mono">${String(t.num).padStart(2, '0')}</span>
-                        <div class="flex-1 min-w-0"><p class="font-medium truncate">${t.title}</p></div>
-                    </div>
-                `
-            }
             return `
                 <div class="track-row flex items-center gap-5 py-4 px-4 cursor-pointer group" data-track-index="${i}" onclick="App.handleTrackClick(${i})">
                     <span class="track-num w-6 text-center text-[var(--fg-muted)] text-sm font-mono group-hover:hidden">${String(t.num).padStart(2, '0')}</span>

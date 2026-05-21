@@ -119,21 +119,21 @@ export const releases: Releases = {
     'born-to-be-deluxe': {
         type: 'album',
         title: 'Born to be Deluxe',
-        year: 'скоро...',
+        year: '2026',
+        releaseDate: '21 мая 2026',
         cover: 'images/album3-cover.jpg',
-        audioPath: 'audio/album3/',
+        audioPath: 'audio/album 3/',
         lyricsPath: 'lyrics/album3/',
-        upcoming: true,
         tracks: [
-            { num: 1, title: 'ZAL', file: 'zal.mp3', lyricsFile: '01-zal.txt' },
-            { num: 2, title: 'Última Historia', file: 'ultima-historia.mp3', lyricsFile: '02-ultima-historia.txt' },
-            { num: 3, title: 'COMЁ N TEAM', file: 'come-n-team.mp3', lyricsFile: '03-come-n-team.txt' },
-            { num: 4, title: 'nikanora', file: 'nikanora.mp3', lyricsFile: '04-nikanora.txt' },
+            { num: 1, title: 'ZAL', file: 'ZAL.mp3', lyricsFile: '01-zal.txt' },
+            { num: 2, title: 'Última Historia', file: 'Última historia.mp3', lyricsFile: '02-ultima-historia.txt' },
+            { num: 3, title: 'COMЁ N TEAM', file: 'come n team.mp3', lyricsFile: '03-come-n-team.txt' },
+            { num: 4, title: 'nikanora', file: 'NIKANORA.mp3', lyricsFile: '04-nikanora.txt' },
             { num: 5, title: 'damurr', file: 'damurr.mp3', lyricsFile: '05-damurr.txt' },
-            { num: 6, title: 'Otiva', file: 'otiva.mp3', lyricsFile: '06-otiva.txt' },
-            { num: 7, title: '22_00', file: '22-00.mp3', lyricsFile: '07-22-00.txt' },
-            { num: 8, title: 'Международный Соннетклауд', file: 'mezhdunarodny.mp3', lyricsFile: '08-mezhdunarodny.txt' },
-            { num: 9, title: 'Борода, потом Марат', file: 'boroda-potom-marat.mp3', lyricsFile: '09-boroda-potom-marat.txt' }
+            { num: 6, title: 'Otiva', file: 'Otiva.mp3', lyricsFile: '06-otiva.txt' },
+            { num: 7, title: '22_00', file: '2200.mp3', lyricsFile: '07-22-00.txt' },
+            { num: 8, title: 'Международный Соннетклауд', file: 'Международный Соннет Клауд.mp3', lyricsFile: '08-mezhdunarodny.txt' },
+            { num: 9, title: 'Борода, потом Марат', file: 'Boroda,marat.mp3', lyricsFile: '09-boroda-potom-marat.txt' }
         ]
     }
 }
