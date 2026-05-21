@@ -56,7 +56,7 @@ export function createLyricsModule(ctx) {
                     if (isKaraokeMode && typeof active.scrollIntoView === 'function' && !isMobileScreen) {
                         active.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
                     } else {
-                        const verticalOffset = 0.4
+                        const verticalOffset = isMobileScreen ? 0.3 : 0.4
                         const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2)
                         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
                         const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
@@ -114,9 +114,7 @@ export function createLyricsModule(ctx) {
                 const firstFullscreen = state.lyricsNodes.fullscreen[0]
                 if (firstFullscreen) {
                     firstFullscreen.classList.add('active')
-                    if (typeof firstFullscreen.scrollIntoView === 'function') {
-                        firstFullscreen.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
-                    }
+                    if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0
                 }
             } else {
                 state.currentLyricIndex = -1
