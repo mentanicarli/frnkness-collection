@@ -2966,11 +2966,11 @@ a:focus-visible {
 
 /* В standalone PWA используем desktop-поведение караоке и анимаций,
    даже на мобильной ширине экрана.
-   Все правила заскоуплены на .fullscreen-player.karaoke-open,
+   Все правила заскоуплены на .fullscreen-player.open.lyrics-open.karaoke-open,
    чтобы они мгновенно снимались при закрытии режима и не давали
    мигания во время CSS-transition (0.4s). */
 @media (display-mode: standalone) {
-    .fullscreen-player.karaoke-open .fs-main-area {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-main-area {
         display: grid;
         grid-template-columns: minmax(280px, 40%) minmax(0, 60%);
         align-items: center;
@@ -2989,14 +2989,14 @@ a:focus-visible {
         align-self: center;
     }
 
-    .fullscreen-player.karaoke-open .fs-cover {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover {
         width: min(100%, var(--karaoke-cover-size));
         height: auto;
         aspect-ratio: 1 / 1;
         border-radius: 22px;
     }
 
-    .fullscreen-player.karaoke-open .fs-track-info {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-track-info {
         top: calc(88px + var(--safe-top) + var(--karaoke-cover-size) + 22px);
         left: 0;
         width: min(40%, 520px);
@@ -3006,13 +3006,10 @@ a:focus-visible {
         opacity: 1;
         visibility: visible;
         pointer-events: auto;
-    }
-
-    .fullscreen-player.lyrics-open.karaoke-open .fs-track-info {
         padding: 0 clamp(20px, 3vw, 42px);
     }
 
-    .fullscreen-player.karaoke-open .fs-header-buttons {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-header-buttons {
         top: calc(16px + var(--safe-top));
         right: 36px;
         gap: 10px;
@@ -3021,7 +3018,7 @@ a:focus-visible {
         pointer-events: auto;
     }
 
-    .fullscreen-player.karaoke-open .fs-lyrics-panel {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-panel {
         position: static;
         right: auto;
         top: auto;
@@ -3030,23 +3027,16 @@ a:focus-visible {
         height: auto;
         border-radius: 0;
         transform: none;
-    }
-
-    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-panel {
         background: transparent;
         border: 0;
         box-shadow: none;
     }
 
-    .fullscreen-player.karaoke-open .fs-lyrics-header {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-header {
         display: none;
     }
 
-    .fullscreen-player.karaoke-open .fs-lyrics-body {
-        padding: 0;
-    }
-
-    .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lyrics-body {
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -3055,7 +3045,7 @@ a:focus-visible {
         min-height: 100%;
     }
 
-    .fullscreen-player.karaoke-open .lrc-line {
+    .fullscreen-player.open.lyrics-open.karaoke-open .lrc-line {
         padding: 10px 0;
         margin-bottom: 12px;
         font-size: 17px;
@@ -3069,20 +3059,22 @@ a:focus-visible {
         transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
     }
 
-    .fullscreen-player.karaoke-open .lrc-line.active {
+    .fullscreen-player.open.lyrics-open.karaoke-open .lrc-line.active {
         opacity: 1;
         transform: scale(1.05);
         font-weight: 600;
         margin-left: 0;
     }
 
-    .fullscreen-player.karaoke-open .fs-lrc-line {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line {
         width: 100%;
         max-width: min(760px, 100%);
         padding: 10px 0;
         margin-bottom: 16px;
         font-size: 17px;
         line-height: 1.75;
+        letter-spacing: 0.01em;
+        text-transform: none;
         opacity: 0.58;
         border-left-width: 0;
         padding-left: 0;
@@ -3091,16 +3083,7 @@ a:focus-visible {
         transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
     }
 
-    .fullscreen-player.lyrics-open.karaoke-open .fs-lrc-line {
-        font-size: 17px;
-        line-height: 1.75;
-        letter-spacing: 0.01em;
-        text-transform: none;
-        text-align: center;
-        opacity: 0.58;
-    }
-
-    .fullscreen-player.karaoke-open .fs-lrc-line.active {
+    .fullscreen-player.open.lyrics-open.karaoke-open .fs-lrc-line.active {
         opacity: 1;
         transform: scale(1.01);
         font-weight: 600;
