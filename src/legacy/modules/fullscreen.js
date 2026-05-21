@@ -1,11 +1,31 @@
 export function createFullscreenModule(ctx) {
     const { dom, state, perf } = ctx
 
+    function setCoverCentered(coverContainer, centered) {
+        if (!coverContainer) return
+        if (centered) {
+            coverContainer.style.position = 'fixed'
+            coverContainer.style.left = '50%'
+            coverContainer.style.top = 'calc((100dvh - 60px - 110px) / 2 + 60px)'
+            coverContainer.style.transform = 'translate(-50%, -50%)'
+            coverContainer.style.zIndex = '14'
+        } else {
+            coverContainer.style.position = ''
+            coverContainer.style.left = ''
+            coverContainer.style.top = ''
+            coverContainer.style.transform = ''
+            coverContainer.style.zIndex = ''
+        }
+    }
+
     function openFsPlayer() {
         if (dom.fsPlayer) {
             dom.fsPlayer.classList.add('open')
             document.body.style.overflow = 'hidden'
             syncFsPlayerModeState()
+
+            const coverContainer = dom.fsPlayer.querySelector('.fs-cover-container')
+            setCoverCentered(coverContainer, !state.fsLyricsOpen)
         }
     }
 
@@ -17,6 +37,9 @@ export function createFullscreenModule(ctx) {
             syncFsPlayerModeState()
             if (dom.fsLyricsToggle && typeof dom.fsLyricsToggle.blur === 'function') dom.fsLyricsToggle.blur()
             document.body.style.overflow = ''
+
+            const coverContainer = dom.fsPlayer.querySelector('.fs-cover-container')
+            setCoverCentered(coverContainer, false)
         }
     }
 
@@ -92,6 +115,11 @@ export function createFullscreenModule(ctx) {
             dom.fsLyricsToggle.classList.toggle('active', lyricsVisible)
             dom.fsLyricsToggle.setAttribute('aria-pressed', lyricsVisible ? 'true' : 'false')
         }
+
+        // Обложка центрируется через JS только когда плеер открыт без текстов
+        const playerOpen = dom.fsPlayer.classList.contains('open')
+        const coverContainer = dom.fsPlayer.querySelector('.fs-cover-container')
+        setCoverCentered(coverContainer, playerOpen && !state.fsLyricsOpen)
     }
 
     function toggleFsLyrics() {
