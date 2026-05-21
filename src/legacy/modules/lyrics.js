@@ -52,30 +52,22 @@ export function createLyricsModule(ctx) {
                     active.classList.add('active', 'entering')
                     requestAnimationFrame(() => active.classList.remove('entering'))
                     const isKaraokeMode = container === dom.fsLyricsBody && state.lyricsMode === 'karaoke'
-                    const isMobileScreen = window.innerWidth <= 768
-                    if (isKaraokeMode && typeof active.scrollIntoView === 'function' && !isMobileScreen) {
-                        active.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
-                    } else if (isMobileScreen) {
+                    if (isKaraokeMode) {
                         if (state.karaokeJustOpened) return
-                        if (newIndex === 0) {
-                            container.scrollTop = 0
-                        } else {
-                            const verticalOffset = 0.3
+                        requestAnimationFrame(() => {
+                            if (!container.clientHeight) return
+                            if (newIndex === 0) {
+                                container.scrollTo({ top: 0, behavior: 'smooth' })
+                                return
+                            }
+                            const verticalOffset = 0.35
                             const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2)
                             const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
                             const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
                             if (Math.abs(container.scrollTop - clampedTop) > 8) {
                                 container.scrollTo({ top: clampedTop, behavior: 'smooth' })
                             }
-                        }
-                    } else {
-                        const verticalOffset = 0.4
-                        const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2)
-                        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
-                        const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
-                        if (Math.abs(container.scrollTop - clampedTop) > 8) {
-                            container.scrollTo({ top: clampedTop, behavior: 'smooth' })
-                        }
+                        })
                     }
                 }
             })
@@ -118,7 +110,7 @@ export function createLyricsModule(ctx) {
             if (dom.lyricsContent) dom.lyricsContent.scrollTop = 0
             if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0
             state.karaokeJustOpened = true
-            setTimeout(() => { state.karaokeJustOpened = false }, 2000)
+            setTimeout(() => { state.karaokeJustOpened = false }, 3000)
 
             const shouldHardStart = !Number.isFinite(dom.audio.currentTime) || dom.audio.currentTime <= 1.2
             if (shouldHardStart && state.parsedLyrics.length) {
