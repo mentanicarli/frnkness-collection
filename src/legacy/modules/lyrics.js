@@ -55,8 +55,20 @@ export function createLyricsModule(ctx) {
                     const isMobileScreen = window.innerWidth <= 768
                     if (isKaraokeMode && typeof active.scrollIntoView === 'function' && !isMobileScreen) {
                         active.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
+                    } else if (isMobileScreen) {
+                        if (newIndex === 0) {
+                            container.scrollTop = 0
+                        } else {
+                            const verticalOffset = 0.3
+                            const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2)
+                            const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
+                            const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
+                            if (Math.abs(container.scrollTop - clampedTop) > 8) {
+                                container.scrollTo({ top: clampedTop, behavior: 'smooth' })
+                            }
+                        }
                     } else {
-                        const verticalOffset = isMobileScreen ? 0.3 : 0.4
+                        const verticalOffset = 0.4
                         const targetTop = active.offsetTop - (container.clientHeight * verticalOffset) + (active.clientHeight / 2)
                         const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
                         const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
@@ -119,6 +131,8 @@ export function createLyricsModule(ctx) {
             } else {
                 state.currentLyricIndex = -1
                 state.karaokeHardStart = false
+                if (dom.lyricsContent) dom.lyricsContent.scrollTop = 0
+                if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0
                 updateKaraoke()
             }
         } else {
