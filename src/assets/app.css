@@ -1454,7 +1454,7 @@ header nav button:hover {
     .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-panel {
         position: fixed;
         inset: 0;
-        top: calc(80px + var(--safe-top));
+        top: calc(80px + var(--safe-top)) !important;
         bottom: 0;
         width: 100%;
         right: 0;
@@ -1509,7 +1509,10 @@ header nav button:hover {
 
 @media (max-width: 768px) {
     .fullscreen-player.lyrics-open.karaoke-open .fs-lyrics-body {
-        padding: clamp(120px, 14vh, 140px) clamp(12px, 2vw, 24px) clamp(30px, 4vh, 60px);
+        padding-top: calc(60px + var(--safe-top)) !important;
+        padding-right: clamp(12px, 2vw, 24px);
+        padding-left: clamp(12px, 2vw, 24px);
+        padding-bottom: clamp(120px, 15vh, 160px) !important;
         max-height: calc(100dvh - calc(80px + var(--safe-top)));
         overflow-y: auto;
         overflow-x: hidden;
