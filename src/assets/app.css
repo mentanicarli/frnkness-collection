@@ -55,8 +55,11 @@
     }
 
     .fullscreen-player.open:not(.lyrics-open) .fs-cover-container {
+        position: fixed !important;
+        left: 50% !important;
         top: calc(50% - clamp(14px, 2.5vh, 22px)) !important;
         transform: translate(-50%, -50%) !important;
+        z-index: 14 !important;
     }
 
     /* 3) In fullscreen karaoke keep cover + karaoke column vertically centered. */
@@ -2264,14 +2267,6 @@ a:focus-visible {
 /* Fullscreen hard-fix overrides (must stay at file end). */
 .fullscreen-player.open:not(.lyrics-open) .fs-main-area {
     padding: 0 !important;
-}
-
-.fullscreen-player.open:not(.lyrics-open) .fs-cover-container {
-    position: fixed !important;
-    left: 50% !important;
-    top: calc(50% - clamp(14px, 2.5vh, 22px)) !important;
-    transform: translate(-50%, -50%) !important;
-    z-index: 14 !important;
 }
 
 .fullscreen-player.open .fs-track-info,
