@@ -57,7 +57,7 @@
     .fullscreen-player.open:not(.lyrics-open) .fs-cover-container {
         position: fixed !important;
         left: 50% !important;
-        top: calc(50% - clamp(14px, 2.5vh, 22px)) !important;
+        top: calc((100dvh - 60px - 110px) / 2 + 60px) !important;
         transform: translate(-50%, -50%) !important;
         z-index: 14 !important;
     }
@@ -3224,11 +3224,6 @@ a:focus-visible {
 
     .fullscreen-player.open .fs-cover-container {
         transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1) !important;
-    }
-
-    .fullscreen-player.open:not(.lyrics-open) .fs-cover-container,
-    .fullscreen-player.open.lyrics-open:not(.karaoke-open) .fs-cover-container {
-        transform: translateX(-50) !important;
     }
 
     .fullscreen-player.open.lyrics-open.karaoke-open .fs-cover-container {
