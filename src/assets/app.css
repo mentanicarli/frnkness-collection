@@ -416,7 +416,7 @@ header nav button span,
 /* ============================================================
            ============================================================ */
 header {
-    background: linear-gradient(180deg, rgba(10, 11, 14, 0.88) 0%, rgba(10, 11, 14, 0.78) 100%);
+    background: linear-gradient(180deg, rgba(10, 11, 14, 0.96) 0%, rgba(10, 11, 14, 0.92) 100%);
     border-bottom: 1px solid rgba(147, 161, 184, 0.12);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
@@ -426,7 +426,7 @@ header {
 }
 
 body.release-page header {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--page-accent-soft) 42%, rgba(10, 11, 14, 0.88)) 0%, rgba(10, 11, 14, 0.78) 100%);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--page-accent-soft) 42%, rgba(10, 11, 14, 0.96)) 0%, rgba(10, 11, 14, 0.92) 100%);
 }
 
 header>div {
@@ -947,7 +947,7 @@ header nav button:hover {
 .player {
     transform: translateY(calc(100% + 10px));
     transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    background: linear-gradient(180deg, rgba(10, 11, 14, 0.88) 0%, rgba(10, 11, 14, 0.78) 100%);
+    background: linear-gradient(180deg, rgba(10, 11, 14, 0.96) 0%, rgba(10, 11, 14, 0.92) 100%);
     backdrop-filter: blur(34px);
     -webkit-backdrop-filter: blur(34px);
     border-top: 1px solid rgba(130, 144, 166, 0.2);
@@ -2965,9 +2965,12 @@ a:focus-visible {
 }
 
 /* В standalone PWA используем desktop-поведение караоке и анимаций,
-   даже на мобильной ширине экрана. */
+   даже на мобильной ширине экрана.
+   Все правила заскоуплены на .fullscreen-player.karaoke-open,
+   чтобы они мгновенно снимались при закрытии режима и не давали
+   мигания во время CSS-transition (0.4s). */
 @media (display-mode: standalone) {
-    .fs-main-area {
+    .fullscreen-player.karaoke-open .fs-main-area {
         display: grid;
         grid-template-columns: minmax(280px, 40%) minmax(0, 60%);
         align-items: center;
@@ -2986,14 +2989,14 @@ a:focus-visible {
         align-self: center;
     }
 
-    .fs-cover {
+    .fullscreen-player.karaoke-open .fs-cover {
         width: min(100%, var(--karaoke-cover-size));
         height: auto;
         aspect-ratio: 1 / 1;
         border-radius: 22px;
     }
 
-    .fs-track-info {
+    .fullscreen-player.karaoke-open .fs-track-info {
         top: calc(88px + var(--safe-top) + var(--karaoke-cover-size) + 22px);
         left: 0;
         width: min(40%, 520px);
@@ -3009,7 +3012,7 @@ a:focus-visible {
         padding: 0 clamp(20px, 3vw, 42px);
     }
 
-    .fs-header-buttons {
+    .fullscreen-player.karaoke-open .fs-header-buttons {
         top: calc(16px + var(--safe-top));
         right: 36px;
         gap: 10px;
@@ -3018,7 +3021,7 @@ a:focus-visible {
         pointer-events: auto;
     }
 
-    .fs-lyrics-panel {
+    .fullscreen-player.karaoke-open .fs-lyrics-panel {
         position: static;
         right: auto;
         top: auto;
@@ -3035,15 +3038,11 @@ a:focus-visible {
         box-shadow: none;
     }
 
-    .fullscreen-player.lyrics-open .fs-lyrics-panel {
-        transform: none;
-    }
-
-    .fs-lyrics-header {
+    .fullscreen-player.karaoke-open .fs-lyrics-header {
         display: none;
     }
 
-    .fs-lyrics-body {
+    .fullscreen-player.karaoke-open .fs-lyrics-body {
         padding: 0;
     }
 
@@ -3056,7 +3055,7 @@ a:focus-visible {
         min-height: 100%;
     }
 
-    .lrc-line {
+    .fullscreen-player.karaoke-open .lrc-line {
         padding: 10px 0;
         margin-bottom: 12px;
         font-size: 17px;
@@ -3070,14 +3069,14 @@ a:focus-visible {
         transition: color 0.26s ease, opacity 0.26s ease, text-shadow 0.26s ease;
     }
 
-    .lrc-line.active {
+    .fullscreen-player.karaoke-open .lrc-line.active {
         opacity: 1;
         transform: scale(1.05);
         font-weight: 600;
         margin-left: 0;
     }
 
-    .fs-lrc-line {
+    .fullscreen-player.karaoke-open .fs-lrc-line {
         width: 100%;
         max-width: min(760px, 100%);
         padding: 10px 0;
@@ -3101,7 +3100,7 @@ a:focus-visible {
         opacity: 0.58;
     }
 
-    .fs-lrc-line.active {
+    .fullscreen-player.karaoke-open .fs-lrc-line.active {
         opacity: 1;
         transform: scale(1.01);
         font-weight: 600;
