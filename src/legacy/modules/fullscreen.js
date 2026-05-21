@@ -108,6 +108,14 @@ export function createFullscreenModule(ctx) {
     function syncFsPlayerModeState() {
         if (!dom.fsPlayer) return
         const karaokeOpen = state.fsLyricsOpen && state.lyricsMode === 'karaoke'
+
+        if (!karaokeOpen && dom.fsPlayer.classList.contains('karaoke-open')) {
+            dom.fsPlayer.classList.add('no-karaoke-transition')
+            requestAnimationFrame(() => {
+                dom.fsPlayer.classList.remove('no-karaoke-transition')
+            })
+        }
+
         const lyricsVisible = dom.fsPlayer.classList.contains('open') && state.fsLyricsOpen
         dom.fsPlayer.classList.toggle('lyrics-open', state.fsLyricsOpen)
         dom.fsPlayer.classList.toggle('karaoke-open', karaokeOpen)
