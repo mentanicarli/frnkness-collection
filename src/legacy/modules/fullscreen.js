@@ -24,6 +24,14 @@ export function createFullscreenModule(ctx) {
             document.body.style.overflow = 'hidden'
             syncFsPlayerModeState()
 
+            // Скрыть мини-плеер пока fullscreen открыт — иначе при закрытии
+            // он резко «проявляется» из-под fullscreen и воспринимается как вспышка.
+            const player = document.getElementById('player')
+            if (player) {
+                player.style.opacity = '0'
+                player.style.pointerEvents = 'none'
+            }
+
             const coverContainer = dom.fsPlayer.querySelector('.fs-cover-container')
             setCoverCentered(coverContainer, !state.fsLyricsOpen)
         }
@@ -40,6 +48,17 @@ export function createFullscreenModule(ctx) {
 
             const coverContainer = dom.fsPlayer.querySelector('.fs-cover-container')
             setCoverCentered(coverContainer, false)
+
+            // Плавно показать мини-плеер после того как fullscreen исчез (0.15s transition).
+            const player = document.getElementById('player')
+            if (player) {
+                setTimeout(() => {
+                    player.style.transition = 'opacity 0.2s ease'
+                    player.style.opacity = '1'
+                    player.style.pointerEvents = ''
+                    setTimeout(() => { player.style.transition = '' }, 200)
+                }, 150)
+            }
         }
     }
 
