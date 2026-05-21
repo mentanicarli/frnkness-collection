@@ -56,6 +56,7 @@ export function createLyricsModule(ctx) {
                     if (isKaraokeMode && typeof active.scrollIntoView === 'function' && !isMobileScreen) {
                         active.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' })
                     } else if (isMobileScreen) {
+                        if (state.karaokeJustOpened) return
                         if (newIndex === 0) {
                             container.scrollTop = 0
                         } else {
@@ -116,6 +117,8 @@ export function createLyricsModule(ctx) {
             state.lyricsNodes.fullscreen = dom.fsLyricsBody ? Array.from(dom.fsLyricsBody.querySelectorAll('.fs-lrc-line')) : []
             if (dom.lyricsContent) dom.lyricsContent.scrollTop = 0
             if (dom.fsLyricsBody) dom.fsLyricsBody.scrollTop = 0
+            state.karaokeJustOpened = true
+            setTimeout(() => { state.karaokeJustOpened = false }, 2000)
 
             const shouldHardStart = !Number.isFinite(dom.audio.currentTime) || dom.audio.currentTime <= 1.2
             if (shouldHardStart && state.parsedLyrics.length) {
