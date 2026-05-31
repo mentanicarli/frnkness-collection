@@ -8,48 +8,43 @@ export function createSearchModule(ctx) {
             ? !dom.searchPanel.classList.contains('open')
             : Boolean(forceState)
         dom.searchPanel.classList.toggle('open', shouldOpen)
-        if (dom.searchToggle) {
-            dom.searchToggle.classList.toggle('active', shouldOpen)
-            dom.searchToggle.style.display = shouldOpen ? 'none' : ''
-        }
-        if (shouldOpen && dom.searchInput) {
-            requestAnimationFrame(() => dom.searchInput.focus())
-            handleSearchInput(dom.searchInput.value)
-        } else if (dom.searchInput) {
-            dom.searchInput.value = ''
-            if (dom.searchResults) dom.searchResults.innerHTML = ''
-        }
+        if (dom.searchToggle) dom.searchToggle.classList.toggle('active', shouldOpen)
+        if (dom.searchBackdrop) dom.searchBackdrop.classList.toggle('open', shouldOpen)
+        document.body.classList.toggle('search-open', shouldOpen)
+        if (shouldOpen && dom.searchInput) requestAnimationFrame(() => dom.searchInput.focus())
     }
 
     function renderSearchResults(results, query) {
         if (!dom.searchResults) return
         const normalized = normalizeSearchText(query)
         if (!normalized) {
-            dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-faint)] font-mono py-2">Введите запрос — релизы, треки и строки из текстов.</p>'
+            dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-muted)]/85">Введите запрос, чтобы искать по релизам, трекам и строкам из текстов.</p>'
             return
         }
         if (!results.length) {
-            dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-faint)] font-mono py-2">Ничего не найдено.</p>'
+            dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-muted)]">Ничего не найдено. Попробуйте другой запрос.</p>'
             return
         }
-        const labels = { release: 'Релиз', track: 'Трек', lyric: 'Строка' }
+        const labels = { release: 'Альбом/релиз', track: 'Трек', lyric: 'Строка из текста' }
         const html = results.map(item => {
             const badge = labels[item.type] || 'Результат'
-            const line = item.line ? `<p class="text-xs text-[var(--fg-muted)] mt-1 line-clamp-2 italic">${escapeHtml(item.line)}</p>` : ''
+            const line = item.line ? `<p class="text-xs text-[var(--fg-muted)]/85 mt-1 line-clamp-2">${escapeHtml(item.line)}</p>` : ''
             const trackTitle = item.trackTitle ? `<p class="text-xs text-[var(--fg-muted)] mt-1">${escapeHtml(item.trackTitle)}</p>` : ''
             return `
-                <button class="w-full text-left rounded-md hover:bg-[var(--bg-2)] transition-colors p-3 mb-0.5 flex items-center justify-between gap-4"
+                <button class="w-full text-left rounded-xl border border-white/8 bg-[var(--bg-card)]/55 hover:bg-[var(--bg-card)]/80 transition-colors p-4 mb-2"
                     onclick="App.openSearchResult('${item.type}', '${item.releaseId}', ${item.trackIndex ?? -1}, ${item.time ?? -1})">
-                    <div class="min-w-0">
-                        <p class="text-sm font-semibold text-[var(--fg)] truncate">${escapeHtml(item.title)}</p>
-                        ${trackTitle}
-                        ${line}
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-[var(--fg)] truncate">${escapeHtml(item.title)}</p>
+                            ${trackTitle}
+                            ${line}
+                        </div>
+                        <span class="text-[10px] uppercase tracking-wider text-[var(--fg-muted)]/80 flex-shrink-0">${badge}</span>
                     </div>
-                    <span class="font-mono text-[9px] uppercase tracking-wider text-[var(--fg-faint)] flex-shrink-0 border border-white/10 rounded px-2 py-1">${badge}</span>
                 </button>
             `
         }).join('')
-        dom.searchResults.innerHTML = `<p class="font-mono text-xs text-[var(--fg-faint)] mb-2">Результатов: ${results.length}</p>${html}`
+        dom.searchResults.innerHTML = `<div class="pb-2"><p class="text-xs uppercase tracking-widest text-[var(--fg-muted)] mb-3">Результаты: ${results.length}</p>${html}</div>`
     }
 
     async function ensureLyricsIndex() {
