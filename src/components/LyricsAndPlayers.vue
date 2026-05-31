@@ -1,15 +1,17 @@
 <template>
-  <div id="lyrics-panel" class="lyrics-panel fixed top-0 right-0 w-full sm:w-[400px] h-full bg-[var(--bg-elevated)] z-50 overflow-hidden flex flex-col">
+  <!-- Мини-панель текста: ТОЛЬКО обычный текст -->
+  <div id="lyrics-panel" class="lyrics-panel fixed top-0 right-0 w-full sm:w-[400px] h-full z-50 overflow-hidden flex flex-col">
     <div class="p-6 border-b border-white/5 flex items-center justify-between flex-shrink-0">
       <div>
         <h4 id="lyrics-track-title" class="font-semibold text-lg"></h4>
         <p class="text-sm text-[var(--fg-muted)]">frnk ness</p>
       </div>
-      <div id="lyrics-mode-switch" class="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 mr-2">
-        <button @click="setLyricsModeText" id="lyrics-mode-text" class="px-3 py-1 text-[11px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Обычный текст">Текст</button>
-        <button @click="setLyricsModeKaraoke" id="lyrics-mode-karaoke" class="px-3 py-1 text-[11px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Караоке">Караоке</button>
+      <!-- переключатель режимов скрыт: караоке доступно только в полноэкранном -->
+      <div id="lyrics-mode-switch" class="hidden">
+        <button @click="setLyricsModeText" id="lyrics-mode-text">Текст</button>
+        <button @click="setLyricsModeKaraoke" id="lyrics-mode-karaoke">Караоке</button>
       </div>
-      <button @click="closeLyrics" class="flex items-center justify-center w-8 h-8 bg-white/5 hover:bg-white/10 rounded-full text-sm transition-colors" aria-label="Закрыть текст">
+      <button @click="closeLyrics" class="flex items-center justify-center w-9 h-9 bg-white/5 hover:bg-white/10 rounded-md text-sm transition-colors" aria-label="Закрыть текст">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
@@ -20,6 +22,7 @@
     </div>
   </div>
 
+  <!-- Полноэкранный плеер: по умолчанию обложка, караоке по кнопке -->
   <div id="fullscreen-player" class="fullscreen-player">
     <div id="fs-bg" class="fullscreen-bg"></div>
     <div class="fs-track-info">
@@ -35,9 +38,9 @@
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
       </button>
-      <button @click="closeFsPlayer" class="fs-header-btn" aria-label="Закрыть">
+      <button @click="closeFsPlayer" class="fs-header-btn" aria-label="Свернуть">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12" />
+          <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
     </div>
@@ -47,78 +50,63 @@
           <img id="fs-cover-a" class="fs-cover-img" src="" alt="Обложка" crossorigin="anonymous" loading="lazy">
           <img id="fs-cover-b" class="fs-cover-img" src="" alt="Обложка" crossorigin="anonymous" loading="lazy">
         </div>
+        <div class="fs-cover-meta">
+          <h2 id="fs-cover-title">—</h2>
+          <p class="fs-cover-artist">frnk ness</p>
+          <div class="fs-cover-progress" @click="seekTrackFs">
+            <div id="fs-progress-bar"></div>
+          </div>
+          <div class="fs-cover-times">
+            <span id="fs-time-current">0:00</span>
+            <span id="fs-time-total">0:00</span>
+          </div>
+          <div class="fs-controls-inner">
+            <button @click="prevTrack" class="fs-btn" aria-label="Предыдущий трек">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+            </button>
+            <button id="fs-play-btn" @click="togglePlay" class="fs-btn fs-play-btn" aria-label="Воспроизвести">
+              <svg id="fs-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              <svg id="fs-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+            </button>
+            <button @click="nextTrack" class="fs-btn" aria-label="Следующий трек">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="fs-lyrics-panel">
         <div class="fs-lyrics-header">
-          <div>
-            <h4 id="fs-lyrics-title" class="font-semibold text-sm">Текст песни</h4>
-            <p class="text-xs text-[var(--fg-muted)]">frnk ness</p>
+          <h4 id="fs-lyrics-title" class="font-semibold text-sm">Текст песни</h4>
+          <div id="fs-lyrics-mode-switch" class="hidden">
+            <button @click="setLyricsModeText" id="fs-lyrics-mode-text">Текст</button>
+            <button @click="setLyricsModeKaraoke" id="fs-lyrics-mode-karaoke">Караоке</button>
           </div>
-          <div id="fs-lyrics-mode-switch" class="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 mr-2">
-            <button @click="setLyricsModeText" id="fs-lyrics-mode-text" class="px-2.5 py-1 text-[10px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Обычный текст">Текст</button>
-            <button @click="setLyricsModeKaraoke" id="fs-lyrics-mode-karaoke" class="px-2.5 py-1 text-[10px] rounded-full text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Караоке">Караоке</button>
-          </div>
-          <button @click="toggleFsLyrics" class="w-7 h-7 bg-white/5 hover:bg-white/10 rounded-full flex items-center justify-center transition-colors">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </button>
         </div>
         <div id="fs-lyrics-body" class="fs-lyrics-body">
-          <p class="text-[var(--fg-muted)] italic">Текст загружается...</p>
+          <p class="italic">Текст загружается...</p>
         </div>
       </div>
     </div>
+    <!-- скрытый блок: сохраняем id для совместимости с движком -->
     <div class="fs-controls">
-      <div class="fs-progress-container" @click="seekTrackFs">
-        <div id="fs-progress-bar" class="fs-progress-bar" style="width: 0%"></div>
-      </div>
-      <div class="fs-controls-inner">
-        <div class="fs-time">
-          <span id="fs-time-current">0:00</span>
-          <span>/</span>
-          <span id="fs-time-total">0:00</span>
-        </div>
-        <button @click="prevTrack" class="fs-btn" aria-label="Предыдущий трек">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-          </svg>
-        </button>
-        <button id="fs-play-btn" @click="togglePlay" class="fs-btn fs-play-btn" aria-label="Воспроизвести">
-          <svg id="fs-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <svg id="fs-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none">
-            <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-          </svg>
-        </button>
-        <button @click="nextTrack" class="fs-btn" aria-label="Следующий трек">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-          </svg>
-        </button>
-        <div class="fs-volume-wrap">
-          <button @click="toggleMute" class="fs-btn" aria-label="Громкость">
-            <svg id="fs-volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path id="fs-vol-wave-1" d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path id="fs-vol-wave-2" d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </svg>
-          </button>
-          <input type="range" id="fs-volume-slider" min="0" max="1" step="0.01" value="1" class="w-20">
-        </div>
+      <div class="fs-progress-container" @click="seekTrackFs"></div>
+      <div class="fs-time"></div>
+      <div class="fs-volume-wrap">
+        <input type="range" id="fs-volume-slider" min="0" max="1" step="0.01" value="1">
+        <svg id="fs-volume-icon" width="0" height="0"><path id="fs-vol-wave-1" d="" /><path id="fs-vol-wave-2" d="" /></svg>
       </div>
     </div>
   </div>
 
-  <div id="player" class="player fixed bottom-0 left-0 right-0 bg-[var(--bg-elevated)] z-30">
-    <div class="progress-container rounded-none" @click="seekTrack">
+  <!-- Мини-плеер (плавающий) -->
+  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30">
+    <div class="progress-container" @click="seekTrack">
       <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
     </div>
-    <div style="width: 100%; padding: 0 clamp(12px, 3vw, 48px);">
+    <div style="width: 100%; padding: 0 clamp(12px, 2vw, 20px);">
       <div class="py-3 flex items-center justify-between w-full" style="gap: clamp(8px, 1.5vw, 16px);">
         <div class="flex items-center flex-1 min-w-0" style="gap: clamp(12px, 2vw, 16px);">
-          <div id="player-cover" class="w-12 h-12 rounded bg-[var(--bg-card)] flex-shrink-0 overflow-hidden shadow-lg">
+          <div id="player-cover" class="w-12 h-12 bg-[var(--bg-card)] flex-shrink-0 overflow-hidden">
             <div class="cover-overlay">
               <button @click.stop="openFsPlayer" class="fullscreen-trigger-btn" aria-label="Открыть на весь экран">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -128,8 +116,8 @@
             </div>
           </div>
           <div class="min-w-0 flex items-center" style="gap: clamp(8px, 1.5vw, 12px);">
-            <div>
-              <p id="player-track" class="font-medium truncate text-sm"></p>
+            <div class="min-w-0">
+              <p id="player-track" class="truncate text-sm"></p>
               <p class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
             </div>
             <button id="lyrics-btn" @click="toggleLyrics" class="lyrics-action-btn hidden sm:flex" aria-label="Открыть текст">
@@ -144,23 +132,15 @@
           </div>
         </div>
         <div class="flex items-center flex-shrink-0" style="gap: clamp(6px, 1.2vw, 12px);">
-          <button @click="prevTrack" class="play-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Предыдущий трек">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-            </svg>
+          <button @click="prevTrack" class="play-btn p-2 transition-colors" aria-label="Предыдущий трек">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
           </button>
           <button id="play-pause-btn" @click="togglePlay" class="play-btn w-10 h-10 rounded-full flex items-center justify-center relative" aria-label="Воспроизвести">
-            <svg id="icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            <svg id="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="hidden">
-              <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
-            </svg>
+            <svg id="icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            <svg id="icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" class="hidden"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
           </button>
-          <button @click="nextTrack" class="play-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Следующий трек">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-            </svg>
+          <button @click="nextTrack" class="play-btn p-2 transition-colors" aria-label="Следующий трек">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
           </button>
         </div>
         <div class="hidden sm:flex items-center flex-1 justify-end ml-auto" style="gap: clamp(8px, 1.5vw, 16px);">
@@ -180,9 +160,7 @@
             <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
           </div>
           <button @click="closeMiniPlayer" class="close-player-btn p-1" aria-label="Закрыть плеер">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
         <div class="flex sm:hidden items-center">
@@ -193,9 +171,7 @@
             </svg>
           </button>
           <button @click="closeMiniPlayer" class="close-player-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Закрыть плеер">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
       </div>
@@ -208,8 +184,6 @@
 <script setup lang="ts">
 import { legacyBridge } from '@/runtime/legacyBridge'
 
-// Компонент описывает разметку плеера/текстов,
-// а действия делегирует в legacy bridge для сохранения текущего поведения.
 const setLyricsModeText = () => legacyBridge.setLyricsMode('text')
 const setLyricsModeKaraoke = () => legacyBridge.setLyricsMode('karaoke')
 const closeLyrics = () => legacyBridge.closeLyrics()
