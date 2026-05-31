@@ -51,20 +51,18 @@ export function createUiModule(ctx) {
         if (dom.homePromo) {
             const ANNOUNCE_COVER = 'images/album3-cover.jpg'
             dom.homePromo.innerHTML = `
-                <div class="release-card promo-release-card text-left rounded-xl p-5 relative w-full" data-fixed-accent="true" onclick="App.openRelease('born-to-be-deluxe')" style="cursor: pointer;">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                        <div class="w-full sm:w-44 aspect-square rounded-xl overflow-hidden bg-[var(--bg)] shadow-lg flex-shrink-0">
+                <div class="release-card promo-release-card text-left relative w-full" data-fixed-accent="true" onclick="App.openRelease('born-to-be-deluxe')" style="cursor: pointer; padding: clamp(16px,2vw,26px);">
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center" style="gap: clamp(18px,3vw,40px);">
+                        <div class="promo-cover-wrap aspect-square overflow-hidden bg-[var(--bg)] flex-shrink-0" style="border-radius: 8px;">
                             <img src="${ANNOUNCE_COVER}" alt="Born to be Deluxe" class="card-image w-full h-full object-cover" loading="eager" decoding="async" fetchpriority="high" onerror="this.style.display='none'">
                         </div>
-                        <div class="flex-1 min-w-0 flex flex-col gap-4">
-                            <div class="promo-badge text-sm sm:text-[0.95rem]">последний релиз</div>
-                            <div>
-                                <h3 class="promo-title text-2xl sm:text-3xl font-semibold line-clamp-2 relative z-10">Born to be Deluxe</h3>
-                            </div>
+                        <div class="flex-1 min-w-0 flex flex-col" style="gap: 16px;">
+                            <div class="promo-badge">последний релиз</div>
+                            <h3 class="promo-title line-clamp-2 relative z-10" style="font-size: clamp(24px,4vw,50px); line-height: 1;">Born to be Deluxe</h3>
                             <div class="flex items-center gap-3">
-                                <button class="promo-cta inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs tracking-widest uppercase font-semibold" onclick="App.openRelease('born-to-be-deluxe')">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                <button class="promo-cta inline-flex items-center gap-2" style="height: 44px; padding: 0 20px; border-radius: 6px; font-size: 13px;" onclick="App.openRelease('born-to-be-deluxe')">
                                     Перейти
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                                 </button>
                             </div>
                         </div>
@@ -79,11 +77,11 @@ export function createUiModule(ctx) {
             const isPriorityCard = index < 6
             const meta = r.type === 'album' ? `${r.tracks.length} треков` : 'Сингл'
             const card = `
-                <button class="release-card text-left rounded-xl p-4 transition-all group relative" data-id="${id}" onclick="App.openRelease('${id}')">
-                    <div class="aspect-square rounded-lg overflow-hidden mb-4 bg-[var(--bg)] shadow-lg">
+                <button class="release-card text-left transition-all group relative" data-id="${id}" onclick="App.openRelease('${id}')">
+                    <div class="aspect-square overflow-hidden mb-3 bg-[var(--bg)] relative">
                         <img src="${r.cover}" alt="${r.title}" class="card-image w-full h-full object-cover" loading="${isPriorityCard ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${index < 4 ? 'high' : 'low'}" onerror="this.style.display='none'">
                     </div>
-                    <h3 class="font-semibold text-[var(--fg)] group-hover:text-[var(--card-accent)] transition-colors line-clamp-2 relative z-10">${r.title}</h3>
+                    <h3 class="font-semibold text-[var(--fg)] transition-colors line-clamp-2 relative z-10">${r.title}</h3>
                     <p class="text-xs text-[var(--fg-muted)] mt-1 relative z-10">${meta} • ${r.year}</p>
                 </button>
             `
@@ -170,13 +168,13 @@ export function createUiModule(ctx) {
         if (!dom.tracklist || !state.currentRelease) return
         dom.tracklist.innerHTML = state.currentRelease.tracks.map((t, i) => {
             return `
-                <div class="track-row flex items-center gap-5 py-4 px-4 cursor-pointer group" data-track-index="${i}" onclick="App.handleTrackClick(${i})">
-                    <span class="track-num w-6 text-center text-[var(--fg-muted)] text-sm font-mono group-hover:hidden">${String(t.num).padStart(2, '0')}</span>
-                    <span class="w-6 text-center hidden group-hover:block">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="text-[var(--page-accent)]"><path d="M8 5v14l11-7z"/></svg>
+                <div class="track-row cursor-pointer group" data-track-index="${i}" onclick="App.handleTrackClick(${i})">
+                    <span class="track-num">
+                        <span class="track-num-digit group-hover:hidden">${String(t.num).padStart(2, '0')}</span>
+                        <svg class="track-num-play hidden group-hover:block" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                     </span>
                     <div class="flex-1 min-w-0"><p class="font-medium truncate">${t.title}</p></div>
-                    <button onclick="event.stopPropagation(); App.showLyrics(${i})" class="lyrics-action-btn scale-90 opacity-0 group-hover:opacity-100" aria-label="Текст песни">
+                    <button onclick="event.stopPropagation(); App.showLyrics(${i})" class="lyrics-action-btn opacity-0 group-hover:opacity-100" aria-label="Текст песни">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span>Текст</span>
                     </button>

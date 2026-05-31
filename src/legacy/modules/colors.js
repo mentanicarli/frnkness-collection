@@ -119,6 +119,20 @@ export function createColorsModule(ctx) {
         }
     }
 
+    // Тёмный приглушённый тон обложки для фона полноэкранного караоке
+    // + читаемый «ink» поверх него (как в утверждённом дизайне).
+    function deriveFsTheme(rgb) {
+        const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2])
+        const bgS = Math.min(Math.max(hsl.s, 16), 42)
+        const bg = hslToRgb(hsl.h, bgS, 22)
+        const onS = Math.min(hsl.s, 30)
+        const on = hslToRgb(hsl.h, onS, 95)
+        return {
+            bg: `rgb(${bg.r}, ${bg.g}, ${bg.b})`,
+            on: `rgb(${on.r}, ${on.g}, ${on.b})`
+        }
+    }
+
     async function updatePlayerAccent(imageUrl) {
         try {
             const rgb = await getDominantColor(imageUrl)
@@ -127,6 +141,9 @@ export function createColorsModule(ctx) {
             root.style.setProperty('--player-accent', vars.hex)
             root.style.setProperty('--player-accent-glow', vars.glow)
             root.style.setProperty('--player-accent-soft', vars.soft)
+            const fs = deriveFsTheme(rgb)
+            root.style.setProperty('--fs-bg', fs.bg)
+            root.style.setProperty('--fs-on', fs.on)
         } catch { }
     }
 

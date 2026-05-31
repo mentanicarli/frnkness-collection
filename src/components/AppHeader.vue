@@ -1,17 +1,37 @@
 <template>
-  <header class="fixed top-0 left-0 right-0 z-40">
+  <header>
     <div
-      style="height: 100%; display: flex; align-items: center; justify-content: space-between; padding: clamp(10px, 2vw, 20px) clamp(12px, 3vw, 48px); width: 100%;"
+      style="height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(16px, 2.4vw, 48px); width: 100%; position: relative;"
     >
-      <button @click="showHome" class="flex items-center gap-3 group" aria-label="На главную">
-        <span class="text-lg font-medium tracking-tight text-white/90 group-hover:text-white transition-colors">frnk ness collection</span>
+      <button @click="showHome" class="flex items-center gap-2 group" aria-label="На главную">
+        <span class="text-lg text-white/95 group-hover:text-white transition-colors">frnk ness</span>
+        <span class="font-mono text-[9px] tracking-[0.2em] uppercase text-[var(--fg-faint)]">collection</span>
       </button>
-      <nav class="hidden sm:flex items-center gap-4 text-sm text-[var(--fg-muted)]">
-        <button
-          id="search-toggle-btn"
-          class="chart-btn header-animated-btn flex items-center justify-center px-3.5 py-2.5 rounded-full hover:scale-105 transition-all duration-300"
-          aria-label="Поиск"
-        >
+
+      <!-- inline search field (раскрывается между логотипом и кнопками) -->
+      <div id="header-search-panel" class="header-search-panel">
+        <div class="header-search-inner">
+          <div class="header-search-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              id="global-search"
+              type="search"
+              placeholder="Искать трек, альбом или строку из текста..."
+              aria-label="Глобальный поиск"
+            >
+            <button @click="closeSearchPanel" class="flex items-center justify-center w-7 h-7 rounded text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Закрыть поиск">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div id="search-results" class="header-search-results"></div>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2">
+        <button id="search-toggle-btn" class="chart-btn header-animated-btn flex items-center justify-center transition-all" aria-label="Поиск">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="7"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -20,7 +40,7 @@
         <button
           id="header-chart-btn"
           @click="openChartFromInteraction"
-          class="chart-btn header-animated-btn flex items-center gap-2 px-6 py-2.5 text-sm tracking-widest uppercase font-semibold rounded-full hover:scale-105 transition-all duration-300"
+          class="chart-btn header-animated-btn flex items-center gap-2 px-5 transition-all"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -31,44 +51,22 @@
         </button>
       </nav>
     </div>
-    <div id="header-search-panel" class="header-search-panel">
-      <div class="header-search-inner">
-        <div class="header-search-input-wrap">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="7"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <input
-            id="global-search"
-            type="search"
-            placeholder="Искать трек, альбом или строку из текста..."
-            aria-label="Глобальный поиск"
-          >
-        </div>
-        <div id="search-results" class="header-search-results"></div>
-      </div>
-    </div>
-  </header>
 
-  <div id="search-backdrop" class="search-backdrop" @click="closeSearchPanel"></div>
+    <div id="search-backdrop" class="search-backdrop" @click="closeSearchPanel"></div>
+  </header>
 </template>
 
 <script setup lang="ts">
 import { legacyBridge } from '@/runtime/legacyBridge'
 
-// Header не содержит бизнес-логики:
-// только проксирует действия пользователя в bridge.
 const showHome = () => legacyBridge.showPage('home')
 let lastChartOpenAt = 0
 const openChartFromInteraction = (event: MouseEvent | PointerEvent) => {
   const now = performance.now()
   if (now - lastChartOpenAt < 250) return
-
-  // На touch/pointer событиях предотвращаем «липкий» второй тап.
   if (event.type === 'pointerdown') {
     event.preventDefault()
   }
-
   lastChartOpenAt = now
   legacyBridge.showPage('chart')
 }
