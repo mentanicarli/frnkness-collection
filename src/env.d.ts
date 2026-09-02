@@ -1,5 +1,17 @@
 /// <reference types="vite/client" />
 
+// Типы собственных env-переменных проекта.
+interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL?: string
+    readonly VITE_SUPABASE_ANON_KEY?: string
+    readonly VITE_SHOW_NEW_RELEASE_PROMO?: string
+    readonly VITE_NEW_RELEASE_PROMO_ID?: string
+}
+
+interface ImportMeta {
+    readonly env: ImportMetaEnv
+}
+
 // Декларация импорта Vue SFC для TypeScript.
 // Нужна, чтобы *.vue корректно типизировались в TS-проектах Vite.
 declare module '*.vue' {

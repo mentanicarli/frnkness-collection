@@ -27,6 +27,7 @@ export function initLegacyApp(deps = {}) {
         SUPABASE_ANON_KEY = '',
         createSupabaseClient = null,
         PROMO_RELEASE_ID = '',
+        SHOW_NEW_RELEASE_PROMO = true,
         releases = {}
     } = config
 
@@ -149,6 +150,7 @@ export function initLegacyApp(deps = {}) {
         colorPromiseCache,
         releasePlayCountCache,
         PROMO_RELEASE_ID,
+        SHOW_NEW_RELEASE_PROMO,
         utils,
         modules: {}
     }
@@ -200,7 +202,8 @@ export function initLegacyApp(deps = {}) {
             else if (dom.searchPanel && dom.searchPanel.classList.contains('open')) modules.search.toggleSearchPanel(false)
             else modules.lyrics.closeLyrics()
         }
-        if (e.key === ' ' && !['BUTTON', 'INPUT'].includes(document.activeElement.tagName)) {
+        const activeTag = document.activeElement ? document.activeElement.tagName : ''
+        if (e.key === ' ' && !['BUTTON', 'INPUT', 'TEXTAREA'].includes(activeTag)) {
             e.preventDefault()
             modules.player.togglePlay()
         }

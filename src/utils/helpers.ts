@@ -57,3 +57,12 @@ export function escapeHtml(value: string): string {
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;')
 }
+
+/**
+ * Собирает URL ассета из пути релиза и имени файла.
+ * Имена файлов содержат пробелы и кириллицу, поэтому путь кодируется,
+ * иначе часть окружений (SW-кэш, прокси) получает разные варианты одного URL.
+ */
+export function buildAssetUrl(basePath: string, fileName: string): string {
+    return encodeURI(`${basePath || ''}${fileName || ''}`)
+}

@@ -35,7 +35,7 @@ export default defineConfig(() => ({
         rollupOptions: {
             output: {
                 manualChunks: {
-                    framework: ['vue', 'pinia']
+                    framework: ['vue']
                 }
             }
         }
@@ -44,7 +44,6 @@ export default defineConfig(() => ({
         alias: {
             '@': path.resolve(__dirname, './src'),
             '@components': path.resolve(__dirname, './src/components'),
-            '@stores': path.resolve(__dirname, './src/stores'),
             '@types': path.resolve(__dirname, './src/types'),
             '@utils': path.resolve(__dirname, './src/utils')
         }

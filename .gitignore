@@ -8,3 +8,6 @@ dist/
 
 # local migration temp artifacts
 *_temp.txt
+
+# Local Claude Code settings
+.claude/

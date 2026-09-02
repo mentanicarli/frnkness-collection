@@ -63,7 +63,7 @@ export function createSearchModule(ctx) {
             Object.entries(releases).forEach(([releaseId, release]) => {
                 release.tracks.forEach((track, trackIndex) => {
                     tasks.push(async () => {
-                        const { lrc } = await ctx.modules.lyrics.fetchTrackLyrics(release, track)
+                        const lrc = await ctx.modules.lyrics.fetchTrackLrc(release, track)
                         if (!lrc) return
                         parseLRC(lrc).forEach(item => {
                             const clean = (item.text || '').trim()

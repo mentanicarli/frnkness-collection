@@ -1,6 +1,6 @@
 export function createPlayerModule(ctx) {
     const { dom, state, perf, releases, utils } = ctx
-    const { formatTime, throttle } = utils
+    const { buildAssetUrl, formatTime } = utils
 
     // ── Flow mode helpers ───────────────────────────────────────────────
 
@@ -78,7 +78,7 @@ export function createPlayerModule(ctx) {
         const release = releases[releaseId]
         const track = release && release.tracks[trackIndex]
         if (!release || !track) return
-        const src = release.audioPath + track.file
+        const src = buildAssetUrl(release.audioPath, track.file)
         if (perf.preloadedAudio.has(src)) return
         if (perf.preloadedAudio.size > 14) {
             const oldest = perf.preloadedAudio.values().next().value
@@ -116,7 +116,7 @@ export function createPlayerModule(ctx) {
 
         state.karaokeHardStart = true
 
-        dom.audio.src = state.currentRelease.audioPath + track.file
+        dom.audio.src = buildAssetUrl(state.currentRelease.audioPath, track.file)
         if (dom.playerTrack) dom.playerTrack.textContent = track.title
 
         dom.playerCover.innerHTML = `

@@ -60,7 +60,13 @@ async function staleWhileRevalidate(request, cacheName) {
             return response
         })
         .catch(() => undefined)
-    return cached || networkPromise
+
+    if (cached) return cached
+
+    // Ни кэша, ни сети: возвращаем явный 504 вместо undefined,
+    // иначе respondWith роняет запрос с невнятной сетевой ошибкой.
+    const response = await networkPromise
+    return response || new Response('', { status: 504, statusText: 'Offline' })
 }
 
 self.addEventListener('fetch', (event) => {

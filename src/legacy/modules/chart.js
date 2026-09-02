@@ -1,6 +1,6 @@
 export function createChartModule(ctx) {
     const { dom, state, releases, releasePlayCountCache, utils } = ctx
-    const { parseTrackKey } = utils
+    const { parseTrackKey, escapeHtml } = utils
 
     async function getReleasePlayCount(releaseId) {
         const release = releases[releaseId]
@@ -9,7 +9,12 @@ export function createChartModule(ctx) {
         if (!state.db) return 0
 
         try {
-            const { data, error } = await state.db.from('play_counts').select('track_key, plays')
+            // Ключи трека начинаются с releaseId, поэтому префиксный фильтр
+            // отдаёт только нужные строки вместо всей таблицы.
+            const { data, error } = await state.db
+                .from('play_counts')
+                .select('track_key, plays')
+                .like('track_key', `${releaseId}-%`)
             if (error) throw error
             let total = 0
             ;(data || []).forEach(item => {
@@ -88,10 +93,10 @@ export function createChartModule(ctx) {
         dom.chartList.innerHTML = tracks.length === 0
             ? '<p class="text-center text-[var(--fg-muted)] mt-10">Список пуст.</p>'
             : tracks.map((t, i) => `
-                <div class="chart-row cursor-pointer group" onclick="App.playChart('${t.releaseId}', ${t.trackIndex})">
+                <div class="chart-row cursor-pointer group" onclick="App.playChart('${escapeHtml(t.releaseId)}', ${t.trackIndex})">
                     <div class="chart-num ${i < 3 ? `top-${i + 1}` : ''}">${i + 1}</div>
                     <div class="chart-cover"><img src="${t.cover}" alt="" loading="${i < 8 ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${i < 3 ? 'high' : 'low'}"></div>
-                    <div class="chart-info"><div class="chart-title">${t.title}</div><div class="chart-artist">frnk ness</div></div>
+                    <div class="chart-info"><div class="chart-title">${escapeHtml(t.title)}</div><div class="chart-artist">frnk ness</div></div>
                     <div class="chart-plays"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>${t.plays}</div>
                 </div>
             `).join('')

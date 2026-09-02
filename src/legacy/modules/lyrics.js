@@ -1,19 +1,19 @@
 export function createLyricsModule(ctx) {
     const { dom, state, utils } = ctx
-    const { parseLRC } = utils
+    const { buildAssetUrl, parseLRC } = utils
 
-    async function fetchTrackLyrics(release, track) {
+    // Синхротекст трека. Используется индексом поиска, которому нужен только .lrc,
+    // поэтому обычный .txt здесь не запрашивается.
+    async function fetchTrackLrc(release, track) {
         const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        let txt = '', lrc = ''
         try {
-            const txtRes = await fetch(release.lyricsPath + track.lyricsFile)
-            if (txtRes.ok) txt = await txtRes.text()
-        } catch { }
-        try {
-            const lrcRes = await fetch(release.lyricsPath + base + '.lrc')
-            if (lrcRes.ok) lrc = await lrcRes.text()
-        } catch { }
-        return { txt, lrc }
+            const res = await fetch(buildAssetUrl(release.lyricsPath, base + '.lrc'))
+            if (!res.ok) return ''
+            const text = await res.text()
+            return isHtmlPayload(res, text) ? '' : text
+        } catch {
+            return ''
+        }
     }
 
     function updateKaraoke() {
@@ -159,7 +159,7 @@ export function createLyricsModule(ctx) {
         state.currentLyricIndex = -1
 
         try {
-            const res = await fetch(state.currentRelease.lyricsPath + base + '.lrc')
+            const res = await fetch(buildAssetUrl(state.currentRelease.lyricsPath, base + '.lrc'))
             if (res.ok) {
                 const text = await res.text()
                 if (!isHtmlPayload(res, text)) lrcText = text
@@ -167,7 +167,7 @@ export function createLyricsModule(ctx) {
         } catch { }
 
         try {
-            const res = await fetch(state.currentRelease.lyricsPath + track.lyricsFile)
+            const res = await fetch(buildAssetUrl(state.currentRelease.lyricsPath, track.lyricsFile))
             if (res.ok) {
                 const text = await res.text()
                 if (!isHtmlPayload(res, text) && text.trim()) plainText = text
@@ -202,5 +202,5 @@ export function createLyricsModule(ctx) {
         if (dom.lyricsPanel) dom.lyricsPanel.classList.toggle('open')
     }
 
-    return { fetchTrackLyrics, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, showLyrics, closeLyrics, toggleLyrics }
+    return { fetchTrackLrc, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, showLyrics, closeLyrics, toggleLyrics }
 }

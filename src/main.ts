@@ -1,20 +1,16 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
 import { createClient } from '@supabase/supabase-js'
 import ColorThief from 'colorthief'
 import App from './App.vue'
 import './assets/app.css'
 
 import { initLegacyApp } from './legacy/app-core'
-import { PROMO_RELEASE_ID, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
+import { PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
-import { debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
+import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
 
 const app = createApp(App)
-const pinia = createPinia()
-
-app.use(pinia)
 app.mount('#app')
 
 // Инициализируем ColorThief из npm и кладём в runtimeState,
@@ -27,6 +23,7 @@ const legacyDeps = {
         SUPABASE_ANON_KEY,
         createSupabaseClient: createClient,
         PROMO_RELEASE_ID,
+        SHOW_NEW_RELEASE_PROMO,
         releases
     },
     shared: {
@@ -35,6 +32,7 @@ const legacyDeps = {
         runtimeCaches
     },
     utils: {
+        buildAssetUrl,
         debounce,
         escapeHtml,
         formatTime,

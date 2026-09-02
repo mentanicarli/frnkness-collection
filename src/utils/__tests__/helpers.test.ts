@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatTime, normalizeSearchText, escapeHtml, debounce, throttle } from '../helpers'
+import { buildAssetUrl, formatTime, normalizeSearchText, escapeHtml, debounce, throttle } from '../helpers'
 
 describe('formatTime', () => {
     it('formats seconds to MM:SS', () => {
@@ -64,5 +64,23 @@ describe('throttle', () => {
         await new Promise(r => setTimeout(r, 60))
         fn()
         expect(count).toBe(2)
+    })
+})
+
+describe('buildAssetUrl', () => {
+    it('leaves plain ascii paths untouched', () => {
+        expect(buildAssetUrl('audio/album1/', 'poopsicks.mp3')).toBe('audio/album1/poopsicks.mp3')
+    })
+
+    it('encodes spaces in directory names', () => {
+        expect(buildAssetUrl('audio/album 3/', 'ZAL.mp3')).toBe('audio/album%203/ZAL.mp3')
+    })
+
+    it('encodes cyrillic file names', () => {
+        expect(buildAssetUrl('audio/album4/', 'ГОУТЫ.mp3')).toBe('audio/album4/%D0%93%D0%9E%D0%A3%D0%A2%D0%AB.mp3')
+    })
+
+    it('tolerates empty arguments', () => {
+        expect(buildAssetUrl('', '')).toBe('')
     })
 })
