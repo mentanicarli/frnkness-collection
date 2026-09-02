@@ -1,5 +1,5 @@
 export function createSearchModule(ctx) {
-    const { dom, state, perf, releases, utils } = ctx
+    const { dom, state, perf, releases, utils, LYRICS_INDEX_URL } = ctx
     const { parseLRC, normalizeSearchText, escapeHtml, debounce } = utils
 
     function toggleSearchPanel(forceState = null) {
@@ -52,41 +52,73 @@ export function createSearchModule(ctx) {
         dom.searchResults.innerHTML = `<p class="font-mono text-xs text-[var(--fg-faint)] mb-2">Результатов: ${results.length}</p>${html}`
     }
 
+    function lrcKey(release, track) {
+        const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
+        return release.lyricsPath + base + '.lrc'
+    }
+
+    function collectLines(entries, releaseId, release, trackIndex, track, lrc) {
+        parseLRC(lrc).forEach(item => {
+            const clean = (item.text || '').trim()
+            if (!clean) return
+            entries.push({
+                releaseId, releaseTitle: release.title, trackIndex,
+                trackTitle: track.title, line: clean,
+                normalized: normalizeSearchText(clean), time: item.time
+            })
+        })
+    }
+
+    // Индекс, собранный на этапе сборки: один файл вместо запроса на трек.
+    // Если его нет (или он битый), возвращаем null и уходим на обход по файлам.
+    async function fetchPrebuiltIndex() {
+        if (!LYRICS_INDEX_URL) return null
+        try {
+            const res = await fetch(LYRICS_INDEX_URL)
+            if (!res.ok) return null
+            const data = await res.json()
+            return data && typeof data === 'object' && !Array.isArray(data) ? data : null
+        } catch {
+            return null
+        }
+    }
+
     async function ensureLyricsIndex() {
         if (state.lyricsIndexReady) return
         if (state.lyricsIndexPromise) return state.lyricsIndexPromise
 
         state.lyricsIndexPromise = (async () => {
             const entries = []
+            const prebuilt = await fetchPrebuiltIndex()
             const tasks = []
 
             Object.entries(releases).forEach(([releaseId, release]) => {
                 release.tracks.forEach((track, trackIndex) => {
+                    if (prebuilt) {
+                        const lrc = prebuilt[lrcKey(release, track)]
+                        if (lrc) collectLines(entries, releaseId, release, trackIndex, track, lrc)
+                        return
+                    }
                     tasks.push(async () => {
                         const lrc = await ctx.modules.lyrics.fetchTrackLrc(release, track)
                         if (!lrc) return
-                        parseLRC(lrc).forEach(item => {
-                            const clean = (item.text || '').trim()
-                            if (!clean) return
-                            entries.push({
-                                releaseId, releaseTitle: release.title, trackIndex,
-                                trackTitle: track.title, line: clean,
-                                normalized: normalizeSearchText(clean), time: item.time
-                            })
-                        })
+                        collectLines(entries, releaseId, release, trackIndex, track, lrc)
                     })
                 })
             })
 
-            const concurrency = 4
-            let pointer = 0
-            const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
-                while (pointer < tasks.length) {
-                    const taskIndex = pointer; pointer += 1
-                    await tasks[taskIndex]()
-                }
-            })
-            await Promise.all(workers)
+            if (tasks.length) {
+                const concurrency = 4
+                let pointer = 0
+                const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
+                    while (pointer < tasks.length) {
+                        const taskIndex = pointer; pointer += 1
+                        await tasks[taskIndex]()
+                    }
+                })
+                await Promise.all(workers)
+            }
+
             state.lyricsIndex = entries
             state.lyricsIndexReady = true
         })()

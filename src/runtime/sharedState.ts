@@ -1,4 +1,3 @@
-import { reactive } from 'vue'
 import type { ColorSet, LyricLine, Release } from '@/types'
 
 // Базовый акцент, который используется до вычисления цвета из обложки.
@@ -36,8 +35,11 @@ export interface RuntimeState {
     db: any
 }
 
-// Общая реактивная модель состояния для Vue-слоя и legacy runtime.
-export const runtimeState = reactive<RuntimeState>({
+// Общая модель состояния runtime.
+// Намеренно обычный объект: шаблоны Vue отсюда ничего не читают, поэтому
+// прокси Vue только добавлял бы накладные расходы на каждое чтение — в том
+// числе в обработчике timeupdate, который ходит сюда несколько раз в секунду.
+export const runtimeState: RuntimeState = {
     currentRelease: null,
     currentReleaseId: null,
     currentTrackIndex: 0,
@@ -62,11 +64,11 @@ export const runtimeState = reactive<RuntimeState>({
     lyricsIndexPromise: null,
     colorThief: null,
     db: null
-})
+}
 
 // Кэши вынесены отдельно, чтобы избежать повторных сетевых/CPU-операций.
 export const runtimeCaches = {
-    colorCache: reactive<Record<string, [number, number, number]>>({}),
-    colorPromiseCache: reactive<Record<string, Promise<[number, number, number]>>>({}),
-    releasePlayCountCache: reactive<Record<string, number>>({})
+    colorCache: {} as Record<string, [number, number, number]>,
+    colorPromiseCache: {} as Record<string, Promise<[number, number, number]>>,
+    releasePlayCountCache: {} as Record<string, number>
 }

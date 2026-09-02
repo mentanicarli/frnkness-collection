@@ -51,12 +51,32 @@ function isMediaRequest(url) {
     return /\/(audio|images)\//i.test(url.pathname)
 }
 
+// Потолок для кэшей, которые растут от действий пользователя.
+// Аудио в проекте больше сотни мегабайт, поэтому без вытеснения
+// media-кэш рано или поздно упёрся бы в квоту хранилища.
+const CACHE_LIMITS = {
+    [MEDIA_CACHE]: 60,
+    [LYRICS_CACHE]: 120
+}
+
+async function trimCache(cacheName) {
+    const limit = CACHE_LIMITS[cacheName]
+    if (!limit) return
+    const cache = await caches.open(cacheName)
+    const keys = await cache.keys()
+    if (keys.length <= limit) return
+    // keys() отдаёт записи в порядке добавления — удаляем самые старые.
+    await Promise.all(keys.slice(0, keys.length - limit).map((key) => cache.delete(key)))
+}
+
 async function staleWhileRevalidate(request, cacheName) {
     const cache = await caches.open(cacheName)
     const cached = await cache.match(request)
     const networkPromise = fetch(request)
         .then((response) => {
-            if (response && response.ok) cache.put(request, response.clone())
+            if (response && response.ok) {
+                cache.put(request, response.clone()).then(() => trimCache(cacheName))
+            }
             return response
         })
         .catch(() => undefined)

@@ -28,6 +28,7 @@ export function initLegacyApp(deps = {}) {
         createSupabaseClient = null,
         PROMO_RELEASE_ID = '',
         SHOW_NEW_RELEASE_PROMO = true,
+        LYRICS_INDEX_URL = '',
         releases = {}
     } = config
 
@@ -140,9 +141,39 @@ export function initLegacyApp(deps = {}) {
 
     // ── Build context & modules ─────────────────────────────────────────
 
+    // Клиент БД создаётся при первом обращении, а не на старте.
+    // Промис кэшируется, чтобы параллельные вызовы не создали два клиента;
+    // после неудачи повторные попытки не делаются — иначе таймер плеера
+    // дёргал бы загрузку чанка на каждом тике.
+    let dbPromise = null
+    let dbUnavailable = false
+
+    function getDb() {
+        if (state.db) return Promise.resolve(state.db)
+        if (dbUnavailable) return Promise.resolve(null)
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY || typeof createSupabaseClient !== 'function') {
+            return Promise.resolve(null)
+        }
+        if (!dbPromise) {
+            dbPromise = Promise.resolve()
+                .then(() => createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY))
+                .then(client => {
+                    state.db = client
+                    return client
+                })
+                .catch(e => {
+                    console.warn('Supabase init failed:', e)
+                    dbUnavailable = true
+                    return null
+                })
+        }
+        return dbPromise
+    }
+
     const ctx = {
         dom,
         state,
+        getDb,
         perf,
         releases,
         DEFAULT_COLOR,
@@ -151,6 +182,7 @@ export function initLegacyApp(deps = {}) {
         releasePlayCountCache,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
+        LYRICS_INDEX_URL,
         utils,
         modules: {}
     }
@@ -212,10 +244,6 @@ export function initLegacyApp(deps = {}) {
     // ── Init ───────────────────────────────────────────────────────────
 
     function init() {
-        if (SUPABASE_URL && SUPABASE_ANON_KEY && typeof createSupabaseClient === 'function') {
-            state.db = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-        }
-
         // Инициализируем динамические поля state, которые нужны lyrics-модулю.
         state.lyricsNodes = { regular: [], fullscreen: [] }
         state.karaokeHardStart = false

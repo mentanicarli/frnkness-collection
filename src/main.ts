@@ -1,5 +1,4 @@
 import { createApp } from 'vue'
-import { createClient } from '@supabase/supabase-js'
 import ColorThief from 'colorthief'
 import App from './App.vue'
 import './assets/app.css'
@@ -13,6 +12,14 @@ import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTra
 const app = createApp(App)
 app.mount('#app')
 
+// Supabase-клиент нужен только чарту и счётчику прослушиваний, а весит
+// заметно больше остального кода. Поэтому он не входит в основной бандл:
+// чанк подтягивается при первом реальном обращении к статистике.
+const createSupabaseClient = async (url: string, key: string) => {
+    const { createClient } = await import('@supabase/supabase-js')
+    return createClient(url, key)
+}
+
 // Инициализируем ColorThief из npm и кладём в runtimeState,
 // чтобы legacy-код мог использовать его без зависимости от window.ColorThief.
 runtimeState.colorThief = new ColorThief()
@@ -21,9 +28,10 @@ const legacyDeps = {
     config: {
         SUPABASE_URL,
         SUPABASE_ANON_KEY,
-        createSupabaseClient: createClient,
+        createSupabaseClient,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
+        LYRICS_INDEX_URL: `${import.meta.env.BASE_URL}lyrics-index.json`,
         releases
     },
     shared: {

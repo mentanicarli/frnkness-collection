@@ -1,17 +1,18 @@
 export function createChartModule(ctx) {
-    const { dom, state, releases, releasePlayCountCache, utils } = ctx
+    const { dom, state, releases, releasePlayCountCache, utils, getDb } = ctx
     const { parseTrackKey, escapeHtml } = utils
 
     async function getReleasePlayCount(releaseId) {
         const release = releases[releaseId]
         if (!release) return 0
         if (releasePlayCountCache[releaseId] !== undefined) return releasePlayCountCache[releaseId]
-        if (!state.db) return 0
+        const db = await getDb()
+        if (!db) return 0
 
         try {
             // Ключи трека начинаются с releaseId, поэтому префиксный фильтр
             // отдаёт только нужные строки вместо всей таблицы.
-            const { data, error } = await state.db
+            const { data, error } = await db
                 .from('play_counts')
                 .select('track_key, plays')
                 .like('track_key', `${releaseId}-%`)
@@ -31,11 +32,13 @@ export function createChartModule(ctx) {
     }
 
     async function incrementPlayCount() {
-        if (!state.currentReleaseId || !state.db || state.trackCounted || state.trackCountPending) return
+        if (!state.currentReleaseId || state.trackCounted || state.trackCountPending) return
         state.trackCountPending = true
         const releaseId = state.currentReleaseId
         try {
-            const { error } = await state.db.rpc('increment_play_count', {
+            const db = await getDb()
+            if (!db) return
+            const { error } = await db.rpc('increment_play_count', {
                 track_key_input: `${releaseId}-${state.currentTrackIndex}`
             })
             if (error) throw error
@@ -61,11 +64,12 @@ export function createChartModule(ctx) {
 
     async function renderChart() {
         if (!dom.chartList) return
-        if (!state.db) {
+        const db = await getDb()
+        if (!db) {
             dom.chartList.innerHTML = '<p class="text-center text-[var(--fg-muted)] mt-10">База недоступна.</p>'
             return
         }
-        const { data, error } = await state.db
+        const { data, error } = await db
             .from('play_counts').select('track_key, plays')
             .order('plays', { ascending: false }).limit(50)
         if (error) {
