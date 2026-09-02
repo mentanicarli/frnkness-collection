@@ -9,8 +9,11 @@ const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
 
-// ID релиза для промо блока (легко меняется)
-export const PROMO_RELEASE_ID = 'faaa'
+// Промо-блок на главной: показывать ли его и какой релиз в нём.
+// Значения по умолчанию берутся из кода, env-переменные позволяют
+// переопределить их на сборке без правки исходников.
+export const SHOW_NEW_RELEASE_PROMO = import.meta.env.VITE_SHOW_NEW_RELEASE_PROMO !== 'false'
+export const PROMO_RELEASE_ID = import.meta.env.VITE_NEW_RELEASE_PROMO_ID || 'zlaya-nostalgia'
 
 // Единый источник данных по дискографии, трекам и путям к медиа/текстам.
 export const releases: Releases = {
@@ -134,6 +137,24 @@ export const releases: Releases = {
             { num: 7, title: '22_00', file: '2200.mp3', lyricsFile: '07-22-00.txt' },
             { num: 8, title: 'Международный Соннетклауд', file: 'Международный Соннет Клауд.mp3', lyricsFile: '08-mezhdunarodny.txt' },
             { num: 9, title: 'Борода, потом Марат', file: 'Boroda,marat.mp3', lyricsFile: '09-boroda-potom-marat.txt' }
+        ]
+    },
+    'zlaya-nostalgia': {
+        type: 'album',
+        title: 'Злая Ностальгия',
+        year: '2026',
+        releaseDate: '26 августа 2026',
+        cover: 'images/album4-cover.jpg',
+        audioPath: 'audio/album4/',
+        lyricsPath: 'lyrics/album4/',
+        tracks: [
+            { num: 1, title: 'Маканочки', file: 'Маканочки.mp3', lyricsFile: '01-makanochki.txt' },
+            { num: 2, title: 'Общество Могнутых Аналитиков', file: 'Общество Могнутых Аналитиков.mp3', lyricsFile: '02-obshchestvo-mognutyh-analitikov.txt' },
+            { num: 3, title: 'ПУПСАСТИЯ', file: 'Пупсастия.mp3', lyricsFile: '03-pupsastiya.txt' },
+            { num: 4, title: 'Случайно взяли топ один', file: 'Случайно взяли топ 1.mp3', lyricsFile: '04-sluchayno-vzyali-top-odin.txt' },
+            { num: 5, title: 'Где же наш первый курс', file: 'Где же наш первый курс.mp3', lyricsFile: '05-gde-zhe-nash-perviy-kurs.txt' },
+            { num: 6, title: 'Бильярд', file: 'Бильярд.mp3', lyricsFile: '06-bilyard.txt' },
+            { num: 7, title: 'ГОУТЫ', file: 'ГОУТЫ.mp3', lyricsFile: '07-gouty.txt' }
         ]
     }
 }
