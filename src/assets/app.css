@@ -358,3 +358,120 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 /* Stagger reveal */
 .stagger-item { opacity: 0; transform: translateY(12px); }
 .stagger-item.visible { opacity: 1; transform: none; transition: opacity 0.32s var(--ease), transform 0.32s var(--ease); }
+
+/* =====================================================================
+   Страница трека (#page-track) — рендерится в legacy/modules/track.js
+   ===================================================================== */
+
+.track-page-inner { padding-top: 24px; padding-bottom: 130px; }
+
+.track-back {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 32px;
+  color: var(--fg-muted); font-family: 'Golos Text'; font-size: 14px;
+  transition: color var(--fast);
+}
+.track-back:hover { color: var(--fg); }
+.track-back svg { transition: transform var(--fast); }
+.track-back:hover svg { transform: translateX(-3px); }
+
+.track-hero {
+  display: grid; grid-template-columns: clamp(140px, 22vw, 240px) 1fr;
+  gap: clamp(20px, 3vw, 40px); align-items: end;
+  padding-bottom: clamp(28px, 4vw, 44px);
+  border-bottom: 1px solid var(--line);
+}
+.track-hero-cover {
+  aspect-ratio: 1; overflow: hidden; border-radius: var(--r-lg);
+  background: var(--bg-card); box-shadow: var(--shadow-pop);
+}
+.track-hero-cover img { width: 100%; height: 100%; object-fit: cover; }
+.track-hero-main { min-width: 0; }
+.track-hero-kind {
+  font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--fg-faint); margin-bottom: 12px;
+}
+.track-hero-title {
+  font-family: 'Unbounded'; font-weight: 800; letter-spacing: -0.03em;
+  font-size: clamp(28px, 5.2vw, 62px); line-height: 1.02; color: var(--fg);
+}
+.track-hero-artist {
+  color: var(--page-accent); font-size: 14px; letter-spacing: 0.02em;
+  text-transform: lowercase; margin-top: 10px;
+}
+.track-hero-meta {
+  font-family: 'JetBrains Mono'; font-size: 13px; color: var(--fg-muted); margin-top: 6px;
+}
+.track-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+.track-play-btn, .track-share-btn {
+  display: inline-flex; align-items: center; gap: 9px; height: 44px; padding: 0 22px;
+  border-radius: var(--r-sm); font-family: 'Golos Text'; font-weight: 600; font-size: 13px;
+  transition: filter var(--fast), transform var(--fast), color var(--fast), border-color var(--fast);
+}
+.track-play-btn { background: var(--page-accent); color: var(--accent-ink); border: none; }
+.track-play-btn:hover { filter: brightness(0.93); transform: scale(1.02); }
+.track-share-btn { background: transparent; color: var(--fg-muted); border: 1px solid var(--line-2); }
+.track-share-btn:hover { color: var(--fg); border-color: var(--fg-muted); }
+
+.track-section { margin-top: clamp(30px, 4vw, 48px); }
+.track-section-title {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  font-family: 'Unbounded'; font-weight: 600; font-size: clamp(17px, 2vw, 23px);
+  letter-spacing: -0.02em; color: var(--fg); margin-bottom: 18px;
+}
+.track-note-hint {
+  font-family: 'JetBrains Mono'; font-weight: 400; font-size: 11px;
+  letter-spacing: 0.04em; color: var(--fg-faint); text-transform: lowercase;
+}
+
+.track-about p {
+  font-size: 16px; line-height: 1.75; color: var(--fg-muted);
+  max-width: 68ch;
+}
+.track-about p + p { margin-top: 14px; }
+
+.track-lyrics-body { max-width: 68ch; }
+.track-lyrics-empty { color: var(--fg-faint); font-family: 'JetBrains Mono'; font-size: 14px; }
+.lyric-line {
+  font-size: 17px; line-height: 1.72; color: var(--fg);
+  padding: 1px 0; border-radius: var(--r-xs);
+}
+.lyric-line.is-blank { height: 12px; line-height: 12px; }
+.lyric-line.has-note {
+  cursor: pointer; display: inline-block; width: 100%;
+  background: var(--page-accent-soft);
+  box-shadow: inset 0 -1px 0 0 var(--page-accent);
+  padding: 1px 6px; margin: 1px -6px;
+  transition: background var(--fast);
+}
+.lyric-line.has-note:hover { background: var(--page-accent-glow); }
+.lyric-line.has-note:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+.lyric-line.has-note.open { background: var(--page-accent-glow); }
+
+.lyric-note {
+  margin: 10px 0 14px; padding: 14px 16px;
+  background: var(--bg-2); border-left: 2px solid var(--page-accent);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 15px; line-height: 1.7; color: var(--fg-muted);
+  animation: noteIn var(--fast) var(--ease);
+}
+@keyframes noteIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.track-siblings { display: flex; flex-direction: column; }
+.track-sibling {
+  display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: center;
+  padding: 11px 12px; border-radius: var(--r-sm); transition: background var(--fast);
+}
+.track-sibling + .track-sibling { border-top: 1px solid var(--line); }
+.track-sibling:hover { background: var(--bg-2); }
+.track-sibling-num {
+  font-family: 'JetBrains Mono'; font-size: 13px; color: var(--fg-faint); text-align: center;
+}
+.track-sibling-title { font-family: 'Golos Text'; font-weight: 600; font-size: 15px; color: var(--fg); }
+.track-sibling:hover .track-sibling-title { color: var(--page-accent); }
+
+@media (max-width: 640px) {
+  .track-hero { grid-template-columns: 1fr; align-items: start; gap: 18px; }
+  .track-hero-cover { width: min(58%, 220px); }
+  .track-play-btn, .track-share-btn { flex: 1 1 auto; justify-content: center; }
+}

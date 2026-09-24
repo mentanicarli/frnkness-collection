@@ -197,7 +197,7 @@ export function createSearchModule(ctx) {
     function openSearchResult(type, releaseId, trackIndex, time = -1) {
         if (!releases[releaseId]) return
         toggleSearchPanel(false)
-        ctx.modules.ui.openRelease(releaseId)
+        ctx.modules.router.goRelease(releaseId)
         if (type === 'release' || trackIndex < 0) return
         setTimeout(() => {
             ctx.modules.player.playTrack(trackIndex, 'fade')

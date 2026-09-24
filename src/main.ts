@@ -8,6 +8,7 @@ import { PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_U
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
 import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
+import { buildTrackHash, findTrackRefBySlug, getTrackSlug } from './utils/slug'
 
 const app = createApp(App)
 app.mount('#app')
@@ -32,6 +33,7 @@ const legacyDeps = {
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
         LYRICS_INDEX_URL: `${import.meta.env.BASE_URL}lyrics-index.json`,
+        TRACK_NOTES_URL: `${import.meta.env.BASE_URL}track-notes.json`,
         releases
     },
     shared: {
@@ -41,10 +43,13 @@ const legacyDeps = {
     },
     utils: {
         buildAssetUrl,
+        buildTrackHash,
         debounce,
         escapeHtml,
+        findTrackRefBySlug,
         formatTime,
         getAllTrackRefs,
+        getTrackSlug,
         isSameTrackRef,
         normalizeSearchText,
         parseLRC,

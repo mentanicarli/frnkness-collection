@@ -11,6 +11,7 @@ import fs from 'fs'
 // приходилось делать отдельный запрос на каждый трек. Файл отдаётся и в
 // dev через middleware, поэтому обе среды идут по одному и тому же пути.
 const LYRICS_INDEX_FILE = 'lyrics-index.json'
+const TRACK_NOTES_FILE = 'track-notes.json'
 
 function buildLyricsIndex() {
     const root = path.resolve(__dirname, 'lyrics')
@@ -29,18 +30,53 @@ function buildLyricsIndex() {
     return JSON.stringify(index)
 }
 
+// Собирает *.notes.json (описание трека и разборы строк) в один файл,
+// чтобы страница трека не ходила за ними по отдельности.
+function buildTrackNotes() {
+    const root = path.resolve(__dirname, 'lyrics')
+    const notes: Record<string, unknown> = {}
+    const walk = (dir: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name)
+            if (entry.isDirectory()) {
+                walk(full)
+                continue
+            }
+            if (!entry.name.toLowerCase().endsWith('.notes.json')) continue
+            const rel = path.relative(__dirname, full).split(path.sep).join('/')
+            try {
+                notes[rel] = JSON.parse(fs.readFileSync(full, 'utf-8'))
+            } catch (e) {
+                // Битый JSON не должен ронять сборку — предупреждаем и пропускаем.
+                console.warn(`[track-notes] пропущен ${rel}: ${(e as Error).message}`)
+            }
+        }
+    }
+    if (fs.existsSync(root)) walk(root)
+    return JSON.stringify(notes)
+}
+
 function lyricsIndexPlugin() {
     return {
         name: 'frnkness-lyrics-index',
         generateBundle(this: any) {
             this.emitFile({ type: 'asset', fileName: LYRICS_INDEX_FILE, source: buildLyricsIndex() })
+            this.emitFile({ type: 'asset', fileName: TRACK_NOTES_FILE, source: buildTrackNotes() })
         },
         configureServer(server: any) {
             server.middlewares.use((req: any, res: any, next: any) => {
                 const url = (req.url || '').split('?')[0]
-                if (!url.endsWith('/' + LYRICS_INDEX_FILE)) return next()
-                res.setHeader('Content-Type', 'application/json; charset=utf-8')
-                res.end(buildLyricsIndex())
+                if (url.endsWith('/' + LYRICS_INDEX_FILE)) {
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(buildLyricsIndex())
+                    return
+                }
+                if (url.endsWith('/' + TRACK_NOTES_FILE)) {
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                    res.end(buildTrackNotes())
+                    return
+                }
+                return next()
             })
         }
     }

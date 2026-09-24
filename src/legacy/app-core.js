@@ -11,6 +11,8 @@ import { createPlayerModule } from './modules/player'
 import { createChartModule } from './modules/chart'
 import { createSearchModule } from './modules/search'
 import { createUiModule } from './modules/ui'
+import { createTrackModule } from './modules/track'
+import { createRouterModule } from './modules/router'
 
 export function initLegacyApp(deps = {}) {
     if (window.__legacyAppInitialized) return
@@ -29,6 +31,7 @@ export function initLegacyApp(deps = {}) {
         PROMO_RELEASE_ID = '',
         SHOW_NEW_RELEASE_PROMO = true,
         LYRICS_INDEX_URL = '',
+        TRACK_NOTES_URL = '',
         releases = {}
     } = config
 
@@ -112,6 +115,7 @@ export function initLegacyApp(deps = {}) {
         dom.searchBackdrop = $('search-backdrop')
         dom.albumsSection = dom.albumsGrid ? dom.albumsGrid.closest('section') : null
         dom.singlesSection = dom.singlesGrid ? dom.singlesGrid.closest('section') : null
+        dom.trackPage = $('page-track')
         dom.lyricsModeSwitch = $('lyrics-mode-switch')
         dom.lyricsModeText = $('lyrics-mode-text')
         dom.lyricsModeKaraoke = $('lyrics-mode-karaoke')
@@ -183,6 +187,7 @@ export function initLegacyApp(deps = {}) {
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
         LYRICS_INDEX_URL,
+        TRACK_NOTES_URL,
         utils,
         modules: {}
     }
@@ -196,11 +201,17 @@ export function initLegacyApp(deps = {}) {
     modules.chart = createChartModule(ctx)
     modules.search = createSearchModule(ctx)
     modules.ui = createUiModule(ctx)
+    modules.track = createTrackModule(ctx)
+    modules.router = createRouterModule(ctx)
 
     // ── window.App ─────────────────────────────────────────────────────
 
     window.App = {
-        openRelease: id => modules.ui.openRelease(id),
+        openRelease: id => modules.router.goRelease(id),
+        openTrackPage: i => modules.router.goTrack(state.currentReleaseId, i),
+        openCurrentTrackPage: () => modules.router.goCurrentTrack(),
+        playTrackFromPage: (r, i) => modules.track.playTrackFromPage(r, i),
+        copyTrackLink: btn => modules.track.copyTrackLink(btn),
         handleTrackClick: (i, src) => modules.player.handleTrackClick(i, src),
         showLyrics: i => modules.lyrics.showLyrics(i),
         setLyricsMode: m => modules.lyrics.setLyricsMode(m),
@@ -218,7 +229,11 @@ export function initLegacyApp(deps = {}) {
         seekTo: t => modules.player.seekTo(t),
         seekTrack: e => modules.player.seekTrack(e),
         seekTrackFs: e => modules.player.seekTrackFs(e),
-        showPage: n => modules.ui.showPage(n),
+        showPage: n => {
+            if (n === 'home') modules.router.goHome()
+            else if (n === 'chart') modules.router.goChart()
+            else modules.ui.showPage(n)
+        },
         playChart: (r, i) => modules.chart.playChart(r, i),
         openSearchResult: (t, r, i, time) => modules.search.openSearchResult(t, r, i, time),
         toggleSearchPanel: s => modules.search.toggleSearchPanel(s),
@@ -250,6 +265,7 @@ export function initLegacyApp(deps = {}) {
 
         cacheDomElements()
         modules.ui.renderHome()
+        modules.router.start()
         modules.search.initGlobalSearch()
         modules.player.updateFlowButtonState()
         modules.ui.initStaggerAnimation()

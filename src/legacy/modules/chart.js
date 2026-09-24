@@ -2,12 +2,18 @@ export function createChartModule(ctx) {
     const { dom, state, releases, releasePlayCountCache, utils, getDb } = ctx
     const { parseTrackKey, escapeHtml } = utils
 
-    async function getReleasePlayCount(releaseId) {
+    // Один запрос на релиз отдаёт и сумму по релизу, и разбивку по трекам,
+    // поэтому странице трека не нужен отдельный поход в базу.
+    const releaseTrackPlaysCache = {}
+
+    async function loadReleasePlays(releaseId) {
         const release = releases[releaseId]
-        if (!release) return 0
-        if (releasePlayCountCache[releaseId] !== undefined) return releasePlayCountCache[releaseId]
+        if (!release) return { total: 0, byTrack: {} }
+        if (releasePlayCountCache[releaseId] !== undefined) {
+            return { total: releasePlayCountCache[releaseId], byTrack: releaseTrackPlaysCache[releaseId] || {} }
+        }
         const db = await getDb()
-        if (!db) return 0
+        if (!db) return { total: 0, byTrack: {} }
 
         try {
             // Ключи трека начинаются с releaseId, поэтому префиксный фильтр
@@ -18,17 +24,33 @@ export function createChartModule(ctx) {
                 .like('track_key', `${releaseId}-%`)
             if (error) throw error
             let total = 0
+            const byTrack = {}
             ;(data || []).forEach(item => {
                 const parsed = parseTrackKey(item.track_key)
                 if (!parsed || parsed.releaseId !== releaseId) return
-                total += Number(item.plays) || 0
+                const plays = Number(item.plays) || 0
+                total += plays
+                // Старый и новый формат ключа могут указывать на один трек,
+                // поэтому складываем, а не перезаписываем.
+                byTrack[parsed.trackIndex] = (byTrack[parsed.trackIndex] || 0) + plays
             })
             releasePlayCountCache[releaseId] = total
-            return total
+            releaseTrackPlaysCache[releaseId] = byTrack
+            return { total, byTrack }
         } catch (e) {
             console.warn('Release play count load failed:', e)
-            return 0
+            return { total: 0, byTrack: {} }
         }
+    }
+
+    async function getReleasePlayCount(releaseId) {
+        const { total } = await loadReleasePlays(releaseId)
+        return total
+    }
+
+    async function getTrackPlayCount(releaseId, trackIndex) {
+        const { byTrack } = await loadReleasePlays(releaseId)
+        return byTrack[trackIndex] || 0
     }
 
     async function incrementPlayCount() {
@@ -44,6 +66,7 @@ export function createChartModule(ctx) {
             if (error) throw error
             state.trackCounted = true
             delete releasePlayCountCache[releaseId]
+            delete releaseTrackPlaysCache[releaseId]
             if (state.currentReleaseId === releaseId && state.currentRelease && dom.releasePlays) {
                 dom.releasePlays.textContent = 'Счетчик прослушиваний обновляется...'
                 getReleasePlayCount(releaseId).then(total => {
@@ -107,9 +130,9 @@ export function createChartModule(ctx) {
     }
 
     function playChart(releaseId, trackIndex) {
-        ctx.modules.ui.openRelease(releaseId)
+        ctx.modules.router.goRelease(releaseId)
         setTimeout(() => ctx.modules.player.playTrack(trackIndex, 'fade'), 100)
     }
 
-    return { getReleasePlayCount, incrementPlayCount, renderChart, playChart }
+    return { getReleasePlayCount, getTrackPlayCount, incrementPlayCount, renderChart, playChart }
 }
