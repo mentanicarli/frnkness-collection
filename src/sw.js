@@ -7,7 +7,7 @@ const MANIFEST_ENTRIES = self.__WB_MANIFEST || []
 
 const BASE_PATH = self.location.pathname.replace(/[^/]+$/, '')
 const MEDIA_CACHE = 'media-v1'
-const LYRICS_CACHE = 'lyrics-v1'
+const LYRICS_CACHE = 'lyrics-v2'
 
 // Версия кеша автоматически выводится из хешей файлов сборки.
 const _rev = MANIFEST_ENTRIES.find(e => e.revision)?.revision ?? ''
@@ -69,6 +69,27 @@ async function trimCache(cacheName) {
     await Promise.all(keys.slice(0, keys.length - limit).map((key) => cache.delete(key)))
 }
 
+// Тексты песен дописываются по ходу жизни сайта, поэтому для них сеть
+// идёт первой: при stale-while-revalidate вернувшийся посетитель получал
+// прошлую версию файла и видел новый текст только на следующем заходе.
+// Файлы маленькие, так что запрос ничего не стоит, а кэш остаётся
+// страховкой на случай офлайна.
+async function networkFirst(request, cacheName) {
+    const cache = await caches.open(cacheName)
+    try {
+        const response = await fetch(request)
+        if (response && response.ok) {
+            cache.put(request, response.clone()).then(() => trimCache(cacheName))
+            return response
+        }
+        const cached = await cache.match(request)
+        return cached || response
+    } catch {
+        const cached = await cache.match(request)
+        return cached || new Response('', { status: 504, statusText: 'Offline' })
+    }
+}
+
 async function staleWhileRevalidate(request, cacheName) {
     const cache = await caches.open(cacheName)
     const cached = await cache.match(request)
@@ -121,7 +142,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     if (isLyricsRequest(url)) {
-        event.respondWith(staleWhileRevalidate(request, LYRICS_CACHE))
+        event.respondWith(networkFirst(request, LYRICS_CACHE))
         return
     }
 
