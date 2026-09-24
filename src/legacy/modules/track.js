@@ -76,14 +76,26 @@ export function createTrackModule(ctx) {
         }
 
         let noteIndex = 0
+        // Разбор вешаем только на первое вхождение строки: иначе припев,
+        // повторённый пять раз, подчёркивал бы полтекста одним и тем же
+        // комментарием.
+        const used = new Set()
         const html = text
             .split('\n')
             .map(rawLine => {
                 const line = rawLine.trim()
                 if (!line) return '<p class="lyric-line is-blank">&nbsp;</p>'
 
-                const note = noteMap.get(normalizeLine(line))
+                // [Припев], [Куплет 2] и прочие метки секций — не строки песни,
+                // поэтому они и не подсвечиваются, и не принимают разборы.
+                if (/^\[.+\]$/.test(line)) {
+                    return `<p class="lyric-section">${escapeHtml(line)}</p>`
+                }
+
+                const key = normalizeLine(line)
+                const note = used.has(key) ? null : noteMap.get(key)
                 if (!note) return `<p class="lyric-line">${escapeHtml(line)}</p>`
+                used.add(key)
 
                 const id = `lyric-note-${noteIndex++}`
                 return `

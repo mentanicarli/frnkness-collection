@@ -475,3 +475,12 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
   .track-hero-cover { width: min(58%, 220px); }
   .track-play-btn, .track-share-btn { flex: 1 1 auto; justify-content: center; }
 }
+
+/* Метки секций в тексте песни: [Припев], [Куплет 1] и т.п. */
+.lyric-section {
+  font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 500;
+  letter-spacing: 0.06em; color: var(--page-accent);
+  margin: 22px 0 8px; opacity: 0.85;
+}
+.lyric-line + .lyric-section { margin-top: 26px; }
+.track-lyrics-body > .lyric-section:first-child { margin-top: 0; }
