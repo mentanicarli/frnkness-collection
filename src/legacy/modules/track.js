@@ -234,14 +234,10 @@ export function createTrackModule(ctx) {
         if (!dynamic) return
 
         const lyrics = renderLyrics(lyricsText, noteMap)
-        const noteCount = lyrics.annotated
         dynamic.innerHTML = `
             ${renderAbout(entry)}
             <section class="track-section">
-                <h2 class="track-section-title">
-                    Текст
-                    ${noteCount ? `<span class="track-note-hint">${noteCount} ${pluralNotes(noteCount)} — нажмите на подчёркнутую строку</span>` : ''}
-                </h2>
+                <h2 class="track-section-title">Текст</h2>
                 <div class="track-lyrics-body">${lyrics.html}</div>
             </section>
         `
@@ -255,14 +251,6 @@ export function createTrackModule(ctx) {
             const base = `Трек ${track.num} из ${release.tracks.length}`
             meta.textContent = plays > 0 ? `${base} • ${plays} ${pluralPlays(plays)}` : base
         })
-    }
-
-    function pluralNotes(count) {
-        const mod10 = count % 10
-        const mod100 = count % 100
-        if (mod10 === 1 && mod100 !== 11) return 'разбор'
-        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'разбора'
-        return 'разборов'
     }
 
     function pluralPlays(count) {

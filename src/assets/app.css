@@ -419,10 +419,6 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
   font-family: 'Unbounded'; font-weight: 600; font-size: clamp(17px, 2vw, 23px);
   letter-spacing: -0.02em; color: var(--fg); margin-bottom: 18px;
 }
-.track-note-hint {
-  font-family: 'JetBrains Mono'; font-weight: 400; font-size: 11px;
-  letter-spacing: 0.04em; color: var(--fg-faint); text-transform: lowercase;
-}
 
 .track-about p {
   font-size: 16px; line-height: 1.75; color: var(--fg-muted);
@@ -484,3 +480,17 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 }
 .lyric-line + .lyric-section { margin-top: 26px; }
 .track-lyrics-body > .lyric-section:first-child { margin-top: 0; }
+
+/* Метки секций в обычном тексте (боковая панель и фуллскрин без караоке).
+   Селекторы с #fs-lyrics-body специфичнее одиночного класса, поэтому
+   для фуллскрина правило задаётся отдельно. */
+.lyrics-section-label {
+  font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: 0.06em;
+  color: var(--player-accent); opacity: 0.8; margin-top: 16px;
+}
+.fs-lyrics-body p.lyrics-section-label {
+  font-family: 'JetBrains Mono'; font-weight: 500;
+  font-size: clamp(11px, 1.1vw, 13px); letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--fs-on) 42%, transparent);
+  margin-top: clamp(18px, 2vw, 28px);
+}

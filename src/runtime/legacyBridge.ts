@@ -16,6 +16,7 @@ export interface LegacyAppApi {
     seekTrack(event: MouseEvent): void
     openFsPlayer(): void
     toggleLyrics(): void
+    openCurrentTrackPage(): void
     closeMiniPlayer(): void
     showPage(name: PageName): void
     toggleFlowMode(): void
@@ -77,6 +78,9 @@ export const legacyBridge = {
     },
     toggleLyrics() {
         invoke('toggleLyrics')
+    },
+    openCurrentTrackPage() {
+        invoke('openCurrentTrackPage')
     },
     closeMiniPlayer() {
         invoke('closeMiniPlayer')

@@ -90,7 +90,13 @@ export function createLyricsModule(ctx) {
     function renderLyricsByMode() {
         const hasKaraoke = state.parsedLyrics.length > 0
         const plainText = state.currentLyricsPlainText || 'Текст не найден'
-        const plainHtml = plainText.split('\n').map(l => `<p class="mb-2">${l || '&nbsp;'}</p>`).join('')
+        // Метки секций вида [Припев] показываем приглушённо, а не как строку песни.
+        const plainHtml = plainText.split('\n').map(l => {
+            const line = l.trim()
+            if (!line) return '<p class="mb-2">&nbsp;</p>'
+            const cls = /^\[.+\]$/.test(line) ? 'mb-2 lyrics-section-label' : 'mb-2'
+            return `<p class="${cls}">${line}</p>`
+        }).join('')
 
         // Мини-панель: ВСЕГДА обычный текст
         if (dom.lyricsContent) dom.lyricsContent.innerHTML = plainHtml

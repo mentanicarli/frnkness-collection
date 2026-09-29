@@ -120,7 +120,7 @@
               <p id="player-track" class="truncate text-sm"></p>
               <p class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
             </div>
-            <button id="lyrics-btn" @click="toggleLyrics" class="lyrics-action-btn hidden sm:flex" aria-label="Открыть текст">
+            <button id="lyrics-btn" @click="openCurrentTrackPage" class="lyrics-action-btn hidden sm:flex" aria-label="Открыть текст">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
@@ -164,7 +164,7 @@
           </button>
         </div>
         <div class="flex sm:hidden items-center">
-          <button id="lyrics-btn-mobile" @click="toggleLyrics" class="p-2 text-[var(--fg-muted)] hover:text-[var(--player-accent)] transition-colors" aria-label="Текст песни">
+          <button id="lyrics-btn-mobile" @click="openCurrentTrackPage" class="p-2 text-[var(--fg-muted)] hover:text-[var(--player-accent)] transition-colors" aria-label="Текст песни">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -196,6 +196,6 @@ const nextTrack = () => legacyBridge.nextTrack()
 const toggleMute = () => legacyBridge.toggleMute()
 const seekTrack = (event: MouseEvent) => legacyBridge.seekTrack(event)
 const openFsPlayer = () => legacyBridge.openFsPlayer()
-const toggleLyrics = () => legacyBridge.toggleLyrics()
+const openCurrentTrackPage = () => legacyBridge.openCurrentTrackPage()
 const closeMiniPlayer = () => legacyBridge.closeMiniPlayer()
 </script>
