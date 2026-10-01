@@ -351,3 +351,26 @@ kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3
 .adm-catalog-table th:nth-child(4) { width: 4.75rem; }
 .adm-catalog-table th:nth-child(6), .adm-catalog-table th:nth-child(7) { width: 5.5rem; }
 .adm-catalog-table th:nth-child(8) { width: 34%; }
+
+/* ── Новый релиз ───────────────────────────────────────────────────── */
+.adm-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem 1rem; }
+@media (max-width: 640px) { .adm-form-grid { grid-template-columns: 1fr; } }
+.adm-file-btn { position: relative; overflow: hidden; cursor: pointer; }
+.adm-file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.adm-file-btn:focus-within { outline: 1px solid var(--fg-muted); outline-offset: 2px; }
+.adm-cover-thumb { width: 4rem; height: 4rem; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line-2); }
+.adm-tracklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.adm-tracklist li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: 0.625rem; align-items: start; padding: 0.625rem; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); }
+.adm-tracklist li[draggable="true"] .adm-track-num { cursor: grab; }
+.adm-tracklist li.dragging { opacity: 0.5; }
+.adm-tracklist li.over { border-color: var(--fg-muted); }
+.adm-track-num { font-size: 0.8125rem; color: var(--fg-faint); padding-top: 0.625rem; text-align: right; }
+.adm-track-fields { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0.5rem; }
+.adm-track-file { grid-column: 1 / -1; gap: 0.625rem; }
+.adm-track-paths { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.adm-track-tools { display: flex; gap: 0.125rem; padding-top: 0.25rem; }
+@media (max-width: 640px) {
+  .adm-tracklist li { grid-template-columns: 1.5rem minmax(0, 1fr); }
+  .adm-track-fields { grid-template-columns: 1fr; }
+  .adm-track-tools { grid-column: 2; }
+}

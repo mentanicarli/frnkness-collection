@@ -92,6 +92,8 @@ export const defaultContent: ContentResponder = ({ action, body }) => {
 
 export async function installMocks(page: Page, options: MockOptions = {}) {
     const calls: ContentCall[] = []
+    const uploads: { name: string; size: number; contentType: string }[] = []
+    const repoState = { sha: HEAD_SHA, files: {} as Record<string, string> }
     const unexpected: string[] = []
     const users = [ADMIN_USER, PLAIN_USER]
 
@@ -124,7 +126,12 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
                 }
             })
         }
-        const body = req.postData() ? JSON.parse(req.postData()!) : {}
+        let body: any = {}
+        try {
+            body = req.postData() ? JSON.parse(req.postData()!) : {}
+        } catch {
+            body = {}
+        }
 
         if (url.pathname === '/auth/v1/token') {
             if (url.searchParams.get('grant_type') === 'password') {
@@ -145,9 +152,33 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         if (url.pathname === '/functions/v1/admin-content') {
             const call = { action: String(body.action), body, authorization: req.headers()['authorization'] ?? null }
             calls.push(call)
-            const res = options.content?.(call) ?? defaultContent(call)
+            let res = options.content?.(call)
+            // Репозиторий после коммитов: head отдаёт новый sha, read — закоммиченное.
+            if (!res && call.action === 'head' && repoState.sha !== HEAD_SHA) {
+                res = { body: { sha: repoState.sha, truncated: false, files: repoTree() } }
+            }
+            if (!res && call.action === 'read') {
+                const paths = body.paths as string[]
+                res = { body: { files: Object.fromEntries(paths.map((p) => [p, p in repoState.files ? repoState.files[p] : repoFile(p)])) } }
+            }
+            res = res ?? defaultContent(call)
+            if (res && call.action === 'commit' && (res.status ?? 200) === 200) {
+                for (const f of body.files as { path: string; content?: string }[]) {
+                    if (typeof f.content === 'string') repoState.files[f.path] = f.content
+                }
+                repoState.sha = (res.body as { sha: string }).sha
+            }
             if (res) return json(route, res.status ?? 200, res.body)
             return json(route, 400, { error: 'bad_request', message: 'нет мока для ' + call.action })
+        }
+
+        if (url.pathname.startsWith('/storage/v1/object/admin-uploads/') && method === 'POST') {
+            const name = decodeURIComponent(url.pathname.slice('/storage/v1/object/admin-uploads/'.length))
+            // Тип файла — из части multipart, как его видит Storage.
+            const raw = req.postDataBuffer()?.toString('latin1') ?? ''
+            const partType = raw.match(/filename="[^"]*"\r\nContent-Type: ([^\r]+)/)?.[1] ?? ''
+            uploads.push({ name, size: req.postDataBuffer()?.length ?? 0, contentType: partType })
+            return json(route, 200, { Key: 'admin-uploads/' + name, Id: name })
         }
 
         if (url.pathname.startsWith('/rest/v1/rpc/')) {
@@ -160,7 +191,7 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         return json(route, 404, { message: 'not mocked' })
     })
 
-    return { calls, unexpected }
+    return { calls, unexpected, uploads }
 }
 
 export async function loginAs(page: Page, user: { email: string; password: string }) {

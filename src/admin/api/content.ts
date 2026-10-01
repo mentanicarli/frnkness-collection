@@ -116,7 +116,11 @@ const STAGING_BUCKET = 'admin-uploads'
  */
 export async function uploadToStaging(file: Blob, ext: string, contentType: string): Promise<string> {
     const name = `${crypto.randomUUID()}.${ext.toLowerCase()}`
-    const { error } = await supabase.storage.from(STAGING_BUCKET).upload(name, file, { contentType, upsert: false })
+    // Для Blob supabase-js шлёт multipart и берёт тип из самого файла, а браузеры
+    // иногда называют mp3 «audio/mp3» или не называют никак. Бакет пускает только
+    // audio/mpeg, image/jpeg, image/png, application/pdf — задаём тип явно.
+    const typed = new Blob([file], { type: contentType })
+    const { error } = await supabase.storage.from(STAGING_BUCKET).upload(name, typed, { contentType, upsert: false })
     if (error) {
         const status = (error as { statusCode?: string | number }).statusCode
         if (String(status) === '401' || String(status) === '403') {
