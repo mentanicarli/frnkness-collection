@@ -289,13 +289,6 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 .fs-main-area { position: absolute; inset: 0; z-index: 2; display: grid; grid-template-columns: 1fr; place-items: center; align-content: center; gap: clamp(28px, 4vw, 64px); padding: clamp(70px, 9vh, 110px) var(--frame); }
 .fullscreen-player.lyrics-open .fs-main-area { grid-template-columns: 1fr 1fr; }
 @media (max-width: 820px) { .fullscreen-player.lyrics-open .fs-main-area { grid-template-columns: 1fr; gap: 18px; } .fullscreen-player.lyrics-open .fs-cover-container { display: none; } }
-@media (max-width: 560px) {
-  .fs-cover { width: min(62vw, 320px); }
-  .fs-cover-meta { width: min(82vw, 360px); }
-  .fs-lrc-line { font-size: clamp(20px, 6vw, 28px); }
-  .fs-lyrics-body { padding: 26vh 0; }
-  .fs-lyrics-body p:not(.fs-lrc-line) { font-size: clamp(18px, 5vw, 24px); }
-}
 .fs-cover-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
 .fs-cover { width: min(48vh, 440px); aspect-ratio: 1; position: relative; border-radius: var(--r-lg); overflow: hidden; box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.7); }
 .fs-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--med) var(--ease), transform var(--med) var(--ease); }
@@ -493,4 +486,101 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
   font-size: clamp(11px, 1.1vw, 13px); letter-spacing: 0.08em;
   color: color-mix(in srgb, var(--fs-on) 42%, transparent);
   margin-top: clamp(18px, 2vw, 28px);
+}
+
+/* =====================================================================
+   Мобильная версия (≤640px, совпадает с sm: в Tailwind).
+   Блок стоит в конце файла специально: мобильные правила должны идти
+   ПОСЛЕ базовых правил тех же селекторов, иначе базовые их перебивают.
+   Десктоп (≥641px) этот блок не затрагивает.
+   ===================================================================== */
+@media (max-width: 640px) {
+  /* ── Шапка: тап-зоны 44px, поиск без двойного крестика и без зума iOS ── */
+  header button.group { min-height: 44px; white-space: nowrap; }
+  #search-toggle-btn { width: 44px; height: 44px; }
+  #header-chart-btn { height: 44px; padding: 0 16px; }
+  .header-search-input-wrap { height: 44px; padding-right: 0; }
+  .header-search-input-wrap button { width: 44px; height: 44px; flex-shrink: 0; }
+  /* iOS увеличивает страницу при фокусе на поле со шрифтом меньше 16px */
+  .header-search-input-wrap input { font-size: 16px; }
+  #global-search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
+
+  /* ── Кнопки «Назад»: тап-зона 44px без сдвига контента ── */
+  #page-chart .shell > button:first-child,
+  #page-release .shell > button:first-child,
+  .track-back { min-height: 44px; margin-top: -12px; margin-bottom: 20px; }
+  #download-lyrics-btn { min-height: 44px; }
+
+  /* ── Треклист: название целиком, номер по первой строке, кнопка-иконка ── */
+  .track-row { grid-template-columns: 28px minmax(0, 1fr) 44px; gap: 10px; align-items: start; padding: 4px 0 4px 8px !important; }
+  .track-row .track-num { display: flex; align-items: center; justify-content: center; height: 44px; }
+  .track-row .track-title { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; line-height: 20px; padding: 12px 0; }
+  .track-row .track-page-btn { opacity: 1; width: 44px; height: 44px; padding: 0; justify-content: center; border: none; color: var(--fg-faint); }
+  .track-row .track-page-btn span { display: none; }
+  .track-row .track-page-btn svg { width: 18px; height: 18px; }
+  .track-row.playing .track-page-btn { color: var(--page-accent); }
+
+  /* ── Чарт: больше места под название, перенос до двух строк ── */
+  .chart-row { grid-template-columns: 24px 44px minmax(0, 1fr) auto; gap: 10px; padding: 9px 4px; }
+  .chart-cover { width: 44px; height: 44px; }
+  .chart-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; overflow-wrap: break-word; }
+  .chart-plays { gap: 6px; }
+
+  /* ── Мини-плеер: обложка+название, play/next, закрыть ── */
+  #player > div + div { padding: 0 6px 0 10px !important; }
+  #player .py-3 { padding-top: 8px; padding-bottom: 8px; gap: 4px !important; }
+  #player .player-main { gap: 10px !important; cursor: pointer; }
+  #player-cover { width: 44px; height: 44px; }
+  #player .cover-overlay { display: none; }
+  #player #lyrics-btn { display: none; }
+  #player .flex-shrink-0 { gap: 4px !important; }
+  #player .play-btn, #player .close-player-btn { width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  /* prev есть в полноэкранном плеере; правило после .play-btn, иначе flex его перебьёт */
+  #player .player-prev-btn { display: none; }
+
+  /* ── Боковая панель текста: ниже статус-бара, крестик 44px ── */
+  .lyrics-panel > div:first-child { padding: calc(16px + var(--safe-top)) 12px 16px 20px; gap: 12px; }
+  .lyrics-panel > div:first-child > button { width: 44px; height: 44px; flex-shrink: 0; }
+  #lyrics-content { padding: 20px 20px calc(24px + var(--safe-bottom)); }
+
+  /* ── Полноэкранный плеер: строго по центру, без выхода за экран ── */
+  .fs-header-buttons { top: calc(12px + var(--safe-top)); right: 16px; }
+  .fs-header-btn { width: 44px; height: 44px; }
+  .fs-main-area,
+  .fullscreen-player.lyrics-open .fs-main-area {
+    grid-template-columns: minmax(0, 1fr); gap: 0;
+    padding: calc(68px + var(--safe-top)) 24px calc(20px + var(--safe-bottom));
+  }
+  /* Обложка — по ширине экрана, но не выше, чем позволяет высота:
+     330px — место под подпись, прогресс, время и кнопки управления. */
+  .fs-cover {
+    width: min(100%, 400px, calc(100vh - var(--safe-top) - var(--safe-bottom) - 330px));
+    width: min(100%, 400px, calc(100svh - var(--safe-top) - var(--safe-bottom) - 330px));
+  }
+  .fs-cover-meta { width: 100%; max-width: 400px; margin-top: 20px; }
+  .fs-cover-meta h2 {
+    font-size: 18px; line-height: 1.25; overflow-wrap: break-word;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* полоска 4px, а тап-зона 24px */
+  .fs-cover-progress { margin-top: 6px; padding: 10px 0; box-sizing: content-box; background-clip: content-box; }
+  .fs-cover-times { margin-top: -4px; font-size: 12px; }
+  .fs-controls-inner { gap: 28px; margin-top: 12px; }
+  .fs-btn { width: 48px; height: 48px; }
+  .fs-play-btn { width: 64px; height: 64px; }
+  .fs-lyrics-panel {
+    height: calc(100vh - 88px - var(--safe-top) - var(--safe-bottom));
+    height: calc(100svh - 88px - var(--safe-top) - var(--safe-bottom));
+  }
+  .fs-lrc-line { font-size: clamp(20px, 6vw, 28px); }
+  .fs-lyrics-body { padding: 26vh 0; }
+  .fs-lyrics-body p:not(.fs-lrc-line) { font-size: clamp(18px, 5vw, 24px); }
+  /* метки [Припев] и т.п. остаются мелкими — правило выше их бы увеличило */
+  .fs-lyrics-body p.lyrics-section-label { font-size: clamp(11px, 1.1vw, 13px); }
+}
+
+/* Самые узкие экраны (iPhone SE 1-го поколения): подпись «collection»
+   не помещается рядом с кнопками и ломает логотип в две строки. */
+@media (max-width: 359px) {
+  header button.group > span + span { display: none; }
 }

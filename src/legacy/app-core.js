@@ -78,7 +78,6 @@ export function initLegacyApp(deps = {}) {
         dom.playPauseBtn = $('play-pause-btn')
         dom.playerCover = $('player-cover')
         dom.lyricsBtn = $('lyrics-btn')
-        dom.lyricsBtnMobile = $('lyrics-btn-mobile')
         dom.fsPlayer = $('fullscreen-player')
         dom.fsBg = $('fs-bg')
         dom.fsCoverA = $('fs-cover-a')

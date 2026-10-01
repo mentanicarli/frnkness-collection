@@ -182,8 +182,8 @@ export function createUiModule(ctx) {
                         <span class="track-num-digit group-hover:hidden">${String(t.num).padStart(2, '0')}</span>
                         <svg class="track-num-play hidden group-hover:block" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                     </span>
-                    <div class="flex-1 min-w-0"><p class="font-medium truncate">${escapeHtml(t.title)}</p></div>
-                    <button onclick="event.stopPropagation(); App.openTrackPage(${i})" class="lyrics-action-btn opacity-0 group-hover:opacity-100" aria-label="Страница трека">
+                    <div class="flex-1 min-w-0"><p class="track-title font-medium truncate">${escapeHtml(t.title)}</p></div>
+                    <button onclick="event.stopPropagation(); App.openTrackPage(${i})" class="lyrics-action-btn track-page-btn opacity-0 group-hover:opacity-100" aria-label="Страница трека">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span>Текст</span>
                     </button>

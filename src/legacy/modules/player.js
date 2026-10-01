@@ -132,7 +132,6 @@ export function createPlayerModule(ctx) {
 
         setMiniPlayerVisible(true)
         if (dom.lyricsBtn) dom.lyricsBtn.classList.remove('hidden')
-        if (dom.lyricsBtnMobile) dom.lyricsBtnMobile.classList.remove('hidden')
 
         document.querySelectorAll('.track-row').forEach((row, i) => {
             row.classList.toggle('playing', i === index)

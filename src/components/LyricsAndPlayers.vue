@@ -105,7 +105,7 @@
     </div>
     <div style="width: 100%; padding: 0 clamp(12px, 2vw, 20px);">
       <div class="py-3 flex items-center justify-between w-full" style="gap: clamp(8px, 1.5vw, 16px);">
-        <div class="flex items-center flex-1 min-w-0" style="gap: clamp(12px, 2vw, 16px);">
+        <div class="player-main flex items-center flex-1 min-w-0" style="gap: clamp(12px, 2vw, 16px);" @click="openFsFromMiniPlayer">
           <div id="player-cover" class="w-12 h-12 bg-[var(--bg-card)] flex-shrink-0 overflow-hidden">
             <div class="cover-overlay">
               <button @click.stop="openFsPlayer" class="fullscreen-trigger-btn" aria-label="Открыть на весь экран">
@@ -132,7 +132,7 @@
           </div>
         </div>
         <div class="flex items-center flex-shrink-0" style="gap: clamp(6px, 1.2vw, 12px);">
-          <button @click="prevTrack" class="play-btn p-2 transition-colors" aria-label="Предыдущий трек">
+          <button @click="prevTrack" class="play-btn player-prev-btn p-2 transition-colors" aria-label="Предыдущий трек">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
           </button>
           <button id="play-pause-btn" @click="togglePlay" class="play-btn w-10 h-10 rounded-full flex items-center justify-center relative" aria-label="Воспроизвести">
@@ -164,12 +164,6 @@
           </button>
         </div>
         <div class="flex sm:hidden items-center">
-          <button id="lyrics-btn-mobile" @click="openCurrentTrackPage" class="p-2 text-[var(--fg-muted)] hover:text-[var(--player-accent)] transition-colors" aria-label="Текст песни">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </button>
           <button @click="closeMiniPlayer" class="close-player-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Закрыть плеер">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
@@ -198,4 +192,10 @@ const seekTrack = (event: MouseEvent) => legacyBridge.seekTrack(event)
 const openFsPlayer = () => legacyBridge.openFsPlayer()
 const openCurrentTrackPage = () => legacyBridge.openCurrentTrackPage()
 const closeMiniPlayer = () => legacyBridge.closeMiniPlayer()
+// На мобиле обложка и название в мини-плеере открывают полноэкранный плеер
+// (оверлей по hover на тач-экране не работает). На десктопе клик ничего не делает.
+const MOBILE_QUERY = '(max-width: 640px)'
+const openFsFromMiniPlayer = () => {
+  if (window.matchMedia(MOBILE_QUERY).matches) legacyBridge.openFsPlayer()
+}
 </script>
