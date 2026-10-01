@@ -10,6 +10,23 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="frnk ness">
     <title>frnk ness collection</title>
+    <script>
+        // Масштаб интерфейса на широких мониторах. Эталон — окно браузера
+        // 1280×672 (внешний размер: 592px страницы + панель браузера), 1rem = 16px.
+        // Считаем от outerWidth/outerHeight: они не меняются при зуме браузера,
+        // поэтому Ctrl +/− работает поверх автомасштаба, как на обычном сайте.
+        // Если масштаб 1 — inline-размер не ставим, остаётся размер браузера.
+        (function () {
+            var root = document.documentElement
+            function applyScale() {
+                var w = window.outerWidth, h = window.outerHeight
+                var scale = w && h ? Math.max(1, Math.min(w / 1280, h / 672)) : 1
+                root.style.fontSize = scale > 1 ? 16 * scale + 'px' : ''
+            }
+            applyScale()
+            window.addEventListener('resize', applyScale)
+        })()
+    </script>
     <link rel="icon" type="image/x-icon" href="./favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
