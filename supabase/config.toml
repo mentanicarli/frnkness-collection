@@ -1,0 +1,8 @@
+# Минимальный конфиг Supabase CLI: нужен для `supabase link`,
+# `supabase db push` и `supabase functions deploy`.
+project_id = "frnkness-collection"
+
+[functions.admin-content]
+# JWT проверяет сама функция (auth.getUser + роль admin). Проверку на шлюзе
+# выключаем, иначе CORS-preflight (OPTIONS без токена) не проходит.
+verify_jwt = false

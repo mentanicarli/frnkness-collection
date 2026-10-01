@@ -65,3 +65,10 @@ export interface ChartTrack {
     releaseId: string
     trackIndex: number
 }
+
+export interface SiteSettings {
+    promo: {
+        enabled: boolean
+        releaseId: string
+    }
+}

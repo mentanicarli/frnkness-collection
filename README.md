@@ -43,7 +43,8 @@ https://frnkness.ru/
 - Компоненты интерфейса: `src/components/*`
 - Корневая композиция: `src/App.vue`, `src/main.ts`
 - Реактивное состояние: `src/runtime/sharedState.ts`
-- Конфиг и данные релизов: `src/config.ts`
+- Контент: `src/content/releases.json` (реестр релизов) и `src/content/site.json` (промо-блок)
+- Конфиг: `src/config.ts` — импортирует JSON и отдаёт `releases`, настройки промо и адрес Supabase
 - Утилиты и типы: `src/utils/*`, `src/types/index.ts`
 
 ### Runtime-слой
@@ -66,7 +67,12 @@ src/
 	App.vue
 	main.ts
 	config.ts
+	supabaseConfig.ts
 	env.d.ts
+	content/
+		releases.json
+		site.json
+	admin/            админка (см. раздел «Админка»)
 	sw.js
 	components/
 		AppHeader.vue
@@ -79,10 +85,13 @@ src/
 		helpers.ts
 		lyrics.ts
 		slug.ts
+		trackNotes.ts
+		promoCard.ts
 		__tests__/
 			helpers.test.ts
 			lyrics.test.ts
 			slug.test.ts
+			trackNotes.test.ts
 	types/
 		index.ts
 	legacy/
@@ -131,10 +140,13 @@ npm install
 
 - `VITE_SUPABASE_URL` — адрес проекта Supabase
 - `VITE_SUPABASE_ANON_KEY` — публичный ключ Supabase
-- `VITE_SHOW_NEW_RELEASE_PROMO` — `false` скрывает промо-блок на главной
-- `VITE_NEW_RELEASE_PROMO_ID` — ID релиза для промо-блока (ключ из `releases` в `src/config.ts`)
+Обе переменные необязательные: без них используются значения по умолчанию из `src/supabaseConfig.ts`.
 
-Все переменные необязательные: без них используются значения по умолчанию из `src/config.ts`.
+Промо-блок на главной настраивается не env-переменными, а файлом `src/content/site.json`:
+
+```json
+{ "promo": { "enabled": true, "releaseId": "zlaya-nostalgia" } }
+```
 
 ### Команды
 
@@ -144,7 +156,12 @@ npm run typecheck
 npm run test:run
 npm run build
 npm run preview
+npm run test:e2e        # Playwright-тесты админки (Supabase и GitHub замоканы)
+npm run check:function  # проверка типов Edge Function через Deno
 ```
+
+`npm run build` после сборки запускает `scripts/check-dist.mjs`: он проверяет, что код
+админки не попал в бандл сайта и в precache service worker.
 
 `npm test` запускает Vitest в watch-режиме, `npm run test:run` — однократный прогон (используется в CI).
 
@@ -207,13 +224,19 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
 2. Создайте папку `lyrics/<папка релиза>/` и файлы текстов. Пустой `.txt` допустим —
    на сайте отобразится «Текст будет позже...».
 3. Для караоке рядом с `имя.txt` положите `имя.lrc` с таймкодами вида `[00:12.34]`.
-4. Добавьте запись в `releases` в `src/config.ts`.
+4. Добавьте запись в конец `src/content/releases.json`.
 
 Имена файлов могут содержать пробелы и кириллицу — пути кодируются
 хелпером `buildAssetUrl` из `src/utils/helpers.ts`.
 
 Чтобы новый релиз попал в промо-блок на главной, укажите его ключ
-в `PROMO_RELEASE_ID` (`src/config.ts`) или в `VITE_NEW_RELEASE_PROMO_ID`.
+в `promo.releaseId` в `src/content/site.json`.
+
+Всё это умеет делать админка (раздел «Новый релиз»).
+
+Важно: существующие релизы в `releases.json` не переименовывайте и не переставляйте
+в них треки — ключ статистики `<releaseId>-<индекс трека>` перепутает прослушивания.
+Админка и функция `admin-content` такие изменения не пропускают.
 
 ## PWA и кэширование
 
@@ -246,6 +269,22 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
 Ключ трека имеет вид `<releaseId>-<индекс трека>` (индекс с нуля).
 Если Supabase недоступен, интерфейс продолжает работать, а статистика возвращает пустые данные.
 
+Схема базы для админки — в `supabase/migrations/`, Edge Function — в `supabase/functions/admin-content/`.
+
+## Админка
+
+Отдельная страница `admin.html` (вторая точка входа Vite, код в `src/admin/`). Вход — Supabase Auth,
+права — `app_metadata.role = 'admin'`. Вся защита на сервере: RLS, проверки в RPC и в функции.
+
+- Изменения контента уходят коммитами в `main` через Edge Function `admin-content`;
+  токен GitHub хранится только в секретах функции.
+- Функция пропускает только пути из белого списка (`lyrics/**`, `audio/**`, `images/**`,
+  `lyrics-books/**`, `src/content/*.json`) — правила в `supabase/functions/_shared/rules.ts`.
+- Медиафайлы загружаются через приватный бакет `admin-uploads` в Supabase Storage.
+- Админка не входит в бандл сайта и не кэшируется service worker.
+
+Настройка с нуля — [docs/admin-setup.md](docs/admin-setup.md).
+
 ## Ограничения
 
 - Основная логика приложения находится в runtime-слое `src/legacy/`, а не в компонентах Vue
@@ -254,8 +293,8 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
 - Роутинг построен на hash-адресах, поэтому страницы треков не индексируются поисковиками,
   а превью ссылки в мессенджерах одинаковое для всего сайта. Чтобы это изменить,
   понадобится генерация отдельного HTML на трек при сборке
-- Тестами покрыты только утилиты (`src/utils/__tests__/`), UI-тестов нет
-- Системы авторизации нет
+- Юнит-тестами покрыты утилиты и логика админки; e2e-тесты есть только у админки
+- Правки из админки появляются на сайте через 1–2 минуты — после сборки в GitHub Actions
 
 ## Автор
 

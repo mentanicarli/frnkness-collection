@@ -3,11 +3,13 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-dist.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "check:function": "cd supabase/functions/admin-content && npx -y deno@2 check index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
@@ -15,6 +17,7 @@
     "vue": "^3.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^5.0.0",

@@ -4,7 +4,9 @@
  */
 export function createTrackModule(ctx) {
     const { dom, state, releases, utils, TRACK_NOTES_URL } = ctx
-    const { buildAssetUrl, escapeHtml, getTrackSlug } = utils
+    const { buildAssetUrl, escapeHtml, getTrackSlug, buildNoteMap, renderLyricsHtml, renderAboutHtml } = utils
+    // Сопоставление разборов со строками живёт в src/utils/trackNotes.ts:
+    // тем же кодом рендерит предпросмотр админка.
 
     // Разборы и описания подгружаются одним файлом на весь сайт и кэшируются.
     let notesPromise = null
@@ -33,29 +35,6 @@ export function createTrackModule(ctx) {
         return release.lyricsPath + base + '.notes.json'
     }
 
-    // Строки сравниваем без учёта регистра, лишних пробелов и знаков по
-    // краям. Иначе разбор отваливался бы из-за запятой в конце строки,
-    // которую легко не скопировать при написании комментария.
-    const EDGE_PUNCTUATION = /^[\s"'«»(\[]+|[\s"'«»)\],.!?;:—–-]+$/g
-
-    function normalizeLine(value) {
-        return String(value || '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .replace(EDGE_PUNCTUATION, '')
-            .toLowerCase()
-    }
-
-    function buildNoteMap(entry) {
-        const map = new Map()
-        const list = entry && Array.isArray(entry.annotations) ? entry.annotations : []
-        list.forEach(item => {
-            if (!item || !item.line || !item.note) return
-            map.set(normalizeLine(item.line), String(item.note))
-        })
-        return map
-    }
-
     async function fetchPlainLyrics(release, track) {
         try {
             const res = await fetch(buildAssetUrl(release.lyricsPath, track.lyricsFile))
@@ -68,45 +47,6 @@ export function createTrackModule(ctx) {
         } catch {
             return ''
         }
-    }
-
-    function renderLyrics(text, noteMap) {
-        if (!text) {
-            return { html: '<p class="track-lyrics-empty">Текст будет позже...</p>', annotated: 0 }
-        }
-
-        let noteIndex = 0
-        // Разбор вешаем только на первое вхождение строки: иначе припев,
-        // повторённый пять раз, подчёркивал бы полтекста одним и тем же
-        // комментарием.
-        const used = new Set()
-        const html = text
-            .split('\n')
-            .map(rawLine => {
-                const line = rawLine.trim()
-                if (!line) return '<p class="lyric-line is-blank">&nbsp;</p>'
-
-                // [Припев], [Куплет 2] и прочие метки секций — не строки песни,
-                // поэтому они и не подсвечиваются, и не принимают разборы.
-                if (/^\[.+\]$/.test(line)) {
-                    return `<p class="lyric-section">${escapeHtml(line)}</p>`
-                }
-
-                const key = normalizeLine(line)
-                const note = used.has(key) ? null : noteMap.get(key)
-                if (!note) return `<p class="lyric-line">${escapeHtml(line)}</p>`
-                used.add(key)
-
-                const id = `lyric-note-${noteIndex++}`
-                return `
-                    <p class="lyric-line has-note" role="button" tabindex="0"
-                       aria-expanded="false" aria-controls="${id}"
-                       data-note-target="${id}">${escapeHtml(line)}</p>
-                    <div class="lyric-note" id="${id}" hidden>${escapeHtml(note)}</div>
-                `
-            })
-            .join('')
-        return { html, annotated: noteIndex }
     }
 
     function renderSiblings(releaseId, release, currentIndex) {
@@ -127,21 +67,6 @@ export function createTrackModule(ctx) {
             <section class="track-section">
                 <h2 class="track-section-title">Другие треки релиза</h2>
                 <div class="track-siblings">${items}</div>
-            </section>
-        `
-    }
-
-    function renderAbout(entry) {
-        const about = entry && typeof entry.about === 'string' ? entry.about.trim() : ''
-        if (!about) return ''
-        const paragraphs = about
-            .split(/\n{2,}/)
-            .map(block => `<p>${escapeHtml(block.trim())}</p>`)
-            .join('')
-        return `
-            <section class="track-section">
-                <h2 class="track-section-title">О треке</h2>
-                <div class="track-about">${paragraphs}</div>
             </section>
         `
     }
@@ -235,9 +160,9 @@ export function createTrackModule(ctx) {
         const dynamic = container.querySelector('#track-dynamic')
         if (!dynamic) return
 
-        const lyrics = renderLyrics(lyricsText, noteMap)
+        const lyrics = renderLyricsHtml(lyricsText, noteMap)
         dynamic.innerHTML = `
-            ${renderAbout(entry)}
+            ${renderAboutHtml(entry)}
             <section class="track-section">
                 <h2 class="track-section-title">Текст</h2>
                 <div class="track-lyrics-body">${lyrics.html}</div>

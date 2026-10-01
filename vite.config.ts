@@ -95,7 +95,9 @@ export default defineConfig(() => ({
             injectRegister: null,
             manifest: false,
             injectManifest: {
-                globIgnores: ['**/supabase-*.js']
+                // Админка не кэшируется service worker'ом сайта: её чанки
+                // называются admin-* (см. chunkFileNames ниже).
+                globIgnores: ['**/supabase-*.js', 'admin.html', '**/admin-*']
             },
             devOptions: { enabled: false }
         }),
@@ -113,7 +115,19 @@ export default defineConfig(() => ({
         target: 'es2020',
         cssCodeSplit: true,
         rollupOptions: {
+            // Вторая точка входа — админка (admin.html → src/admin/main.ts).
+            input: {
+                index: path.resolve(__dirname, 'index.html'),
+                admin: path.resolve(__dirname, 'admin.html')
+            },
             output: {
+                // Всё, что содержит код src/admin/, получает префикс admin-:
+                // по нему админку исключает service worker и проверяет
+                // scripts/check-dist.mjs.
+                chunkFileNames: (chunk) =>
+                    chunk.moduleIds.some((id) => id.split(path.sep).join('/').includes('/src/admin/'))
+                        ? 'assets/admin-[name]-[hash].js'
+                        : 'assets/[name]-[hash].js',
                 manualChunks: {
                     framework: ['vue'],
                     supabase: ['@supabase/supabase-js']
@@ -131,6 +145,8 @@ export default defineConfig(() => ({
     },
     test: {
         environment: 'jsdom',
-        globals: true
+        globals: true,
+        // Playwright-тесты живут в e2e/ и запускаются отдельно (npm run test:e2e).
+        exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**']
     }
 }))

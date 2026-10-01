@@ -11,3 +11,10 @@ dist/
 
 # Local Claude Code settings
 .claude/
+
+# Playwright
+test-results/
+playwright-report/
+
+# Deno (npm run check:function)
+deno.lock

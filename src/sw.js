@@ -120,6 +120,10 @@ self.addEventListener('fetch', (event) => {
     // Байт-рейндж запросы (стриминг аудио) — пропускаем мимо кеша.
     if (request.headers.has('range')) return
 
+    // Админка (admin.html и её чанки admin-*) идёт мимо service worker:
+    // её не нужно ни кэшировать, ни подменять офлайн-страницей сайта.
+    if (/\/admin\.html$/.test(url.pathname) || /\/assets\/admin-[^/]*$/.test(url.pathname)) return
+
     if (request.mode === 'navigate') {
         event.respondWith(
             (async () => {
