@@ -181,6 +181,8 @@ export function createTrackModule(ctx) {
         const kind = release.type === 'album' ? 'Альбом' : 'Сингл'
         const dateDisplay = release.releaseDate || release.year
 
+        // Открытый на экране релиз; плеер (state.currentRelease*) не трогаем.
+        state.viewedReleaseId = releaseId
         ctx.modules.colors.updatePageAccent(cover)
 
         container.innerHTML = `
@@ -261,15 +263,9 @@ export function createTrackModule(ctx) {
         return 'прослушиваний'
     }
 
-    // Запуск трека со страницы: релиз мог быть не открыт, поэтому ставим
-    // его в состояние явно, не уходя при этом со страницы трека.
+    // Запуск трека со страницы: явно по (релиз, индекс), не уходя со страницы.
     function playTrackFromPage(releaseId, trackIndex) {
-        const release = releases[releaseId]
-        if (!release || !release.tracks[trackIndex]) return
-        state.currentRelease = release
-        state.currentReleaseId = releaseId
-        ctx.modules.ui.renderTracklist()
-        ctx.modules.player.playTrack(trackIndex, 'fade')
+        ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
     }
 
     async function copyTrackLink(button) {

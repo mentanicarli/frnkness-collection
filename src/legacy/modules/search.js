@@ -199,13 +199,13 @@ export function createSearchModule(ctx) {
         toggleSearchPanel(false)
         ctx.modules.router.goRelease(releaseId)
         if (type === 'release' || trackIndex < 0) return
-        setTimeout(() => {
-            ctx.modules.player.playTrack(trackIndex, 'fade')
-            if (type === 'lyric') {
-                ctx.modules.lyrics.showLyrics(trackIndex)
-                if (Number.isFinite(time) && time >= 0) ctx.modules.player.seekTo(time)
-            }
-        }, 120)
+        // Трек запускаем явно по (релиз, индекс): на отрисовку страницы
+        // релиза не рассчитываем — она плеер не трогает.
+        ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
+        if (type === 'lyric') {
+            ctx.modules.lyrics.showLyrics(trackIndex)
+            if (Number.isFinite(time) && time >= 0) ctx.modules.player.seekTo(time)
+        }
     }
 
     return { toggleSearchPanel, renderSearchResults, ensureLyricsIndex, searchCatalog, handleSearchInput, initGlobalSearch, openSearchResult }

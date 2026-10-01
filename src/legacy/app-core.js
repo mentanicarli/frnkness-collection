@@ -135,7 +135,9 @@ export function initLegacyApp(deps = {}) {
                 const index = Number(indexRaw)
                 if (!Number.isInteger(index) || index < 0) return
                 const now = performance.now()
-                perf.pendingTrackClickGuard = { index, expiresAt: now + 450 }
+                // Гард гасит синтетический click после этого pointerdown — только
+                // для той же строки того же (открытого) релиза.
+                perf.pendingTrackClickGuard = { releaseId: state.viewedReleaseId, index, expiresAt: now + 450 }
                 modules.player.handleTrackClick(index, 'pointer')
                 event.preventDefault()
             }, { passive: false })
@@ -207,7 +209,8 @@ export function initLegacyApp(deps = {}) {
 
     window.App = {
         openRelease: id => modules.router.goRelease(id),
-        openTrackPage: i => modules.router.goTrack(state.currentReleaseId, i),
+        // Кнопка «Текст» в строке треклиста: трек открытого релиза.
+        openTrackPage: i => modules.router.goTrack(state.viewedReleaseId, i),
         openCurrentTrackPage: () => modules.router.goCurrentTrack(),
         playTrackFromPage: (r, i) => modules.track.playTrackFromPage(r, i),
         copyTrackLink: btn => modules.track.copyTrackLink(btn),

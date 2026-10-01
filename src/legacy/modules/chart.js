@@ -55,23 +55,35 @@ export function createChartModule(ctx) {
 
     async function incrementPlayCount() {
         if (!state.currentReleaseId || state.trackCounted || state.trackCountPending) return
-        state.trackCountPending = true
+        // Всё, что входит в ключ, фиксируем до await: пока идёт запрос,
+        // может заиграть другой трек.
         const releaseId = state.currentReleaseId
+        const trackIndex = state.currentTrackIndex
+        const session = state.playSession
+        const release = releases[releaseId]
+        // Защита от мусорных ключей: «release--1» база прочитала бы как
+        // старый 1-based формат и засчитала бы первому треку релиза.
+        if (!release || !Number.isInteger(trackIndex) || trackIndex < 0 || !release.tracks[trackIndex]) return
+        const isSameSession = () => state.playSession === session
+        state.trackCountPending = true
         try {
             const db = await getDb()
             if (!db) return
             const { error } = await db.rpc('increment_play_count', {
-                track_key_input: `${releaseId}-${state.currentTrackIndex}`
+                track_key_input: `${releaseId}-${trackIndex}`
             })
             if (error) throw error
-            state.trackCounted = true
+            // Флаг относится к запуску, который засчитывали: новый запуск
+            // (даже того же трека) должен засчитаться сам.
+            if (isSameSession()) state.trackCounted = true
             delete releasePlayCountCache[releaseId]
             delete releaseTrackPlaysCache[releaseId]
-            if (state.currentReleaseId === releaseId && state.currentRelease && dom.releasePlays) {
+            // Счётчик на странице — только если открыт тот релиз, которому засчитали.
+            if (state.viewedReleaseId === releaseId && dom.releasePlays) {
                 dom.releasePlays.textContent = 'Счетчик прослушиваний обновляется...'
                 getReleasePlayCount(releaseId).then(total => {
-                    if (state.currentReleaseId === releaseId && dom.releasePlays) {
-                        const type = state.currentRelease?.type === 'album' ? 'альбома' : 'сингла'
+                    if (state.viewedReleaseId === releaseId && dom.releasePlays) {
+                        const type = release.type === 'album' ? 'альбома' : 'сингла'
                         dom.releasePlays.textContent = `Прослушиваний ${type}: ${total}`
                     }
                 })
@@ -81,7 +93,7 @@ export function createChartModule(ctx) {
         } catch (e) {
             console.warn('Play count update failed:', e)
         } finally {
-            state.trackCountPending = false
+            if (isSameSession()) state.trackCountPending = false
         }
     }
 
@@ -131,7 +143,7 @@ export function createChartModule(ctx) {
 
     function playChart(releaseId, trackIndex) {
         ctx.modules.router.goRelease(releaseId)
-        setTimeout(() => ctx.modules.player.playTrack(trackIndex, 'fade'), 100)
+        ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
     }
 
     return { getReleasePlayCount, getTrackPlayCount, incrementPlayCount, renderChart, playChart }

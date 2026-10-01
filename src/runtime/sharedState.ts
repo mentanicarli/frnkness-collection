@@ -8,9 +8,16 @@ export const DEFAULT_COLOR: ColorSet = {
 }
 
 export interface RuntimeState {
+    // Релиз, страница которого открыта на экране (страница релиза или трека).
+    // Нужен только интерфейсу страницы; плеер это поле не читает.
+    viewedReleaseId: string | null
+    // Играющий релиз и трек — состояние плеера. Открытие страниц его не меняет.
     currentRelease: Release | null
     currentReleaseId: string | null
     currentTrackIndex: number
+    // Растёт при каждом запуске трека: по нему ответ на засчёт прослушивания
+    // отличает «свой» запуск от следующего (в том числе повтор того же трека).
+    playSession: number
     isPlaying: boolean
     trackCounted: boolean
     trackCountPending: boolean
@@ -40,9 +47,11 @@ export interface RuntimeState {
 // прокси Vue только добавлял бы накладные расходы на каждое чтение — в том
 // числе в обработчике timeupdate, который ходит сюда несколько раз в секунду.
 export const runtimeState: RuntimeState = {
+    viewedReleaseId: null,
     currentRelease: null,
     currentReleaseId: null,
-    currentTrackIndex: 0,
+    currentTrackIndex: -1,
+    playSession: 0,
     isPlaying: false,
     trackCounted: false,
     trackCountPending: false,

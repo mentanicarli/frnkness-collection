@@ -29,6 +29,8 @@ export function createPlayerModule(ctx) {
         if (dom.flowModeLabel) dom.flowModeLabel.textContent = 'Поток'
     }
 
+    // Единственная точка запуска трека из другого релиза: явно задаёт
+    // играющий релиз. Треклист, поиск, чарт, страница трека и Поток идут сюда.
     function playTrackByRef(releaseId, trackIndex, direction = 'fade') {
         const release = releases[releaseId]
         if (!release || !release.tracks[trackIndex]) return
@@ -92,27 +94,54 @@ export function createPlayerModule(ctx) {
 
     // ── Playback ────────────────────────────────────────────────────────
 
+    // Клик по строке треклиста: index — трек ОТКРЫТОГО релиза.
+    // Тот же трек, что играет, — пауза/продолжить, любой другой — запуск.
     function handleTrackClick(index, source = 'click') {
+        const releaseId = state.viewedReleaseId
+        if (!releaseId) return
         if (source === 'click' && perf.pendingTrackClickGuard) {
+            const guard = perf.pendingTrackClickGuard
             const now = performance.now()
-            if (perf.pendingTrackClickGuard.index === index && now <= perf.pendingTrackClickGuard.expiresAt) {
+            if (guard.releaseId === releaseId && guard.index === index && now <= guard.expiresAt) {
                 perf.pendingTrackClickGuard = null
                 return
             }
-            if (now > perf.pendingTrackClickGuard.expiresAt) perf.pendingTrackClickGuard = null
+            if (now > guard.expiresAt) perf.pendingTrackClickGuard = null
         }
-        if (state.currentReleaseId && state.currentTrackIndex === index) togglePlay()
-        else playTrack(index, 'fade')
+        if (isCurrentTrack(releaseId, index)) togglePlay()
+        else playTrackByRef(releaseId, index, 'fade')
     }
 
+    function isCurrentTrack(releaseId, index) {
+        return state.currentReleaseId === releaseId && state.currentTrackIndex === index
+    }
+
+    // Подсветка строк треклиста. Только если на экране открыт именно играющий
+    // релиз — иначе индекс играющего трека к этому списку отношения не имеет.
+    function syncTracklistState() {
+        const isActive = Boolean(
+            state.viewedReleaseId &&
+            state.viewedReleaseId === state.currentReleaseId &&
+            dom.player && dom.player.classList.contains('visible')
+        )
+        document.querySelectorAll('#tracklist .track-row').forEach(row => {
+            const isCurrent = isActive && Number(row.dataset.trackIndex) === state.currentTrackIndex
+            row.classList.toggle('playing', isCurrent)
+            row.classList.toggle('paused', isCurrent && !state.isPlaying)
+        })
+    }
+
+    // Запуск трека index ИГРАЮЩЕГО релиза (next/prev/ended). Чтобы сменить
+    // релиз, используйте playTrackByRef.
     function playTrack(index, direction = null) {
         if (!state.currentRelease) return
-
-        state.currentTrackIndex = index
-        state.trackCounted = false
-        state.trackCountPending = false
         const track = state.currentRelease.tracks[index]
         if (!track) return
+
+        state.currentTrackIndex = index
+        state.playSession += 1
+        state.trackCounted = false
+        state.trackCountPending = false
 
         state.karaokeHardStart = true
 
@@ -133,14 +162,15 @@ export function createPlayerModule(ctx) {
         setMiniPlayerVisible(true)
         if (dom.lyricsBtn) dom.lyricsBtn.classList.remove('hidden')
 
-        document.querySelectorAll('.track-row').forEach((row, i) => {
-            row.classList.toggle('playing', i === index)
-            row.classList.remove('paused')
-        })
+        syncTracklistState()
 
         ctx.modules.fullscreen.updateFullscreen(track.title, state.currentRelease.cover, direction)
         ctx.modules.colors.updatePlayerAccent(state.currentRelease.cover)
-        ctx.modules.colors.updatePageAccent(state.currentRelease.cover)
+        // Акцент страницы — по играющему релизу, только если на экране не
+        // открыт другой релиз (иначе страница B перекрасилась бы в цвета A).
+        if (!state.viewedReleaseId || state.viewedReleaseId === state.currentReleaseId) {
+            ctx.modules.colors.updatePageAccent(state.currentRelease.cover)
+        }
         updateFlowButtonState()
 
         if (state.currentReleaseId) {
@@ -171,11 +201,6 @@ export function createPlayerModule(ctx) {
             dom.audio.play()
             state.isPlaying = true
             setMiniPlayerVisible(true)
-            const rows = document.querySelectorAll('.track-row')
-            if (rows[state.currentTrackIndex]) {
-                rows[state.currentTrackIndex].classList.add('playing')
-                rows[state.currentTrackIndex].classList.remove('paused')
-            }
         } else {
             dom.audio.pause()
             state.isPlaying = false
@@ -188,8 +213,7 @@ export function createPlayerModule(ctx) {
         if (dom.iconPause) dom.iconPause.classList.toggle('hidden', !state.isPlaying)
         if (dom.playPauseBtn) dom.playPauseBtn.classList.toggle('playing-state', state.isPlaying)
         if (dom.playerCover) dom.playerCover.classList.toggle('playing-glow', state.isPlaying)
-        const activeRow = document.querySelector('.track-row.playing')
-        if (activeRow) activeRow.classList.toggle('paused', !state.isPlaying)
+        syncTracklistState()
         ctx.modules.fullscreen.updateFsPlayPauseIcon()
     }
 
@@ -326,12 +350,14 @@ export function createPlayerModule(ctx) {
         state.isPlaying = false
         updatePlayPauseIcon()
         setMiniPlayerVisible(false)
-        document.querySelectorAll('.track-row.playing').forEach(row => row.classList.remove('playing', 'paused'))
+        syncTracklistState()
     }
 
     return {
         handleTrackClick,
         playTrack,
+        playTrackByRef,
+        syncTracklistState,
         togglePlay,
         updatePlayPauseIcon,
         nextTrack,

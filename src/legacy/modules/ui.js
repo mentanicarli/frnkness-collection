@@ -116,13 +116,13 @@ export function createUiModule(ctx) {
 
     // Только отрисовка содержимого страницы релиза.
     // Показ страницы и адрес в URL — задача роутера.
+    // Меняет только «открытый» релиз: играющий трек (state.currentRelease*)
+    // принадлежит плееру и от навигации не зависит.
     function renderRelease(id) {
         const r = releases[id]
         if (!r) return
 
-        state.currentRelease = r
-        state.currentReleaseId = id
-        state.currentTrackIndex = -1
+        state.viewedReleaseId = id
         ctx.modules.colors.updatePageAccent(r.cover)
 
         if (dom.releaseCover) {
@@ -165,7 +165,7 @@ export function createUiModule(ctx) {
 
         if (dom.releasePlays && !r.upcoming) {
             ctx.modules.chart.getReleasePlayCount(id).then(total => {
-                if (state.currentReleaseId !== id || !dom.releasePlays) return
+                if (state.viewedReleaseId !== id || !dom.releasePlays) return
                 dom.releasePlays.textContent = `Прослушиваний ${r.type === 'album' ? 'альбома' : 'сингла'}: ${total}`
             })
         }
@@ -174,8 +174,9 @@ export function createUiModule(ctx) {
     }
 
     function renderTracklist() {
-        if (!dom.tracklist || !state.currentRelease) return
-        dom.tracklist.innerHTML = state.currentRelease.tracks.map((t, i) => {
+        const release = state.viewedReleaseId ? releases[state.viewedReleaseId] : null
+        if (!dom.tracklist || !release) return
+        dom.tracklist.innerHTML = release.tracks.map((t, i) => {
             return `
                 <div class="track-row cursor-pointer group" data-track-index="${i}" onclick="App.handleTrackClick(${i})">
                     <span class="track-num">
@@ -190,6 +191,8 @@ export function createUiModule(ctx) {
                 </div>
             `
         }).join('')
+        // Если открыт играющий релиз — сразу подсвечиваем его трек.
+        ctx.modules.player.syncTracklistState()
     }
 
     function showPage(name) {
@@ -197,6 +200,8 @@ export function createUiModule(ctx) {
         const page = document.getElementById('page-' + name)
         if (page) page.classList.add('active')
         document.body.classList.toggle('release-page', name === 'release' || name === 'track')
+        // Страницы релиза и трека выставляют открытый релиз сами при отрисовке.
+        if (name !== 'release' && name !== 'track') state.viewedReleaseId = null
         window.scrollTo(0, 0)
         if (name === 'home') ctx.modules.colors.resetPageAccent()
         if (name === 'home') setTimeout(initStaggerAnimation, 50)
