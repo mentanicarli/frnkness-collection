@@ -282,6 +282,11 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
   `lyrics-books/**`, `src/content/*.json`) — правила в `supabase/functions/_shared/rules.ts`.
 - Медиафайлы загружаются через приватный бакет `admin-uploads` в Supabase Storage.
 - Админка не входит в бандл сайта и не кэшируется service worker.
+- Статистика: `increment_play_count` пишет каждое прослушивание ещё и в `play_events`;
+  дашборд читает агрегаты через admin-only RPC (`admin_stats_*`). Графики по дням —
+  с даты запуска журнала, итоги за всё время — из `play_counts`. Прямая запись в
+  `play_counts` закрыта, менять счётчик может только `increment_play_count`.
+- Миграции проверяются на PGlite (Postgres в WASM) в `supabase/tests/` — входят в `npm run test:run`.
 
 Настройка с нуля — [docs/admin-setup.md](docs/admin-setup.md).
 

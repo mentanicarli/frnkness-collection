@@ -1,4 +1,6 @@
 import type { Page, Route } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
 
 // Моки Supabase Auth, PostgREST и функции admin-content. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
@@ -57,9 +59,19 @@ export interface MockOptions {
     rpc?: (name: string, body: unknown) => { status?: number; body: unknown } | undefined
 }
 
-export const defaultContent: ContentResponder = ({ action }) => {
+// Содержимое репозитория для мока read: настоящие файлы из рабочей копии.
+export function repoFile(rel: string): string | null {
+    const full = path.resolve(__dirname, '..', rel)
+    return fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null
+}
+
+export const defaultContent: ContentResponder = ({ action, body }) => {
     if (action === 'ping') return { body: { user: { email: ADMIN_USER.email }, repo: 'mentanicarli/frnkness-collection', branch: 'main' } }
     if (action === 'head') return { body: { sha: HEAD_SHA, truncated: false, files: [] } }
+    if (action === 'read') {
+        const paths = body.paths as string[]
+        return { body: { files: Object.fromEntries(paths.map((p) => [p, repoFile(p)])) } }
+    }
     if (action === 'deploy-status') return { body: { state: 'published', url: 'https://github.com/x/actions/runs/1' } }
     return undefined
 }

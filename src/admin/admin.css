@@ -172,3 +172,84 @@ body.adm-body::before { opacity: 0.6; }
 
 .adm-status-item a, .adm-link { color: var(--fg-muted); text-decoration: underline; text-underline-offset: 0.15em; }
 .adm-status-item a:hover, .adm-link:hover { color: var(--fg); }
+
+/* ── Статистика ────────────────────────────────────────────────────── */
+.adm-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.adm-tile { background: var(--bg-1); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 0.875rem 1rem; }
+.adm-tile-label { font-size: 0.75rem; color: var(--fg-muted); font-weight: 600; }
+/* Крупные числа — тем же гротеском и пропорциональными цифрами. */
+.adm-tile-value { font-family: 'Golos Text', sans-serif; font-weight: 700; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.02em; margin-top: 0.25rem; }
+.adm-tile-hint { font-size: 0.6875rem; color: var(--fg-faint); margin-top: 0.125rem; }
+@media (max-width: 640px) { .adm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adm-tile-value { font-size: 1.5rem; } }
+
+.adm-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 1.25rem 0 0.375rem; }
+.adm-segmented { display: inline-flex; background: var(--bg-1); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 0.1875rem; gap: 0.125rem; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.adm-segmented::-webkit-scrollbar { display: none; }
+.adm-segmented button {
+  border: 0; background: transparent; color: var(--fg-muted); font-size: 0.8125rem; font-weight: 600;
+  padding: 0.375rem 0.75rem; border-radius: 0.25rem; white-space: nowrap; transition: background var(--fast), color var(--fast);
+}
+.adm-segmented button:hover { color: var(--fg); }
+.adm-segmented button.active { background: var(--bg-3); color: var(--fg); }
+.adm-segmented-sm button { font-size: 0.75rem; padding: 0.25rem 0.625rem; }
+.adm-custom-range .adm-input { width: auto; padding: 0.375rem 0.5rem; color-scheme: dark; }
+.adm-period-note { margin: 0 0 1rem; }
+
+.adm-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 1rem; }
+.adm-grid-2 > .adm-card + .adm-card { margin-top: 0; }
+@media (max-width: 760px) { .adm-grid-2 { grid-template-columns: 1fr; } }
+
+/* График */
+.adm-chart { position: relative; transition: opacity var(--fast); }
+.adm-chart.is-busy { opacity: 0.5; }
+.adm-chart-plot { position: relative; width: 100%; }
+.adm-chart-plot svg { display: block; outline: none; }
+.adm-chart-plot svg:focus-visible { outline: 1px solid var(--fg-muted); outline-offset: 2px; border-radius: var(--r-xs); }
+.adm-chart-grid line { stroke: var(--line); stroke-width: 1; shape-rendering: crispEdges; }
+.adm-chart-grid text, .adm-chart-x text { fill: var(--fg-faint); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-variant-numeric: tabular-nums; }
+.adm-chart-x text.is-active { fill: var(--fg); }
+.adm-chart-bar { fill: #c9c9ce; transition: fill var(--fast), opacity var(--fast); }
+.adm-chart-bar.is-active { fill: var(--fg); }
+.adm-chart-bar.is-dim { opacity: 0.45; }
+.adm-chart-empty { position: absolute; inset: 0 0 24px 36px; display: grid; place-items: center; color: var(--fg-faint); font-size: 0.8125rem; pointer-events: none; }
+.adm-chart-tip {
+  position: absolute; transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; z-index: 2;
+  background: var(--bg-3); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  padding: 0.375rem 0.625rem; font-size: 0.75rem; white-space: nowrap; box-shadow: var(--shadow-pop);
+}
+.adm-chart-tip-title { color: var(--fg-muted); font-size: 0.6875rem; }
+.adm-chart-table { margin-top: 0.5rem; font-size: 0.75rem; }
+.adm-chart-table summary { cursor: pointer; color: var(--fg-faint); width: fit-content; }
+.adm-chart-table summary:hover { color: var(--fg-muted); }
+.adm-chart-table .adm-table { margin-top: 0.5rem; max-height: 16rem; display: block; overflow: auto; }
+
+/* Таблицы */
+.adm-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.adm-table th { text-align: left; font-weight: 600; color: var(--fg-faint); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.375rem 0.5rem; border-bottom: 1px solid var(--line-2); }
+.adm-table td { padding: 0.4375rem 0.5rem; border-bottom: 1px solid var(--line); }
+.adm-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Топы */
+.adm-top-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; transition: opacity var(--fast); }
+.adm-top-list.is-busy { opacity: 0.5; }
+.adm-top-list li { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; align-items: center; gap: 0.625rem; padding: 0.375rem 0; }
+.adm-top-rank { color: var(--fg-faint); font-family: 'JetBrains Mono'; font-size: 0.75rem; text-align: right; font-variant-numeric: tabular-nums; }
+.adm-top-main { display: grid; min-width: 0; gap: 0.0625rem; text-align: left; }
+.adm-top-link { background: none; border: 0; padding: 0; color: inherit; font: inherit; }
+.adm-top-link:hover .adm-top-title { text-decoration: underline; text-underline-offset: 0.15em; }
+.adm-top-title { font-size: 0.875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-top-sub { font-size: 0.6875rem; color: var(--fg-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-top-bar { display: block; height: 2px; border-radius: 1px; background: #c9c9ce; margin-top: 0.3125rem; opacity: 0.7; }
+.adm-top-value { font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--fg-muted); }
+.adm-unknown { margin-top: 0.75rem; }
+.adm-unknown summary { cursor: pointer; }
+.adm-unknown ul { margin: 0.375rem 0 0; padding-left: 1rem; }
+
+/* Карточка релиза */
+.adm-release-card { margin-top: 1rem; scroll-margin-top: 5rem; }
+.adm-release-head { justify-content: space-between; margin-bottom: 0.5rem; }
+.adm-release-select { width: auto; min-width: 14rem; max-width: 100%; }
+.adm-release-tracks { margin: 0.75rem 0 1.25rem; }
+.adm-window-head { justify-content: space-between; margin-bottom: 0.375rem; }
+@media (max-width: 640px) { .adm-release-select { min-width: 0; width: 100%; } }

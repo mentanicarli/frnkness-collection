@@ -38,8 +38,10 @@ const NAV = [
 
 const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.vue'))
 
+// Разделы грузятся по требованию: каждый — отдельный чанк admin-*.
 const VIEWS: Record<string, Component> = {
-    home: HomeView
+    home: HomeView,
+    stats: defineAsyncComponent(() => import('./views/StatsView.vue'))
 }
 
 const current = computed(() => VIEWS[route.section.value] || placeholder)
