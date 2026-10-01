@@ -298,3 +298,24 @@ body.adm-body::before { opacity: 0.6; }
   border-top: 1px solid var(--line);
 }
 @media (max-width: 760px) { .adm-savebar { margin: 1rem -1rem 0; padding-left: 1rem; padding-right: 1rem; } }
+
+/* ── Караоке ───────────────────────────────────────────────────────── */
+.adm-lrc-player { margin-bottom: 0.25rem; }
+.adm-lrc-controls { gap: 0.5rem; }
+.adm-lrc-time { font-size: 0.8125rem; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.adm-lrc-seek { width: 100%; margin-top: 0.75rem; accent-color: var(--fg); }
+.adm-lrc-actions { gap: 0.5rem; margin-bottom: 0.5rem; }
+kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3125rem; border: 1px solid var(--line-2); border-radius: 0.25rem; color: var(--fg-faint); margin-left: 0.25rem; }
+.adm-btn-primary kbd { color: inherit; border-color: currentColor; opacity: 0.6; }
+.adm-lrc-lines { list-style: none; margin: 0.75rem 0 0; padding: 0.375rem; background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-md); max-height: 60vh; overflow: auto; }
+.adm-lrc-lines li { display: flex; align-items: center; gap: 0.25rem; border-radius: var(--r-xs); }
+.adm-lrc-lines li.next { background: var(--bg-2); box-shadow: inset 2px 0 0 var(--fg); }
+.adm-lrc-lines li.playing .adm-lrc-text { color: var(--fg); font-weight: 600; }
+.adm-lrc-lines li.bad .adm-lrc-stamp { color: #ff8a80; }
+.adm-lrc-line { flex: 1; min-width: 0; display: flex; gap: 0.75rem; align-items: baseline; text-align: left; background: none; border: 0; color: var(--fg-muted); font: inherit; font-size: 0.875rem; padding: 0.3125rem 0.5rem; }
+.adm-lrc-line:not(:disabled):hover .adm-lrc-text { color: var(--fg); }
+.adm-lrc-line:disabled { cursor: default; }
+.adm-lrc-stamp { font-size: 0.75rem; color: var(--fg-faint); min-width: 4.25rem; font-variant-numeric: tabular-nums; }
+.adm-lrc-text { overflow-wrap: anywhere; }
+.adm-lrc-nudge { display: inline-flex; flex-shrink: 0; }
+.adm-karaoke { position: relative; --fs-on: #ffffff; background: var(--fs-bg); border: 1px solid var(--line-2); border-radius: var(--r-md); height: 60vh; min-height: 18rem; overflow: auto; padding: 30vh 1rem; scroll-behavior: smooth; }

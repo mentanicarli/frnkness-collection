@@ -121,11 +121,11 @@ export default defineConfig(() => ({
                 admin: path.resolve(__dirname, 'admin.html')
             },
             output: {
-                // Всё, что содержит код src/admin/, получает префикс admin-:
-                // по нему админку исключает service worker и проверяет
-                // scripts/check-dist.mjs.
+                // Всё, что содержит код src/admin/ или общие правила функции
+                // (supabase/functions/), получает префикс admin-: по нему админку
+                // исключает service worker и проверяет scripts/check-dist.mjs.
                 chunkFileNames: (chunk) =>
-                    chunk.moduleIds.some((id) => id.split(path.sep).join('/').includes('/src/admin/'))
+                    chunk.moduleIds.some((id) => /\/(src\/admin|supabase\/functions)\//.test(id.split(path.sep).join('/')))
                         ? 'assets/admin-[name]-[hash].js'
                         : 'assets/[name]-[hash].js',
                 manualChunks: {

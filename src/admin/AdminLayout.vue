@@ -44,7 +44,8 @@ const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.v
 const VIEWS: Record<string, Component> = {
     home: HomeView,
     stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
-    lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue'))
+    lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
+    lrc: defineAsyncComponent(() => import('./views/LrcView.vue'))
 }
 
 const current = computed(() => VIEWS[route.section.value] || placeholder)
