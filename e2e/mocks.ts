@@ -1,7 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 
 // Моки Supabase Auth, PostgREST и функции admin-content. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
@@ -60,21 +60,35 @@ export interface MockOptions {
     rpc?: (name: string, body: unknown) => { status?: number; body: unknown } | undefined
 }
 
-// Содержимое репозитория для мока read: настоящие файлы из рабочей копии.
+// Содержимое репозитория для мока read — из HEAD, а не из рабочей копии:
+// мок изображает GitHub, а в рабочей копии могут лежать черновики.
+const ROOT = path.resolve(__dirname, '..')
+const fileCache = new Map<string, string | null>()
 export function repoFile(rel: string): string | null {
-    const full = path.resolve(__dirname, '..', rel)
-    return fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null
+    if (!fileCache.has(rel)) {
+        let content: string | null
+        try {
+            content = execFileSync('git', ['show', `HEAD:${rel}`], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+        } catch {
+            content = null
+        }
+        fileCache.set(rel, content)
+    }
+    return fileCache.get(rel)!
 }
 
 // Дерево репозитория для мока head: файлы из git с реальными размерами.
 let treeCache: { path: string; size: number }[] | null = null
 export function repoTree(): { path: string; size: number }[] {
     if (!treeCache) {
-        const root = path.resolve(__dirname, '..')
-        treeCache = execSync('git -c core.quotepath=off ls-files', { cwd: root, encoding: 'utf8' })
-            .split('\n')
-            .filter((p) => p && fs.existsSync(path.join(root, p)))
-            .map((p) => ({ path: p, size: fs.statSync(path.join(root, p)).size }))
+        // Дерево HEAD с размерами blob — как его отдаёт GitHub.
+        treeCache = execFileSync('git', ['ls-tree', '-r', '-l', '-z', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
+            .split('\0')
+            .filter(Boolean)
+            .map((line) => {
+                const [meta, p] = line.split('\t')
+                return { path: p, size: Number(meta.trim().split(/\s+/)[3]) }
+            })
     }
     return treeCache
 }

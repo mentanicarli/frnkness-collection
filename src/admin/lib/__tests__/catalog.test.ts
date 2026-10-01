@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
 import path from 'node:path'
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import type { Releases } from '@/types'
 import { computeCatalogReport, contentPathsNeeded } from '../catalog'
 import releasesJson from '@/content/releases.json'
@@ -109,12 +108,18 @@ describe('отчёт о каталоге', () => {
 
 describe('отчёт по настоящему репозиторию', () => {
     it('считается без ошибок и находит известные пробелы', () => {
-        const tree = execSync('git -c core.quotepath=off ls-files', { cwd: ROOT, encoding: 'utf8' })
-            .split('\n')
-            .filter((p) => p && fs.existsSync(path.join(ROOT, p)))
-            .map((p) => ({ path: p, size: fs.statSync(path.join(ROOT, p)).size }))
+        // Состояние репозитория (HEAD), а не рабочей копии с возможными черновиками.
+        const tree = execFileSync('git', ['ls-tree', '-r', '-l', '-z', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
+            .split('\0')
+            .filter(Boolean)
+            .map((line) => {
+                const [meta, p] = line.split('\t')
+                return { path: p, size: Number(meta.trim().split(/\s+/)[3]) }
+            })
         const needed = contentPathsNeeded(releases, tree)
-        const contents = Object.fromEntries(needed.map((p) => [p, fs.readFileSync(path.join(ROOT, p), 'utf8')]))
+        const contents = Object.fromEntries(
+            needed.map((p) => [p, execFileSync('git', ['show', `HEAD:${p}`], { cwd: ROOT, encoding: 'utf8' })])
+        )
         const report = computeCatalogReport(releases, tree, contents)
 
         const all = report.releases.flatMap((r) => r.tracks)
@@ -128,5 +133,6 @@ describe('отчёт по настоящему репозиторию', () => {
         // У POOPSICKS есть .lrc и разборы.
         expect(all[0]).toMatchObject({ title: 'POOPSICKS', lrc: true, notes: 'ok' })
         expect(all[0].annotations).toBeGreaterThan(0)
-    })
+        // Десятки вызовов git на Windows в параллельном прогоне не укладываются в 5 с.
+    }, 30_000)
 })
