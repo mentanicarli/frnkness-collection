@@ -161,7 +161,7 @@ body.adm-body::before { opacity: 0.6; }
 
 /* ── Публикация (тост) ─────────────────────────────────────────────── */
 .adm-toast {
-  position: fixed; right: 1rem; bottom: calc(1rem + var(--safe-bottom)); z-index: 90;
+  position: fixed; right: 1rem; top: calc(4.25rem + var(--safe-top)); z-index: 90;
   max-width: min(26rem, calc(100vw - 2rem));
   background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r-md);
   padding: 0.75rem 0.875rem; box-shadow: var(--shadow-pop); font-size: 0.8125rem;
@@ -253,3 +253,48 @@ body.adm-body::before { opacity: 0.6; }
 .adm-release-tracks { margin: 0.75rem 0 1.25rem; }
 .adm-window-head { justify-content: space-between; margin-bottom: 0.375rem; }
 @media (max-width: 640px) { .adm-release-select { min-width: 0; width: 100%; } }
+
+/* ── Коммит ────────────────────────────────────────────────────────── */
+.adm-commit-msg { margin-top: 0.75rem; padding: 0.5rem 0.625rem; background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-sm); font-size: 0.75rem; word-break: break-word; }
+.adm-file-kind { display: inline-block; min-width: 4.5rem; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-faint); }
+.adm-file-kind.new { color: #7ee09a; }
+.adm-file-kind.changed { color: #ffd278; }
+.adm-commit-notes { margin: 0.75rem 0 0; padding-left: 1.125rem; }
+
+/* ── Выбор трека и редактор ────────────────────────────────────────── */
+.adm-picker { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.75rem; }
+@media (max-width: 640px) { .adm-picker { grid-template-columns: 1fr; } }
+.adm-track-meta { margin: 1rem 0 0.75rem; }
+.adm-editor-tabs { margin-bottom: 0.75rem; }
+.adm-editor { display: grid; gap: 1.25rem; }
+.adm-editor.wide { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.adm-editor.wide .adm-editor-tabs { display: none; }
+.adm-editor-col { min-width: 0; }
+.adm-lyrics-input { min-height: 24rem; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+.adm-format-hint { margin-top: 0.5rem; }
+.adm-format-hint summary { cursor: pointer; width: fit-content; }
+.adm-format-hint ul { margin: 0.375rem 0 0; padding-left: 1.125rem; display: grid; gap: 0.25rem; }
+
+.adm-lines { background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 0.5rem; max-height: 70vh; overflow: auto; }
+.adm-line-blank { height: 0.625rem; }
+.adm-line-section { font-family: 'JetBrains Mono'; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-faint); padding: 0.375rem 0.5rem 0.125rem; }
+.adm-line {
+  display: grid; gap: 0.125rem; width: 100%; text-align: left; background: transparent; border: 1px solid transparent;
+  color: var(--fg); font: inherit; font-size: 0.875rem; line-height: 1.45; padding: 0.25rem 0.5rem; border-radius: var(--r-xs);
+}
+.adm-line:hover { background: var(--bg-2); }
+.adm-line.active { border-color: var(--line-2); background: var(--bg-2); }
+.adm-line.has-note > span:first-child { text-decoration: underline; text-decoration-color: var(--fg-faint); text-underline-offset: 0.2em; }
+.adm-line-note { font-size: 0.75rem; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-note-editor { display: grid; gap: 0.5rem; padding: 0.5rem 0.5rem 0.75rem; }
+
+.adm-preview { background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--r-md); padding: 0 1rem 1.25rem; max-height: 75vh; overflow: auto; }
+.adm-preview .track-section:first-child { margin-top: 1rem; }
+
+.adm-savebar {
+  position: sticky; bottom: 0; z-index: 20; margin: 1.25rem -1.25rem 0; padding: 0.75rem 1.25rem calc(0.75rem + var(--safe-bottom));
+  display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(1rem); -webkit-backdrop-filter: blur(1rem);
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 760px) { .adm-savebar { margin: 1rem -1rem 0; padding-left: 1rem; padding-right: 1rem; } }

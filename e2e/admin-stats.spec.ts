@@ -88,8 +88,7 @@ test('сводка, график, топы и карточка релиза', as
     await expect(page.getByTestId('period-note')).toHaveText('Период: 2 сен 2026 — 1 окт 2026.')
     await expect(page.locator('.adm-chart-bar').first()).toBeAttached()
     expect(await page.locator('.adm-card').first().locator('.adm-chart-bar').count()).toBe(30)
-    const daily = mock.rpcCalls.find((c) => c.name === 'admin_stats_daily')!
-    expect(daily.body).toEqual({ p_from: '2026-09-02', p_to: TODAY })
+    await expect.poll(() => mock.rpcCalls.find((c) => c.name === 'admin_stats_daily')?.body).toEqual({ p_from: '2026-09-02', p_to: TODAY })
 
     const topTracks = page.getByTestId('top-tracks')
     await expect(topTracks.locator('li').first()).toContainText('ГОУТЫ')
@@ -138,7 +137,7 @@ test('журнал запущен позже релиза — честные п�
     const mock: StatsMock = { rpcCalls: [], trackingSince: '2026-09-20T10:00:00+00:00' }
     await openStats(page, mock)
     await expect(page.getByTestId('period-note')).toContainText('Раньше 20 сен 2026 журнал не вёлся')
-    expect(mock.rpcCalls.find((c) => c.name === 'admin_stats_daily')!.body).toEqual({ p_from: '2026-09-20', p_to: TODAY })
+    await expect.poll(() => mock.rpcCalls.find((c) => c.name === 'admin_stats_daily')?.body).toEqual({ p_from: '2026-09-20', p_to: TODAY })
     await expect(page.getByTestId('window-note')).toHaveText(
         'Релиз вышел 26 авг 2026, а журнал по дням ведётся с 20 сен 2026 — данных о первых 7 днях нет.'
     )

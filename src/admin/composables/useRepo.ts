@@ -49,6 +49,15 @@ function load(force = false): Promise<void> {
     return inflight
 }
 
+/**
+ * После своего коммита: новая база для следующих правок известна сразу,
+ * остальное (дерево, JSON) обновляется в фоне.
+ */
+function afterCommit(sha: string) {
+    state.sha = sha
+    load(true)
+}
+
 export function useRepo() {
-    return { state, load, reload: () => load(true) }
+    return { state, load, reload: () => load(true), afterCommit }
 }

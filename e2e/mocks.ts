@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
+import { execSync } from 'node:child_process'
 
 // Моки Supabase Auth, PostgREST и функции admin-content. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
@@ -65,9 +66,22 @@ export function repoFile(rel: string): string | null {
     return fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null
 }
 
+// Дерево репозитория для мока head: файлы из git с реальными размерами.
+let treeCache: { path: string; size: number }[] | null = null
+export function repoTree(): { path: string; size: number }[] {
+    if (!treeCache) {
+        const root = path.resolve(__dirname, '..')
+        treeCache = execSync('git -c core.quotepath=off ls-files', { cwd: root, encoding: 'utf8' })
+            .split('\n')
+            .filter((p) => p && fs.existsSync(path.join(root, p)))
+            .map((p) => ({ path: p, size: fs.statSync(path.join(root, p)).size }))
+    }
+    return treeCache
+}
+
 export const defaultContent: ContentResponder = ({ action, body }) => {
     if (action === 'ping') return { body: { user: { email: ADMIN_USER.email }, repo: 'mentanicarli/frnkness-collection', branch: 'main' } }
-    if (action === 'head') return { body: { sha: HEAD_SHA, truncated: false, files: [] } }
+    if (action === 'head') return { body: { sha: HEAD_SHA, truncated: false, files: repoTree() } }
     if (action === 'read') {
         const paths = body.paths as string[]
         return { body: { files: Object.fromEntries(paths.map((p) => [p, repoFile(p)])) } }

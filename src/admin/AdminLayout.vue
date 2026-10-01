@@ -15,6 +15,7 @@
     <main class="adm-shell">
         <component :is="current" :key="route.section.value" />
     </main>
+    <PublishToast />
 </template>
 
 <script setup lang="ts">
@@ -22,6 +23,7 @@ import { computed, defineAsyncComponent, type Component } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useRoute } from './composables/useRoute'
 import HomeView from './views/HomeView.vue'
+import PublishToast from './components/PublishToast.vue'
 
 const auth = useAuth()
 const route = useRoute()
@@ -41,7 +43,8 @@ const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.v
 // Разделы грузятся по требованию: каждый — отдельный чанк admin-*.
 const VIEWS: Record<string, Component> = {
     home: HomeView,
-    stats: defineAsyncComponent(() => import('./views/StatsView.vue'))
+    stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
+    lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue'))
 }
 
 const current = computed(() => VIEWS[route.section.value] || placeholder)
