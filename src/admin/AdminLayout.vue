@@ -46,7 +46,8 @@ const VIEWS: Record<string, Component> = {
     stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
     lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
     lrc: defineAsyncComponent(() => import('./views/LrcView.vue')),
-    promo: defineAsyncComponent(() => import('./views/PromoView.vue'))
+    promo: defineAsyncComponent(() => import('./views/PromoView.vue')),
+    catalog: defineAsyncComponent(() => import('./views/CatalogView.vue'))
 }
 
 const current = computed(() => VIEWS[route.section.value] || placeholder)
