@@ -1,5 +1,4 @@
 <template>
-  <div id="particles-js"></div>
   <AppHeader />
   <MainPages />
   <LyricsAndPlayers />

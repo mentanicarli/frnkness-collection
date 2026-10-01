@@ -16,7 +16,9 @@ export function createTrackModule(ctx) {
         if (notesBundle) return Promise.resolve(notesBundle)
         if (!TRACK_NOTES_URL) return Promise.resolve({})
         if (!notesPromise) {
-            notesPromise = fetch(TRACK_NOTES_URL)
+            // no-cache: дешёвая проверка по ETag, чтобы разборы из админки
+            // были видны сразу, а не через 10 минут HTTP-кэша GitHub Pages.
+            notesPromise = fetch(TRACK_NOTES_URL, { cache: 'no-cache' })
                 .then(res => (res.ok ? res.json() : {}))
                 .then(data => {
                     notesBundle = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
@@ -35,18 +37,10 @@ export function createTrackModule(ctx) {
         return release.lyricsPath + base + '.notes.json'
     }
 
+    // Тот же файл, что грузит плеер: если трек играет, запроса второй раз не будет.
     async function fetchPlainLyrics(release, track) {
-        try {
-            const res = await fetch(buildAssetUrl(release.lyricsPath, track.lyricsFile))
-            if (!res.ok) return ''
-            const text = await res.text()
-            const contentType = (res.headers.get('content-type') || '').toLowerCase()
-            if (contentType.includes('text/html')) return ''
-            if (/<!doctype html|<html|<head|<body/i.test(text)) return ''
-            return text.trim() ? text : ''
-        } catch {
-            return ''
-        }
+        const text = await ctx.modules.lyrics.fetchTrackTxt(release, track)
+        return text.trim() ? text : ''
     }
 
     function renderSiblings(releaseId, release, currentIndex) {

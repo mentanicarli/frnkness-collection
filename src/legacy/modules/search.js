@@ -94,25 +94,13 @@ export function createSearchModule(ctx) {
         })
     }
 
-    // Запасной путь без собранного индекса: .lrc, а если его нет — .txt.
-    async function fetchTrackTxt(release, track) {
-        try {
-            const res = await fetch(release.lyricsPath + track.lyricsFile)
-            if (!res.ok) return ''
-            const text = await res.text()
-            const type = (res.headers.get('content-type') || '').toLowerCase()
-            return type.includes('text/html') || /<!doctype html|<html/i.test(text) ? '' : text
-        } catch {
-            return ''
-        }
-    }
-
     // Индекс, собранный на этапе сборки: один файл вместо запроса на трек.
     // Если его нет (или он битый), возвращаем null и уходим на обход по файлам.
     async function fetchPrebuiltIndex() {
         if (!LYRICS_INDEX_URL) return null
         try {
-            const res = await fetch(LYRICS_INDEX_URL)
+            // no-cache: свежий индекс сразу после публикации из админки.
+            const res = await fetch(LYRICS_INDEX_URL, { cache: 'no-cache' })
             if (!res.ok) return null
             const data = await res.json()
             return data && typeof data === 'object' && !Array.isArray(data) ? data : null
@@ -145,7 +133,8 @@ export function createSearchModule(ctx) {
                             collectLrcLines(entries, releaseId, release, trackIndex, track, lrc)
                             return
                         }
-                        const txt = await fetchTrackTxt(release, track)
+                        // Запасной путь без собранного индекса: .lrc, а если его нет — .txt.
+                        const txt = await ctx.modules.lyrics.fetchTrackTxt(release, track)
                         if (txt) collectTxtLines(entries, releaseId, release, trackIndex, track, txt)
                     })
                 })

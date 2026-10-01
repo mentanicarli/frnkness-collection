@@ -2,34 +2,6 @@ export function createUiModule(ctx) {
     const { dom, state, releases, utils, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO } = ctx
     const { throttle, escapeHtml, renderPromoCardHtml } = utils
 
-    function initParticles() {
-        const container = document.getElementById('particles-js')
-        if (!container) return
-        const style = document.createElement('style')
-        style.textContent = `
-            @keyframes float {
-                0% { transform: translateY(0) translateX(0); opacity: 0; }
-                50% { opacity: 0.5; }
-                100% { transform: translateY(-100vh) translateX(${Math.random() > 0.5 ? '' : '-'}50px); opacity: 0; }
-            }
-        `
-        document.head.appendChild(style)
-        for (let i = 0; i < 15; i++) {
-            const p = document.createElement('div')
-            const size = Math.random() * 3 + 1
-            p.style.cssText = `
-                position: absolute; width: ${size}px; height: ${size}px;
-                background: rgba(212, 255, 0, 0.4); border-radius: 50%;
-                left: ${Math.random() * 100}%; top: ${Math.random() * 100}%;
-                box-shadow: 0 0 ${size * 2}px rgba(212, 255, 0, 0.2);
-                animation: float ${Math.random() * 10 + 10}s linear infinite;
-                animation-delay: ${Math.random() * 5}s;
-                will-change: transform, opacity;
-            `
-            container.appendChild(p)
-        }
-    }
-
     function initStaggerAnimation() {
         document.querySelectorAll('.stagger-item').forEach((item, i) => {
             item.classList.remove('visible')
@@ -190,5 +162,5 @@ export function createUiModule(ctx) {
         if (name !== 'home') ctx.modules.search.toggleSearchPanel(false)
     }
 
-    return { initParticles, initStaggerAnimation, renderHome, renderRelease, renderTracklist, showPage }
+    return { initStaggerAnimation, renderHome, renderRelease, renderTracklist, showPage }
 }

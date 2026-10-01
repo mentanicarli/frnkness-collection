@@ -1,19 +1,25 @@
 export function createLyricsModule(ctx) {
     const { dom, state, utils } = ctx
-    const { buildAssetUrl, parseLRC } = utils
+    const { buildAssetUrl, parseLRC, fetchTextFile } = utils
+
+    // Адреса файлов текста трека. Загрузка — через fetchTextFile: один и тот же
+    // файл плеер, страница трека и поиск получают одним запросом.
+    function lrcUrl(release, track) {
+        return buildAssetUrl(release.lyricsPath, track.lyricsFile.replace(/\.[^/.]+$/, '') + '.lrc')
+    }
+
+    function txtUrl(release, track) {
+        return buildAssetUrl(release.lyricsPath, track.lyricsFile)
+    }
 
     // Синхротекст трека. Используется запасным путём индекса поиска (когда нет
     // собранного lyrics-index.json); .txt для треков без караоке поиск берёт сам.
-    async function fetchTrackLrc(release, track) {
-        const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        try {
-            const res = await fetch(buildAssetUrl(release.lyricsPath, base + '.lrc'))
-            if (!res.ok) return ''
-            const text = await res.text()
-            return isHtmlPayload(res, text) ? '' : text
-        } catch {
-            return ''
-        }
+    function fetchTrackLrc(release, track) {
+        return fetchTextFile(lrcUrl(release, track))
+    }
+
+    function fetchTrackTxt(release, track) {
+        return fetchTextFile(txtUrl(release, track))
     }
 
     function updateKaraoke() {
@@ -173,14 +179,11 @@ export function createLyricsModule(ctx) {
         ctx.modules.fullscreen.syncFsPlayerModeState()
     }
 
-    function isHtmlPayload(res, text) {
-        const contentType = (res?.headers?.get('content-type') || '').toLowerCase()
-        if (contentType.includes('text/html')) return true
-        return /<!doctype html|<html|<head|<link|<body/i.test(text || '')
-    }
-
     // Промис последней загрузки текста: revealKaraokeAt ждёт именно его.
     let loadPromise = Promise.resolve()
+    // Токен последней загрузки: ответ для трека, с которого уже переключились,
+    // не должен перезаписать текст текущего (как renderToken в track.js).
+    let loadToken = 0
 
     function loadLyrics(index) {
         loadPromise = fetchAndRenderLyrics(index).catch(() => {})
@@ -188,33 +191,20 @@ export function createLyricsModule(ctx) {
     }
 
     async function fetchAndRenderLyrics(index) {
-        if (!state.currentRelease) return
-        const track = state.currentRelease.tracks[index]
+        const release = state.currentRelease
+        if (!release) return
+        const track = release.tracks[index]
         if (!track) return
 
-        const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        const missingText = 'Текст будет позже...'
-        let plainText = missingText
-        let lrcText = ''
-
+        const token = ++loadToken
         state.currentLyricsTrackIndex = index
         state.currentLyricIndex = -1
 
-        try {
-            const res = await fetch(buildAssetUrl(state.currentRelease.lyricsPath, base + '.lrc'))
-            if (res.ok) {
-                const text = await res.text()
-                if (!isHtmlPayload(res, text)) lrcText = text
-            }
-        } catch { }
-
-        try {
-            const res = await fetch(buildAssetUrl(state.currentRelease.lyricsPath, track.lyricsFile))
-            if (res.ok) {
-                const text = await res.text()
-                if (!isHtmlPayload(res, text) && text.trim()) plainText = text
-            }
-        } catch { }
+        // .lrc и .txt — параллельно.
+        const [lrcText, txt] = await Promise.all([fetchTrackLrc(release, track), fetchTrackTxt(release, track)])
+        // Пока грузили, заиграл другой трек — его текст уже грузится своим вызовом.
+        if (token !== loadToken || state.currentRelease !== release || state.currentTrackIndex !== index) return
+        const plainText = txt.trim() ? txt : 'Текст будет позже...'
 
         const fsCoverTitle = document.getElementById('fs-cover-title')
         if (fsCoverTitle) fsCoverTitle.textContent = track.title
@@ -229,5 +219,5 @@ export function createLyricsModule(ctx) {
         renderLyricsByMode()
     }
 
-    return { fetchTrackLrc, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, revealKaraokeAt }
+    return { fetchTrackLrc, fetchTrackTxt, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, revealKaraokeAt }
 }

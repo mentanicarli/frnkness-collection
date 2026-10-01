@@ -100,8 +100,6 @@ img { display: block; max-width: 100%; }
 ::selection { background: var(--page-accent); color: var(--accent-ink); }
 .font-mono { font-family: 'JetBrains Mono', monospace; }
 
-#particles-js { display: none !important; }
-
 body::before {
   content: "";
   position: fixed; inset: 0; z-index: 0; pointer-events: none;

@@ -264,7 +264,6 @@ export function initLegacyApp(deps = {}) {
         modules.ui.initStaggerAnimation()
         modules.player.setupAudioEvents()
         modules.player.setupVolumeControls()
-        modules.ui.initParticles()
 
         // Прогрев первых обложек через requestIdleCallback.
         modules.player.runWhenIdle(() => {

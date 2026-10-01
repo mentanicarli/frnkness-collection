@@ -47,6 +47,12 @@ function isLyricsRequest(url) {
     return /\/lyrics\/.+\.(txt|lrc)$/i.test(url.pathname)
 }
 
+// Собранные из текстов файлы: разборы и индекс поиска. Меняются вместе с
+// текстами при публикации из админки, поэтому идут тем же путём.
+function isLyricsDataRequest(url) {
+    return /\/(track-notes|lyrics-index)\.json$/i.test(url.pathname)
+}
+
 function isMediaRequest(url) {
     return /\/(audio|images)\//i.test(url.pathname)
 }
@@ -145,7 +151,7 @@ self.addEventListener('fetch', (event) => {
         return
     }
 
-    if (isLyricsRequest(url)) {
+    if (isLyricsRequest(url) || isLyricsDataRequest(url)) {
         event.respondWith(networkFirst(request, LYRICS_CACHE))
         return
     }

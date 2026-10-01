@@ -10,6 +10,7 @@ import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, t
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
 import { buildTrackHash, findTrackRefBySlug, getTrackSlug } from './utils/slug'
 import { createMatcher, normalizeForSearch } from './utils/search'
+import { fetchTextFile } from './utils/textFiles'
 import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
 import { renderPromoCardHtml } from './utils/promoCard'
 
@@ -51,6 +52,7 @@ const legacyDeps = {
         createMatcher,
         debounce,
         escapeHtml,
+        fetchTextFile,
         findTrackRefBySlug,
         formatTime,
         getAllTrackRefs,
