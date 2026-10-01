@@ -331,6 +331,7 @@ kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3
 /* ── Промо ─────────────────────────────────────────────────────────── */
 /* Карточка — разметка сайта; клики в превью не нужны (на сайте ведут в релиз). */
 .adm-promo-preview { pointer-events: none; }
+.adm-promo-gap { margin-top: clamp(0.875rem, 2vw, 1.25rem); }
 
 /* ── Каталог ───────────────────────────────────────────────────────── */
 .adm-catalog-summary { gap: 1rem; font-size: 0.8125rem; color: var(--fg-muted); margin-bottom: 0.5rem; }

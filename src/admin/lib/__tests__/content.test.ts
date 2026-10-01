@@ -19,3 +19,17 @@ describe('сериализация src/content', () => {
         expect(serializeSite(extra)).toBe('{\n    "promo": {\n        "enabled": false,\n        "releaseId": "faaa"\n    }\n}\n')
     })
 })
+
+describe('site.json с анонсом', () => {
+    it('анонс — после promo, пустые text/url не пишутся', () => {
+        const out = serializeSite({
+            promo: { enabled: true, releaseId: 'faaa' },
+            announce: { enabled: true, title: ' Скоро ', cover: 'images/a.jpg', releaseAt: '2026-11-01T18:00:00+03:00', text: '  ', url: '' }
+        })
+        expect(JSON.parse(out)).toEqual({
+            promo: { enabled: true, releaseId: 'faaa' },
+            announce: { enabled: true, title: 'Скоро', cover: 'images/a.jpg', releaseAt: '2026-11-01T18:00:00+03:00' }
+        })
+        expect(Object.keys(JSON.parse(out))).toEqual(['promo', 'announce'])
+    })
+})

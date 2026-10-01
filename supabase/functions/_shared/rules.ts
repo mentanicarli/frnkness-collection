@@ -431,7 +431,7 @@ export interface SiteSettingsData {
 export function validateSiteSettings(value: unknown, registry: unknown): string[] {
     if (!isPlainObject(value)) return ['site.json должен быть объектом']
     const errors: string[] = []
-    for (const key of Object.keys(value)) if (key !== 'promo') errors.push(`site.json: лишнее поле «${key}»`)
+    for (const key of Object.keys(value)) if (key !== 'promo' && key !== 'announce') errors.push(`site.json: лишнее поле «${key}»`)
     const promo = value.promo
     if (!isPlainObject(promo)) return [...errors, 'site.json: нет блока promo']
     for (const key of Object.keys(promo)) {
@@ -440,6 +440,32 @@ export function validateSiteSettings(value: unknown, registry: unknown): string[
     if (typeof promo.enabled !== 'boolean') errors.push('site.json: promo.enabled должно быть true/false')
     if (typeof promo.releaseId !== 'string' || !isPlainObject(registry) || !(promo.releaseId in registry)) {
         errors.push('site.json: promo.releaseId должен быть id существующего релиза')
+    }
+    if (value.announce !== undefined) errors.push(...validateAnnounce(value.announce))
+    return errors
+}
+
+const ANNOUNCE_KEYS = new Set(['enabled', 'title', 'cover', 'releaseAt', 'text', 'url'])
+// Время выхода — по Москве, с явным смещением: «2026-11-01T18:00:00+03:00».
+export const ANNOUNCE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?\+03:00$/
+
+/** Блок анонса в site.json (необязательный — старые файлы без него валидны). */
+export function validateAnnounce(value: unknown): string[] {
+    const p = 'site.json: announce'
+    if (!isPlainObject(value)) return [`${p} должен быть объектом`]
+    const errors: string[] = []
+    for (const key of Object.keys(value)) if (!ANNOUNCE_KEYS.has(key)) errors.push(`${p}: лишнее поле «${key}»`)
+    if (typeof value.enabled !== 'boolean') errors.push(`${p}.enabled должно быть true/false`)
+    if (typeof value.title !== 'string' || !value.title.trim() || value.title.length > 120) errors.push(`${p}.title — от 1 до 120 символов`)
+    if (typeof value.cover !== 'string' || !/^images\/[a-z0-9-]+\.(jpg|jpeg|png)$/.test(value.cover)) {
+        errors.push(`${p}.cover должна лежать в images/ и называться латиницей`)
+    }
+    if (typeof value.releaseAt !== 'string' || !ANNOUNCE_TIME_RE.test(value.releaseAt) || !Number.isFinite(Date.parse(value.releaseAt))) {
+        errors.push(`${p}.releaseAt — дата и время по Москве вида 2026-11-01T18:00:00+03:00`)
+    }
+    if (value.text !== undefined && (typeof value.text !== 'string' || value.text.length > 400)) errors.push(`${p}.text — до 400 символов`)
+    if (value.url !== undefined && (typeof value.url !== 'string' || !/^https:\/\/[^\s"'<>]+$/.test(value.url) || value.url.length > 500)) {
+        errors.push(`${p}.url — ссылка https://…`)
     }
     return errors
 }

@@ -335,3 +335,47 @@ describe('checkDeletions — удалять можно только заменя
         ])
     })
 })
+
+describe('site.json: анонс', () => {
+    const announce = {
+        enabled: true,
+        title: 'Новый альбом',
+        cover: 'images/announce-novyy-albom-20261002.jpg',
+        releaseAt: '2026-11-01T18:00:00+03:00',
+        text: 'Пресейв открыт',
+        url: 'https://example.com/presave'
+    }
+
+    it('старый формат без анонса и полный анонс — валидны', () => {
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' } }, current)).toEqual([])
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce }, current)).toEqual([])
+        const { text: _t, url: _u, ...minimal } = announce
+        expect(validateSiteSettings({ promo: { enabled: false, releaseId: 'faaa' }, announce: minimal }, current)).toEqual([])
+    })
+
+    it('проверяет поля анонса', () => {
+        const bad = { enabled: 'да', title: '', cover: 'images/Обложка.jpg', releaseAt: '2026-11-01 18:00', url: 'http://x', extra: 1 }
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: bad }, current)).toEqual([
+            'site.json: announce: лишнее поле «extra»',
+            'site.json: announce.enabled должно быть true/false',
+            'site.json: announce.title — от 1 до 120 символов',
+            'site.json: announce.cover должна лежать в images/ и называться латиницей',
+            'site.json: announce.releaseAt — дата и время по Москве вида 2026-11-01T18:00:00+03:00',
+            'site.json: announce.url — ссылка https://…'
+        ])
+    })
+
+    it('время только по Москве (+03:00)', () => {
+        const utc = { ...announce, releaseAt: '2026-11-01T15:00:00Z' }
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: utc }, current)).toHaveLength(1)
+    })
+
+    it('обложку анонса можно удалить при замене', () => {
+        const before = { promo: { enabled: true, releaseId: 'faaa' }, announce }
+        const after = { promo: { enabled: true, releaseId: 'faaa' }, announce: { ...announce, cover: 'images/announce-novyy-albom-20261003.jpg' } }
+        expect(checkDeletions([announce.cover], { registry: current, site: before }, { registry: current, site: after })).toEqual([])
+        expect(checkDeletions([announce.cover], { registry: current, site: before }, { registry: current, site: before })).toHaveLength(1)
+        // Анонс убран целиком — обложка больше не нужна.
+        expect(checkDeletions([announce.cover], { registry: current, site: before }, { registry: current, site: { promo: before.promo } })).toEqual([])
+    })
+})

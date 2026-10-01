@@ -408,6 +408,36 @@ describe('admin-content: правка релиза и удаление заме�
     })
 })
 
+describe('admin-content: анонс в site.json', () => {
+    const announce = { enabled: true, title: 'Скоро', cover: 'images/announce-skoro-20261002.jpg', releaseAt: '2026-11-01T18:00:00+03:00' }
+
+    it('новая обложка в том же коммите — ок', async () => {
+        staging.set(uuidName('jpg'), { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), created_at: new Date(now).toISOString() })
+        const blob = await (await call({ action: 'stage-blob', stagingPath: uuidName('jpg'), path: announce.cover })).json()
+        const res = await call({
+            action: 'commit',
+            baseSha: BASE,
+            message: 'анонс',
+            files: [
+                { path: 'src/content/site.json', content: JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' }, announce }) },
+                { path: announce.cover, blob: { sha: blob.sha, size: blob.size, token: blob.token } }
+            ]
+        })
+        expect(res.status).toBe(200)
+    })
+
+    it('ссылка на несуществующую обложку — отказ', async () => {
+        const res = await call({
+            action: 'commit',
+            baseSha: BASE,
+            message: 'анонс',
+            files: [{ path: 'src/content/site.json', content: JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' }, announce }) }]
+        })
+        expect(res.status).toBe(422)
+        expect((await res.json()).details).toEqual(['обложка анонса не найдена: images/announce-skoro-20261002.jpg'])
+    })
+})
+
 describe('admin-content: stage-blob', () => {
     const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])
 

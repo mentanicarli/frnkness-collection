@@ -66,9 +66,23 @@ export interface ChartTrack {
     trackIndex: number
 }
 
+/** Анонс будущего релиза (ещё нет в каталоге). */
+export interface Announce {
+    enabled: boolean
+    title: string
+    /** Путь к обложке в images/. */
+    cover: string
+    /** ISO с +03:00, например 2026-11-01T18:00:00+03:00. */
+    releaseAt: string
+    text?: string
+    url?: string
+}
+
 export interface SiteSettings {
     promo: {
         enabled: boolean
         releaseId: string
     }
+    /** Необязательный блок: в старых site.json его нет. */
+    announce?: Announce
 }

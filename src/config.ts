@@ -12,6 +12,8 @@ export const siteSettings: SiteSettings = siteData as SiteSettings
 
 export const SHOW_NEW_RELEASE_PROMO = siteSettings.promo.enabled
 export const PROMO_RELEASE_ID = siteSettings.promo.releaseId
+// Анонс будущего релиза; в старых site.json блока нет.
+export const ANNOUNCE = siteSettings.announce ?? null
 
 // Единый источник данных по дискографии, трекам и путям к медиа/текстам —
 // src/content/releases.json. Порядок ключей задаёт порядок карточек на главной.

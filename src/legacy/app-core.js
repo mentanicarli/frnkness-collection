@@ -30,6 +30,7 @@ export function initLegacyApp(deps = {}) {
         createSupabaseClient = null,
         PROMO_RELEASE_ID = '',
         SHOW_NEW_RELEASE_PROMO = true,
+        ANNOUNCE = null,
         LYRICS_INDEX_URL = '',
         TRACK_NOTES_URL = '',
         releases = {}
@@ -182,6 +183,7 @@ export function initLegacyApp(deps = {}) {
         releasePlayCountCache,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
+        ANNOUNCE,
         LYRICS_INDEX_URL,
         TRACK_NOTES_URL,
         utils,

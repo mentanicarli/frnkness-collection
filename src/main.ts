@@ -4,7 +4,7 @@ import App from './App.vue'
 import './assets/app.css'
 
 import { initLegacyApp } from './legacy/app-core'
-import { PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
+import { ANNOUNCE, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
 import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
 import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
@@ -14,6 +14,7 @@ import { fetchTextFile } from './utils/textFiles'
 import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
 import { renderPromoCardHtml } from './utils/promoCard'
 import { setupMediaSession } from './runtime/mediaSession'
+import { isAnnounceActive, renderAnnounceCardHtml, startAnnounceCountdown } from './utils/announceCard'
 
 const app = createApp(App)
 app.mount('#app')
@@ -37,6 +38,7 @@ const legacyDeps = {
         createSupabaseClient,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
+        ANNOUNCE,
         LYRICS_INDEX_URL: `${import.meta.env.BASE_URL}lyrics-index.json`,
         TRACK_NOTES_URL: `${import.meta.env.BASE_URL}track-notes.json`,
         releases
@@ -67,6 +69,9 @@ const legacyDeps = {
         renderAboutHtml,
         renderLyricsHtml,
         renderPromoCardHtml,
+        renderAnnounceCardHtml,
+        isAnnounceActive,
+        startAnnounceCountdown,
         setupMediaSession,
         throttle
     }

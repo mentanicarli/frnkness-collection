@@ -353,7 +353,13 @@ export function createHandler(deps: HandlerDeps) {
                 const current = await readFile(RELEASES, baseSha)
                 registry = current === null ? {} : parseJson(current, RELEASES)
             }
-            errors.push(...validateSiteSettings(parseJson(textByPath.get(SITE)!, SITE), registry))
+            const site = parseJson(textByPath.get(SITE)!, SITE)
+            errors.push(...validateSiteSettings(site, registry))
+            // Обложка анонса должна быть в этом коммите или уже в репозитории.
+            const cover = (site as { announce?: { cover?: unknown } })?.announce?.cover
+            if (typeof cover === 'string' && !(seen.has(cover) && !deletes.includes(cover)) && !(await fileExists(cover, baseSha))) {
+                errors.push(`обложка анонса не найдена: ${cover}`)
+            }
         }
         if (deletes.length) {
             // Удалять можно только заменяемую обложку/PDF, на которую новая

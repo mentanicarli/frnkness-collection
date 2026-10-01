@@ -20,7 +20,8 @@ test('вход админа: разделы и статус подключени
     await expect(page.getByRole('navigation', { name: 'Разделы' })).toBeVisible()
     await expect(page.getByTestId('status-github')).toContainText('mentanicarli/frnkness-collection')
     await expect(page.getByTestId('status-deploy')).toContainText('опубликована')
-    expect(mocks.calls.map((c) => c.action)).toEqual(['ping', 'head', 'deploy-status'])
+    // Проверка подключений + загрузка site.json для подсказки об истёкшем анонсе.
+    await expect.poll(() => mocks.calls.map((c) => c.action).sort()).toEqual(['deploy-status', 'head', 'head', 'ping', 'read'])
     expect(mocks.calls.every((c) => c.authorization?.startsWith('Bearer '))).toBe(true)
     expect(mocks.unexpected).toEqual([])
 

@@ -36,6 +36,10 @@
         </div>
     </section>
 
+    <div v-if="announceExpired" class="adm-alert adm-alert-warn" style="margin-top: 1rem" data-testid="announce-expired">
+        Анонс истёк — добавьте релиз и выключите анонс. <a href="#/promo">Открыть «Промо»</a>
+    </div>
+
     <div v-if="github.state === 'ok' && (token.kind === 'soon' || token.kind === 'expired')"
          class="adm-alert" :class="token.kind === 'expired' ? 'adm-alert-error' : 'adm-alert-warn'" style="margin-top: 1rem" data-testid="token-alert">
         <template v-if="token.kind === 'expired'">Токен GitHub истёк {{ token.date }} — сохранения из админки не работают.</template>
@@ -49,6 +53,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { deployStatus, fetchHead, ping, AdminApiError } from '../api/content'
 import { TOKEN_DOCS_URL, pluralDays, tokenStatus } from '../lib/token'
+import { useRepo } from '../composables/useRepo'
+import { isAnnounceExpired } from '@/utils/announceCard'
+
+const repo = useRepo()
+const announceExpired = computed(() => isAnnounceExpired(repo.state.site?.announce))
 
 type CheckState = 'loading' | 'ok' | 'error'
 
@@ -91,6 +100,8 @@ async function check() {
     try {
         const info = await ping()
         Object.assign(github, { state: 'ok', repo: info.repo, branch: info.branch, tokenExpiresAt: info.tokenExpiresAt })
+        // site.json нужен для подсказки об истёкшем анонсе; ошибки — не про «Обзор».
+        repo.load().catch(() => undefined)
         const head = await fetchHead()
         const status = await deployStatus(head.sha)
         Object.assign(deploy, { state: 'ok', sha: head.sha, label: DEPLOY_LABELS[status.state], url: status.url })

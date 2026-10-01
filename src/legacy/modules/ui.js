@@ -1,6 +1,7 @@
 export function createUiModule(ctx) {
-    const { dom, state, releases, utils, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO } = ctx
-    const { throttle, escapeHtml, renderPromoCardHtml } = utils
+    const { dom, state, releases, utils, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, ANNOUNCE } = ctx
+    const { throttle, escapeHtml, renderPromoCardHtml, renderAnnounceCardHtml, isAnnounceActive, startAnnounceCountdown } = utils
+    let stopAnnounceCountdown = null
 
     function initStaggerAnimation() {
         document.querySelectorAll('.stagger-item').forEach((item, i) => {
@@ -20,13 +21,26 @@ export function createUiModule(ctx) {
         if (!dom.albumsGrid || !dom.singlesGrid) return
         let albumsHtml = '', singlesHtml = ''
 
-        // Промо-блок собирается из релиза, на который указывает PROMO_RELEASE_ID.
+        // Промо-блок: анонс будущего релиза (если включён и время не вышло),
+        // под ним — релиз, на который указывает PROMO_RELEASE_ID.
+        if (stopAnnounceCountdown) {
+            stopAnnounceCountdown()
+            stopAnnounceCountdown = null
+        }
         const promoRelease = SHOW_NEW_RELEASE_PROMO ? releases[PROMO_RELEASE_ID] : null
-        if (dom.homePromo && promoRelease) {
-            const promoCover = promoRelease.cover
-            dom.homePromo.innerHTML = renderPromoCardHtml(PROMO_RELEASE_ID, promoRelease)
-            const promoCard = dom.homePromo.querySelector('.promo-release-card')
-            if (promoCard) ctx.modules.colors.applyCardAccent(promoCard, promoCover)
+        const showAnnounce = Boolean(isAnnounceActive && isAnnounceActive(ANNOUNCE))
+        if (dom.homePromo && (promoRelease || showAnnounce)) {
+            const announceHtml = showAnnounce ? renderAnnounceCardHtml(ANNOUNCE) : ''
+            const promoHtml = promoRelease ? renderPromoCardHtml(PROMO_RELEASE_ID, promoRelease) : ''
+            dom.homePromo.innerHTML = announceHtml + promoHtml
+            const promoCard = dom.homePromo.querySelector('.promo-release-card:not(.announce-card)')
+            if (promoCard) ctx.modules.colors.applyCardAccent(promoCard, promoRelease.cover)
+            const announceCard = dom.homePromo.querySelector('.announce-card')
+            if (announceCard) {
+                ctx.modules.colors.applyCardAccent(announceCard, ANNOUNCE.cover)
+                // Время вышло — карточка исчезает, а не висит с нулями.
+                stopAnnounceCountdown = startAnnounceCountdown(announceCard, () => announceCard.remove())
+            }
         } else if (dom.homePromo) {
             dom.homePromo.innerHTML = ''
         }

@@ -212,6 +212,16 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 @media (max-width: 640px) {
   .promo-cover-wrap { width: 100%; max-width: 16.25rem; align-self: center; }
 }
+/* Анонс будущего релиза: над карточкой «последний релиз». */
+.announce-card + .promo-release-card { margin-top: clamp(0.875rem, 2vw, 1.25rem); }
+.announce-countdown {
+  font-family: 'JetBrains Mono', monospace; font-weight: 500; font-variant-numeric: tabular-nums;
+  font-size: clamp(1.25rem, 3vw, 2rem); letter-spacing: -0.01em; color: var(--fg); line-height: 1.1;
+}
+.announce-when { margin: -0.5rem 0 0; font-size: 0.8125rem; color: var(--fg-muted); }
+.announce-text { margin: 0; font-size: 0.875rem; color: var(--fg-muted); line-height: 1.5; max-width: 36rem; }
+.announce-cta { width: fit-content; }
+
 .promo-badge {
   display: inline-block; width: fit-content; font-family: 'JetBrains Mono'; font-size: 0.625rem !important;
   letter-spacing: 0.14em; text-transform: uppercase; color: var(--page-accent);
