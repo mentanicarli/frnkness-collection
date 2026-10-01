@@ -3,6 +3,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { encodeBase64 } from 'jsr:@std/encoding@1/base64'
 import { createHandler } from './handler.ts'
+import { playsForRelease } from '../_shared/revert.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -46,7 +47,13 @@ const handler = createHandler({
         }
     },
     toBase64: (bytes) => encodeBase64(bytes),
-    now: () => Date.now()
+    now: () => Date.now(),
+    // Сервисный ключ обходит RLS: функция читает счётчики напрямую.
+    async playsFor(releaseIds) {
+        const { data, error } = await supabase.from('play_counts').select('track_key, plays')
+        if (error) throw new Error(`play_counts: ${error.message}`)
+        return Object.fromEntries(releaseIds.map((id) => [id, playsForRelease(id, data ?? [])]))
+    }
 })
 
 Deno.serve(handler)

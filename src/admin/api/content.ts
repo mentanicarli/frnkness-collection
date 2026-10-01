@@ -144,3 +144,28 @@ export async function uploadToStaging(file: Blob, ext: string, contentType: stri
     }
     return name
 }
+
+// ── История и откат ──────────────────────────────────────────────────
+
+export interface HistoryCommit {
+    sha: string
+    message: string
+    date: string | null
+    author: string | null
+    source: 'admin' | 'code'
+    files: { path: string; status: string; previous: string | null }[]
+}
+
+export interface RevertPreview {
+    head: string
+    message: string
+    revertMessage: string
+    ok: boolean
+    files: { path: string; action: 'restore' | 'recreate' | 'delete' }[]
+    conflicts: { path: string; commits: { sha: string; message: string }[] }[]
+    blocked: string[]
+}
+
+export const fetchHistory = () => callContent<{ head: string | null; commits: HistoryCommit[] }>('history')
+export const previewRevert = (sha: string) => callContent<RevertPreview>('revert-preview', { sha })
+export const revertCommit = (sha: string, baseSha: string) => callContent<CommitResult>('revert', { sha, baseSha })

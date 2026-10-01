@@ -10,7 +10,7 @@ import { usePublish } from './usePublish'
  */
 export interface PlannedFile {
     path: string
-    kind: 'new' | 'changed' | 'deleted'
+    kind: 'new' | 'changed' | 'deleted' | 'restored'
     /** Размер в байтах (для медиафайлов). */
     size?: number
 }
@@ -21,7 +21,9 @@ export interface CommitPlan {
     files: PlannedFile[]
     notes?: string[]
     /** Готовит содержимое файлов (например, загружает медиа). */
-    prepare: (progress: (text: string) => void) => Promise<CommitFile[]>
+    prepare?: (progress: (text: string) => void) => Promise<CommitFile[]>
+    /** Вместо обычного коммита — своё действие на сервере (например, откат). */
+    run?: (baseSha: string) => Promise<CommitResult>
 }
 
 export function useCommitFlow() {
@@ -59,9 +61,15 @@ export function useCommitFlow() {
         try {
             const baseSha = repo.state.sha
             if (!baseSha) throw new AdminApiError('no_base', 0, 'Нет данных о версии сайта — обнови страницу')
-            const files = await plan.prepare((text) => (state.progress = text))
-            state.progress = 'Создаём коммит…'
-            const result = await commitFiles(baseSha, plan.message, files)
+            let result: CommitResult
+            if (plan.run) {
+                state.progress = 'Создаём коммит…'
+                result = await plan.run(baseSha)
+            } else {
+                const files = plan.prepare ? await plan.prepare((text) => (state.progress = text)) : []
+                state.progress = 'Создаём коммит…'
+                result = await commitFiles(baseSha, plan.message, files)
+            }
             publish.track(result.sha, result.message)
             repo.afterCommit(result.sha)
             finish(result)

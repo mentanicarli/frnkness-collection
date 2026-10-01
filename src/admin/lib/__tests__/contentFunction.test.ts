@@ -108,7 +108,8 @@ function setup() {
             }
         },
         toBase64: (bytes) => Buffer.from(bytes).toString('base64'),
-        now: () => now
+        now: () => now,
+        playsFor: async (ids) => Object.fromEntries(ids.map((id) => [id, 0]))
     }
     handle = createHandler(deps)
 }

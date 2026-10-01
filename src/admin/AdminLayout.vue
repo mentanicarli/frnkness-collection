@@ -36,6 +36,7 @@ const NAV = [
     { id: 'promo', label: 'Промо' },
     { id: 'catalog', label: 'Каталог' },
     { id: 'releases', label: 'Релизы' },
+    { id: 'history', label: 'История' },
     { id: 'new-release', label: 'Новый релиз' }
 ] as const
 
@@ -50,6 +51,7 @@ const VIEWS: Record<string, Component> = {
     promo: defineAsyncComponent(() => import('./views/PromoView.vue')),
     catalog: defineAsyncComponent(() => import('./views/CatalogView.vue')),
     releases: defineAsyncComponent(() => import('./views/ReleasesView.vue')),
+    history: defineAsyncComponent(() => import('./views/HistoryView.vue')),
     'new-release': defineAsyncComponent(() => import('./views/NewReleaseView.vue'))
 }
 

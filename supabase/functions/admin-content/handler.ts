@@ -21,6 +21,40 @@ import {
     validateTrackNotes
 } from '../_shared/rules.ts'
 import { parseTokenExpiration } from '../_shared/tokenExpiry.ts'
+import {
+    RELEASES_PATH,
+    SITE_PATH,
+    isAdminCommit,
+    planRevert,
+    removedReleaseIds,
+    revertMessage,
+    type CommitFileChange,
+    type TreeItem
+} from '../_shared/revert.ts'
+
+interface GhCommit {
+    sha: string
+    commit: { message: string; author?: { name?: string; date?: string }; committer?: { date?: string } }
+    parents: { sha: string }[]
+    files?: CommitFileChange[]
+}
+
+const HISTORY_SIZE = 30
+const firstLine = (message: string) => message.split('\n')[0]
+
+/** Параллельно, но не больше limit запросов сразу. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+    const out: R[] = new Array(items.length)
+    let next = 0
+    const worker = async () => {
+        while (next < items.length) {
+            const i = next++
+            out[i] = await fn(items[i])
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+    return out
+}
 
 export interface AuthUser {
     id: string
@@ -50,6 +84,8 @@ export interface HandlerDeps {
     }
     toBase64(bytes: Uint8Array): string
     now(): number
+    /** Прослушивания релизов (из play_counts) — для защиты статистики при откате. */
+    playsFor(releaseIds: string[]): Promise<Record<string, number>>
 }
 
 class HttpError extends Error {
@@ -68,7 +104,8 @@ const SHA_RE = /^[0-9a-f]{40}$/
 /** Запись дерева коммита; sha: null — удалить файл. */
 interface TreeEntry {
     path: string
-    mode: '100644'
+    /** Обычно 100644; при откате — режим из дерева родителя. */
+    mode: string
     type: 'blob'
     sha?: string | null
     content?: string
@@ -434,6 +471,132 @@ export function createHandler(deps: HandlerDeps) {
         return { sha: created.sha, url: created.html_url, message }
     }
 
+    // ── История и откат ────────────────────────────────────────────────
+
+    const loadCommit = (sha: string) => ghJson<GhCommit>(`${repoPath()}/commits/${sha}`)
+
+    async function history() {
+        const list = await ghJson<GhCommit[]>(`${repoPath()}/commits?sha=${encodeURIComponent(env.branch)}&per_page=${HISTORY_SIZE}`)
+        const details = await mapLimit(list, 6, (c) => loadCommit(c.sha))
+        return {
+            head: list[0]?.sha ?? null,
+            commits: details.map((c) => ({
+                sha: c.sha,
+                message: firstLine(c.commit.message),
+                date: c.commit.committer?.date ?? c.commit.author?.date ?? null,
+                author: c.commit.author?.name ?? null,
+                source: isAdminCommit(c.commit.message) ? 'admin' : 'code',
+                files: (c.files ?? []).map((f) => ({ path: f.filename, status: f.status, previous: f.previous_filename ?? null }))
+            }))
+        }
+    }
+
+    async function readJsonAt(path: string, ref: string): Promise<unknown> {
+        const text = await readFile(path, ref)
+        return text === null ? null : parseJson(text, path)
+    }
+
+    async function buildRevert(body: Record<string, unknown>) {
+        const sha = body.sha
+        if (typeof sha !== 'string' || !SHA_RE.test(sha)) throw new HttpError(400, 'bad_request', 'Нужен sha коммита')
+        const head = await headSha()
+        const commit = await loadCommit(sha)
+        const files = commit.files ?? []
+        const parentSha = commit.parents[0]?.sha
+
+        // Какие из затронутых файлов потом меняли более поздние коммиты.
+        const touched = new Set(files.flatMap((f) => [f.filename, ...(f.previous_filename ? [f.previous_filename] : [])]))
+        const laterChanges = new Map<string, { sha: string; message: string }[]>()
+        if (sha !== head) {
+            const cmp = await ghJson<{ commits: GhCommit[]; files?: CommitFileChange[] }>(`${repoPath()}/compare/${sha}...${head}`)
+            const changed = new Set((cmp.files ?? []).flatMap((f) => [f.filename, ...(f.previous_filename ? [f.previous_filename] : [])]))
+            if ([...touched].some((p) => changed.has(p))) {
+                const later = await mapLimit(cmp.commits.slice(-100), 6, (c) => loadCommit(c.sha))
+                for (const c of later) {
+                    for (const f of c.files ?? []) {
+                        for (const p of [f.filename, f.previous_filename]) {
+                            if (!p || !touched.has(p)) continue
+                            const list = laterChanges.get(p) ?? []
+                            if (!list.some((x) => x.sha === c.sha)) list.push({ sha: c.sha, message: firstLine(c.commit.message) })
+                            laterChanges.set(p, list)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Дерево родителя: из него берутся sha blob — без повторной загрузки файлов.
+        const parentTree = new Map<string, TreeItem>()
+        if (parentSha) {
+            const parent = await ghJson<{ tree: { sha: string } }>(`${repoPath()}/git/commits/${parentSha}`)
+            const tree = await ghJson<{ tree: { path: string; type: string; sha: string; mode: string }[] }>(
+                `${repoPath()}/git/trees/${parent.tree.sha}?recursive=1`
+            )
+            for (const e of tree.tree) if (e.type === 'blob') parentTree.set(e.path, { sha: e.sha, mode: e.mode })
+        }
+
+        const touchesReleases = files.some((f) => f.filename === RELEASES_PATH)
+        const touchesSite = files.some((f) => f.filename === SITE_PATH)
+        let releases: { head: unknown; parent: unknown } | undefined
+        let site: { head: unknown; parent: unknown } | undefined
+        let plays: Record<string, number> = {}
+        let registryAfter: unknown
+        if ((touchesReleases || touchesSite) && parentSha) {
+            const headReleases = await readJsonAt(RELEASES_PATH, head)
+            const headSite = await readJsonAt(SITE_PATH, head)
+            if (touchesReleases) {
+                releases = { head: headReleases, parent: await readJsonAt(RELEASES_PATH, parentSha) }
+                const removed = removedReleaseIds(releases.head, releases.parent)
+                if (removed.length) plays = await deps.playsFor(removed)
+            }
+            registryAfter = releases ? releases.parent : headReleases
+            // site.json проверяется всегда, когда меняется реестр: промо может
+            // указывать на релиз, который откат уберёт.
+            site = { head: headSite, parent: touchesSite ? await readJsonAt(SITE_PATH, parentSha) : headSite }
+        }
+
+        const plan = planRevert({
+            message: commit.commit.message,
+            parentCount: commit.parents.length,
+            files,
+            parentTree,
+            laterChanges,
+            releases,
+            site,
+            plays,
+            registryAfter
+        })
+        return { head, commit, plan }
+    }
+
+    async function revertPreview(body: Record<string, unknown>) {
+        const { head, commit, plan } = await buildRevert(body)
+        return {
+            head,
+            message: firstLine(commit.commit.message),
+            revertMessage: revertMessage(commit.commit.message),
+            ok: plan.ok,
+            files: plan.files,
+            conflicts: plan.conflicts,
+            blocked: plan.blocked
+        }
+    }
+
+    async function revert(body: Record<string, unknown>) {
+        const baseSha = body.baseSha
+        if (typeof baseSha !== 'string' || !SHA_RE.test(baseSha)) throw new HttpError(400, 'bad_request', 'Нужен baseSha')
+        const { head, commit, plan } = await buildRevert(body)
+        if (head !== baseSha) throw new HttpError(409, 'conflict', 'Данные на сайте изменились, пока ты смотрел историю. Обнови страницу и повтори откат.')
+        if (!plan.ok) {
+            const details = [
+                ...plan.blocked,
+                ...plan.conflicts.map((c) => `${c.path} позже менялся: ${c.commits.map((x) => `«${x.message}»`).join(', ')}`)
+            ]
+            throw new HttpError(422, 'revert_blocked', 'Откат невозможен', details.length ? details : ['Откатывать нечего'])
+        }
+        return writeCommit(head, revertMessage(commit.commit.message), plan.entries as TreeEntry[])
+    }
+
     async function deployStatus(body: Record<string, unknown>) {
         const sha = body.sha
         if (typeof sha !== 'string' || !SHA_RE.test(sha)) throw new HttpError(400, 'bad_request', 'Нужен sha коммита')
@@ -493,6 +656,12 @@ export function createHandler(deps: HandlerDeps) {
                     return json(200, await commit(body))
                 case 'deploy-status':
                     return json(200, await deployStatus(body))
+                case 'history':
+                    return json(200, await history())
+                case 'revert-preview':
+                    return json(200, await revertPreview(body))
+                case 'revert':
+                    return json(200, await revert(body))
                 default:
                     throw new HttpError(400, 'bad_request', 'Неизвестное действие')
             }

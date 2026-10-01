@@ -47,7 +47,7 @@ import type { CommitFlow } from '../composables/useCommitFlow'
 
 const props = defineProps<{ flow: CommitFlow }>()
 
-const KIND_LABEL = { new: 'новый', changed: 'изменён', deleted: 'удалён' } as const
+const KIND_LABEL = { new: 'новый', changed: 'изменён', deleted: 'удалён', restored: 'восстановлен' } as const
 
 const fullMessage = computed(() => {
     const m = props.flow.state.plan?.message ?? ''
