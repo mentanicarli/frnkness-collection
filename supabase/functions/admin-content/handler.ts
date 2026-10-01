@@ -19,6 +19,7 @@ import {
     validateSiteSettings,
     validateTrackNotes
 } from '../_shared/rules.ts'
+import { parseTokenExpiration } from '../_shared/tokenExpiry.ts'
 
 export interface AuthUser {
     id: string
@@ -181,8 +182,15 @@ export function createHandler(deps: HandlerDeps) {
     // ── Действия ───────────────────────────────────────────────────────
 
     async function ping(user: AuthUser) {
-        const repo = await ghJson<{ full_name: string; default_branch: string }>(repoPath())
-        return { user: { email: user.email ?? null }, repo: repo.full_name, branch: env.branch }
+        const res = await gh(repoPath())
+        const repo = (await res.json()) as { full_name: string; default_branch: string }
+        return {
+            user: { email: user.email ?? null },
+            repo: repo.full_name,
+            branch: env.branch,
+            // Срок fine-grained токена; null — токен без срока.
+            tokenExpiresAt: parseTokenExpiration(res.headers.get('github-authentication-token-expiration'))
+        }
     }
 
     async function head() {

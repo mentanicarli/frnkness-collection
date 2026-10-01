@@ -20,6 +20,10 @@
                 <span v-else-if="github.state === 'ok'">GitHub: репозиторий {{ github.repo }}, ветка {{ github.branch }}</span>
                 <span v-else>GitHub: {{ github.error }}</span>
             </div>
+            <div v-if="github.state === 'ok'" class="adm-status-item" data-testid="status-token">
+                <span class="adm-dot" :class="tokenDot"></span>
+                <span>{{ tokenText }}</span>
+            </div>
             <div class="adm-status-item" data-testid="status-deploy">
                 <span class="adm-dot" :class="dot(deploy.state)"></span>
                 <span v-if="deploy.state === 'loading'">Сайт: проверяем последний деплой…</span>
@@ -31,18 +35,26 @@
             </div>
         </div>
     </section>
+
+    <div v-if="github.state === 'ok' && (token.kind === 'soon' || token.kind === 'expired')"
+         class="adm-alert" :class="token.kind === 'expired' ? 'adm-alert-error' : 'adm-alert-warn'" style="margin-top: 1rem" data-testid="token-alert">
+        <template v-if="token.kind === 'expired'">Токен GitHub истёк {{ token.date }} — сохранения из админки не работают.</template>
+        <template v-else>Токен GitHub истекает через {{ token.days }} {{ pluralDays(token.days!) }} ({{ token.date }}).</template>
+        Обнови его по инструкции: <a :href="TOKEN_DOCS_URL" target="_blank" rel="noopener">«Срок действия и обновление»</a>.
+    </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { deployStatus, fetchHead, ping, AdminApiError } from '../api/content'
+import { TOKEN_DOCS_URL, pluralDays, tokenStatus } from '../lib/token'
 
 type CheckState = 'loading' | 'ok' | 'error'
 
 const auth = useAuth()
 const loading = ref(false)
-const github = reactive({ state: 'loading' as CheckState, repo: '', branch: '', error: '' })
+const github = reactive({ state: 'loading' as CheckState, repo: '', branch: '', error: '', tokenExpiresAt: undefined as string | null | undefined })
 const deploy = reactive({ state: 'loading' as CheckState, sha: '', label: '', url: '' as string | null, error: '' })
 
 const DEPLOY_LABELS = {
@@ -56,6 +68,20 @@ function dot(state: CheckState) {
     return { 'adm-dot-ok': state === 'ok', 'adm-dot-err': state === 'error', 'adm-dot-pulse': state === 'loading' }
 }
 
+const token = computed(() => tokenStatus(github.tokenExpiresAt ?? null))
+const tokenText = computed(() => {
+    if (github.tokenExpiresAt === undefined) return 'Срок токена GitHub неизвестен — обнови функцию admin-content (см. команды в инструкции)'
+    const t = token.value
+    if (t.kind === 'none') return 'Токен GitHub без срока действия'
+    if (t.kind === 'expired') return `Токен GitHub истёк ${t.date}`
+    return `Токен GitHub действует ещё ${t.days} ${pluralDays(t.days!)} (до ${t.date})`
+})
+const tokenDot = computed(() => ({
+    'adm-dot-ok': github.tokenExpiresAt !== undefined && (token.value.kind === 'ok' || token.value.kind === 'none'),
+    'adm-dot-warn': github.tokenExpiresAt === undefined || token.value.kind === 'soon',
+    'adm-dot-err': token.value.kind === 'expired'
+}))
+
 const message = (e: unknown) => (e instanceof AdminApiError ? e.message : 'неизвестная ошибка')
 
 async function check() {
@@ -64,7 +90,7 @@ async function check() {
     deploy.state = 'loading'
     try {
         const info = await ping()
-        Object.assign(github, { state: 'ok', repo: info.repo, branch: info.branch })
+        Object.assign(github, { state: 'ok', repo: info.repo, branch: info.branch, tokenExpiresAt: info.tokenExpiresAt })
         const head = await fetchHead()
         const status = await deployStatus(head.sha)
         Object.assign(deploy, { state: 'ok', sha: head.sha, label: DEPLOY_LABELS[status.state], url: status.url })

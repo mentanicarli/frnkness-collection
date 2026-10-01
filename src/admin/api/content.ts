@@ -64,6 +64,8 @@ export interface PingResult {
     user: { email: string | null }
     repo: string
     branch: string
+    /** ISO; null — токен без срока; undefined — старая версия функции. */
+    tokenExpiresAt?: string | null
 }
 
 export interface RepoHead {

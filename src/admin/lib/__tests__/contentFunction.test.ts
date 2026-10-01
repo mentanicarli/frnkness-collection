@@ -16,6 +16,7 @@ interface FakeState {
     protectedBranch: boolean
     runs: { status: string; conclusion: string | null; html_url: string }[]
     nextSha: number
+    tokenExpiration?: string
 }
 
 function createFakeGitHub(state: FakeState): typeof fetch {
@@ -28,7 +29,12 @@ function createFakeGitHub(state: FakeState): typeof fetch {
         const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
         if (state.tokenInvalid) return json({ message: 'Bad credentials' }, 401)
         const r = `/repos/${REPO}`
-        if (path === r) return json({ full_name: REPO, default_branch: 'main' })
+        if (path === r) {
+            return new Response(JSON.stringify({ full_name: REPO, default_branch: 'main' }), {
+                status: 200,
+                headers: state.tokenExpiration ? { 'github-authentication-token-expiration': state.tokenExpiration } : {}
+            })
+        }
         if (path === `${r}/git/ref/heads/main`) return json({ object: { sha: state.head } })
         if (method === 'GET' && path.startsWith(`${r}/git/commits/`)) return json({ tree: { sha: sha(900) } })
         if (method === 'GET' && path.startsWith(`${r}/git/trees/`)) {
@@ -162,7 +168,9 @@ describe('admin-content: доступ', () => {
     })
 
     it('ping и head', async () => {
-        expect(await (await call({ action: 'ping' })).json()).toEqual({ user: { email: 'me@example.com' }, repo: REPO, branch: 'main' })
+        expect(await (await call({ action: 'ping' })).json()).toEqual({ user: { email: 'me@example.com' }, repo: REPO, branch: 'main', tokenExpiresAt: null })
+        state.tokenExpiration = '2026-12-31 23:59:59 UTC'
+        expect((await (await call({ action: 'ping' })).json()).tokenExpiresAt).toBe('2026-12-31T23:59:59.000Z')
         const head = await (await call({ action: 'head' })).json()
         expect(head.sha).toBe(BASE)
         expect(head.files.map((f: { path: string }) => f.path)).toContain('lyrics/singles/faaa.txt')
