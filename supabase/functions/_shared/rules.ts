@@ -240,6 +240,96 @@ export function validateNewRelease(id: string, value: unknown): string[] {
 }
 
 /**
+ * Поля существующего релиза, которые можно менять: они не участвуют в ключе
+ * статистики и не задают расположение файлов треков.
+ */
+export const EDITABLE_RELEASE_FIELDS = new Set(['title', 'releaseDate', 'year', 'cover', 'videoUrl', 'lyricsBookPath'])
+
+/**
+ * Проверяет правку существующего релиза. Старые значения (в том числе имена
+ * файлов не по нынешним правилам) допустимы, если их не трогали.
+ */
+export function validateReleaseEdit(id: string, before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+    const errors: string[] = []
+    const p = `релиз «${id}»`
+    const changed = (key: string) => stableStringify(before[key]) !== stableStringify(after[key])
+    if (changed('title') && (typeof after.title !== 'string' || !after.title.trim())) errors.push(`${p}: пустое название`)
+    if (changed('year') || changed('releaseDate')) {
+        if (typeof after.year !== 'string' || !/^\d{4}$/.test(after.year)) errors.push(`${p}: год должен быть из 4 цифр`)
+        if (after.releaseDate !== undefined) {
+            const m = typeof after.releaseDate === 'string' ? after.releaseDate.match(RELEASE_DATE_RE) : null
+            if (!m) errors.push(`${p}: дата должна быть вида «26 августа 2026»`)
+            else if (m[3] !== after.year) errors.push(`${p}: год в дате не совпадает с полем year`)
+        }
+    }
+    if (changed('cover') && (typeof after.cover !== 'string' || !/^images\/[a-z0-9-]+\.(jpg|jpeg|png)$/.test(after.cover))) {
+        errors.push(`${p}: обложка должна лежать в images/ и называться латиницей`)
+    }
+    if (changed('lyricsBookPath') && after.lyricsBookPath !== undefined &&
+        (typeof after.lyricsBookPath !== 'string' || !/^lyrics-books\/[a-z0-9-]+\.pdf$/.test(after.lyricsBookPath))) {
+        errors.push(`${p}: PDF должен лежать в lyrics-books/ и называться латиницей`)
+    }
+    if (changed('videoUrl') && after.videoUrl !== undefined && (typeof after.videoUrl !== 'string' || !YOUTUBE_EMBED_RE.test(after.videoUrl))) {
+        errors.push(`${p}: ссылка на видео должна быть вида https://www.youtube.com/embed/<id>`)
+    }
+    return errors
+}
+
+/** Все пути, на которые ссылается реестр (обложки, PDF, файлы треков). */
+export function registryPaths(registry: unknown): Set<string> {
+    const out = new Set<string>()
+    if (!isPlainObject(registry)) return out
+    for (const r of Object.values(registry)) {
+        if (!isPlainObject(r)) continue
+        if (typeof r.cover === 'string') out.add(r.cover)
+        if (typeof r.lyricsBookPath === 'string') out.add(r.lyricsBookPath)
+        if (Array.isArray(r.tracks) && typeof r.audioPath === 'string' && typeof r.lyricsPath === 'string') {
+            for (const t of r.tracks) {
+                if (!isPlainObject(t)) continue
+                if (typeof t.file === 'string') out.add(r.audioPath + t.file)
+                if (typeof t.lyricsFile === 'string') out.add(r.lyricsPath + t.lyricsFile)
+            }
+        }
+    }
+    return out
+}
+
+/** Пути медиа, которыми владеет site.json (обложка анонса). */
+export function sitePaths(site: unknown): Set<string> {
+    const out = new Set<string>()
+    if (isPlainObject(site) && isPlainObject(site.announce) && typeof site.announce.cover === 'string') out.add(site.announce.cover)
+    return out
+}
+
+/**
+ * Удалять файлы можно только заменяемые: обложку или PDF релиза (или
+ * обложку анонса), на которые ссылалась прежняя версия и больше не ссылается
+ * новая. Так из админки нельзя удалить mp3, тексты или чужие файлы.
+ */
+export function checkDeletions(
+    paths: string[],
+    before: { registry: unknown; site: unknown },
+    after: { registry: unknown; site: unknown }
+): string[] {
+    const errors: string[] = []
+    const replaceable = new Set<string>()
+    if (isPlainObject(before.registry)) {
+        for (const r of Object.values(before.registry)) {
+            if (!isPlainObject(r)) continue
+            if (typeof r.cover === 'string') replaceable.add(r.cover)
+            if (typeof r.lyricsBookPath === 'string') replaceable.add(r.lyricsBookPath)
+        }
+    }
+    for (const p of sitePaths(before.site)) replaceable.add(p)
+    const stillUsed = new Set([...registryPaths(after.registry), ...sitePaths(after.site)])
+    for (const p of paths) {
+        if (!replaceable.has(p)) errors.push(`удалять можно только заменяемую обложку или PDF: ${p}`)
+        else if (stillUsed.has(p)) errors.push(`файл ещё используется, удалять нельзя: ${p}`)
+    }
+    return errors
+}
+
+/**
  * Защита статистики: ключ прослушиваний — «<releaseId>-<индекс трека>»,
  * поэтому существующие релизы нельзя ни менять, ни удалять, ни
  * переставлять в них треки. Разрешено только добавить новый релиз.
@@ -268,8 +358,24 @@ export function checkRegistryChange(before: unknown, after: unknown): string[] {
         }
         const { tracks: _a, ...oldRest } = release as Record<string, unknown>
         const { tracks: _b, ...newRest } = (isPlainObject(next) ? next : {}) as Record<string, unknown>
-        if (stableStringify(oldRest) !== stableStringify(newRest)) {
-            errors.push(`релиз «${id}»: существующие релизы в админке не редактируются`)
+        let edited = false
+        for (const key of new Set([...Object.keys(oldRest), ...Object.keys(newRest)])) {
+            if (stableStringify(oldRest[key]) === stableStringify(newRest[key])) continue
+            if (EDITABLE_RELEASE_FIELDS.has(key)) edited = true
+            else errors.push(`релиз «${id}»: поле «${key}» менять нельзя`)
+        }
+        if (edited && isPlainObject(next)) errors.push(...validateReleaseEdit(id, release as Record<string, unknown>, next))
+        // Новая обложка или PDF не должны совпасть с файлами другого релиза.
+        if (edited && isPlainObject(next)) {
+            for (const key of ['cover', 'lyricsBookPath'] as const) {
+                const path = next[key]
+                if (typeof path !== 'string' || path === (release as Record<string, unknown>)[key]) continue
+                for (const [otherId, other] of Object.entries(after)) {
+                    if (otherId !== id && isPlainObject(other) && (other.cover === path || other.lyricsBookPath === path)) {
+                        errors.push(`релиз «${id}»: файл ${path} уже занят релизом «${otherId}»`)
+                    }
+                }
+            }
         }
     }
 

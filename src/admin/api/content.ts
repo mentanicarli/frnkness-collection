@@ -97,6 +97,15 @@ export interface CommitFile {
     content?: string
     /** Медиафайлы — после stage-blob. */
     blob?: Pick<StagedBlob, 'sha' | 'size' | 'token'>
+    /** Удалить файл (только заменённую обложку или PDF). */
+    delete?: true
+}
+
+/** Загрузка медиафайла для коммита: staging-бакет → blob в GitHub. */
+export async function uploadMedia(file: Blob, path: string, ext: string, contentType: string): Promise<CommitFile> {
+    const staging = await uploadToStaging(file, ext, contentType)
+    const blob = await stageBlob(staging, path)
+    return { path, blob: { sha: blob.sha, size: blob.size, token: blob.token } }
 }
 
 export interface CommitResult {

@@ -75,7 +75,9 @@ function setup() {
         files: {
             'src/content/releases.json': JSON.stringify(releasesJson, null, 4),
             'src/content/site.json': JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' } }),
-            'lyrics/singles/faaa.txt': 'Строка\n'
+            'lyrics/singles/faaa.txt': 'Строка\n',
+            'images/single6-cover.jpg': 'jpeg',
+            'lyrics-books/disinvolto-lyrics.pdf': 'pdf'
         },
         calls: [],
         tokenInvalid: false,
@@ -322,6 +324,87 @@ describe('admin-content: commit', () => {
             files: [{ path: 'images/single7-cover.jpg', blob: { sha: sha(5), size: 10, token: 'f'.repeat(64) } }]
         })
         expect((await forged.json()).details).toEqual(['подпись загрузки не совпадает: images/single7-cover.jpg'])
+    })
+})
+
+describe('admin-content: правка релиза и удаление заменённых файлов', () => {
+    const registry = () => JSON.parse(JSON.stringify(releasesJson))
+
+    async function stagedCover(path: string) {
+        staging.set(uuidName('jpg'), { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), created_at: new Date(now).toISOString() })
+        return (await call({ action: 'stage-blob', stagingPath: uuidName('jpg'), path })).json()
+    }
+
+    it('новая обложка под новым именем, старая удаляется в том же коммите', async () => {
+        const blob = await stagedCover('images/single6-cover-20261002.jpg')
+        const next = registry()
+        next.faaa.cover = 'images/single6-cover-20261002.jpg'
+        next.faaa.title = 'FAAA (remaster)'
+        const res = await call({
+            action: 'commit',
+            baseSha: BASE,
+            message: 'релиз «FAAA»: название, обложка',
+            files: [
+                { path: 'src/content/releases.json', content: JSON.stringify(next, null, 4) },
+                { path: 'images/single6-cover-20261002.jpg', blob: { sha: blob.sha, size: blob.size, token: blob.token } },
+                { path: 'images/single6-cover.jpg', delete: true }
+            ]
+        })
+        expect(res.status).toBe(200)
+        const tree = state.calls.find((c) => c.method === 'POST' && c.path.endsWith('/git/trees'))!.body.tree
+        expect(tree).toContainEqual({ path: 'images/single6-cover.jpg', mode: '100644', type: 'blob', sha: null })
+        expect(tree).toContainEqual({ path: 'images/single6-cover-20261002.jpg', mode: '100644', type: 'blob', sha: blob.sha })
+    })
+
+    it('убрать PDF и удалить файл', async () => {
+        const next = registry()
+        delete next.disinvolto.lyricsBookPath
+        const res = await call({
+            action: 'commit',
+            baseSha: BASE,
+            message: 'x',
+            files: [
+                { path: 'src/content/releases.json', content: JSON.stringify(next) },
+                { path: 'lyrics-books/disinvolto-lyrics.pdf', delete: true }
+            ]
+        })
+        expect(res.status).toBe(200)
+    })
+
+    it('удалить используемую обложку, mp3 или текст — нельзя', async () => {
+        const res = await call({
+            action: 'commit',
+            baseSha: BASE,
+            message: 'x',
+            files: [
+                { path: 'images/single6-cover.jpg', delete: true },
+                { path: 'audio/singles/faaa.mp3', delete: true },
+                { path: 'lyrics/singles/faaa.txt', delete: true }
+            ]
+        })
+        expect(res.status).toBe(422)
+        expect((await res.json()).details).toEqual([
+            'файл ещё используется, удалять нельзя: images/single6-cover.jpg',
+            'удалять можно только заменяемую обложку или PDF: audio/singles/faaa.mp3',
+            'удалять можно только заменяемую обложку или PDF: lyrics/singles/faaa.txt'
+        ])
+        expect(writes()).toHaveLength(0)
+    })
+
+    it('правка треков существующего релиза по-прежнему отклоняется', async () => {
+        const next = registry()
+        next.faaa.tracks[0].file = 'other.mp3'
+        const res = await call({ action: 'commit', baseSha: BASE, message: 'x', files: [{ path: 'src/content/releases.json', content: JSON.stringify(next) }] })
+        expect(res.status).toBe(422)
+        expect((await res.json()).details.join()).toContain('трек 1 нельзя менять')
+    })
+
+    it('id менять нельзя', async () => {
+        const next = registry()
+        next['faaa-renamed'] = next.faaa
+        delete next.faaa
+        const res = await call({ action: 'commit', baseSha: BASE, message: 'x', files: [{ path: 'src/content/releases.json', content: JSON.stringify(next) }] })
+        expect((await res.json()).details.join()).toContain('«faaa» нельзя удалить или переименовать')
     })
 })
 

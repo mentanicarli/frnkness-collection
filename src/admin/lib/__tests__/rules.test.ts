@@ -4,6 +4,7 @@ import {
     checkRegistryChange,
     validateNewRelease,
     validateSiteSettings,
+    checkDeletions,
     type Registry,
     type RegistryRelease
 } from '../../../../supabase/functions/_shared/rules.ts'
@@ -133,14 +134,79 @@ describe('checkRegistryChange — защита статистики', () => {
         expect(checkRegistryChange(current, added).join()).toContain('нельзя добавлять или удалять треки')
     })
 
-    it('запрещает менять поля трека и релиза', () => {
+    it('запрещает менять треки и служебные поля релиза', () => {
         const track = clone(current)
         track.faaa.tracks[0].title = 'FAAA!'
         expect(checkRegistryChange(current, track)).toHaveLength(1)
 
-        const release = clone(current)
-        release.faaa.cover = 'images/other.jpg'
-        expect(checkRegistryChange(current, release).join()).toContain('не редактируются')
+        for (const [key, value] of [
+            ['type', 'album'],
+            ['audioPath', 'audio/other/'],
+            ['lyricsPath', 'lyrics/other/'],
+            ['upcoming', true]
+        ] as const) {
+            const next = clone(current)
+            ;(next.faaa as unknown as Record<string, unknown>)[key] = value
+            expect(checkRegistryChange(current, next), key).toEqual([`релиз «faaa»: поле «${key}» менять нельзя`])
+        }
+    })
+
+    it('разрешает менять название, дату, обложку, видео и PDF существующего релиза', () => {
+        const next = clone(current)
+        Object.assign(next['zlaya-nostalgia'], {
+            title: 'Злая Ностальгия (Deluxe)',
+            releaseDate: '1 сентября 2026',
+            cover: 'images/album4-cover-20261002.jpg',
+            videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
+            lyricsBookPath: 'lyrics-books/album4-lyrics-20261002.pdf'
+        })
+        expect(checkRegistryChange(current, next)).toEqual([])
+
+        // Год меняется вместе с датой.
+        const moved = clone(current)
+        Object.assign(moved.faaa, { releaseDate: '3 января 2027', year: '2027' })
+        expect(checkRegistryChange(current, moved)).toEqual([])
+
+        // PDF и видео можно убрать.
+        const removed = clone(current)
+        delete removed.disinvolto.lyricsBookPath
+        delete removed.disinvolto.videoUrl
+        expect(checkRegistryChange(current, removed)).toEqual([])
+    })
+
+    it('проверяет значения редактируемых полей', () => {
+        const next = clone(current)
+        Object.assign(next.faaa, { title: ' ', releaseDate: '1 января 2030', cover: 'images/Обложка.jpg', videoUrl: 'https://evil.example/x' })
+        expect(checkRegistryChange(current, next)).toEqual([
+            'релиз «faaa»: пустое название',
+            'релиз «faaa»: год в дате не совпадает с полем year',
+            'релиз «faaa»: обложка должна лежать в images/ и называться латиницей',
+            'релиз «faaa»: ссылка на видео должна быть вида https://www.youtube.com/embed/<id>'
+        ])
+    })
+
+    it('старые имена файлов допустимы, если их не трогали', () => {
+        // У «Born to be Deluxe» папка аудио с пробелом — правка названия её не задевает.
+        const next = clone(current)
+        next['born-to-be-deluxe'].title = 'Born to be Deluxe!'
+        expect(checkRegistryChange(current, next)).toEqual([])
+    })
+
+    it('новая обложка не может занять файл другого релиза', () => {
+        const next = clone(current)
+        next.faaa.cover = 'images/album4-cover.jpg'
+        expect(checkRegistryChange(current, next)).toEqual(['релиз «faaa»: файл images/album4-cover.jpg уже занят релизом «zlaya-nostalgia»'])
+    })
+
+    it('id и треки по-прежнему защищены при правке остальных полей', () => {
+        const next: Registry = {}
+        for (const [id, r] of Object.entries(clone(current))) next[id === 'faaa' ? 'faaa-new' : id] = { ...r, title: r.title + '!' }
+        expect(checkRegistryChange(current, next).join()).toContain('«faaa» нельзя удалить или переименовать')
+
+        const reordered = clone(current)
+        reordered['zlaya-nostalgia'].title = 'Другое'
+        reordered['zlaya-nostalgia'].tracks.reverse()
+        expect(checkRegistryChange(current, reordered).join()).toContain('нельзя менять или переставлять')
     })
 
     it('не реагирует на порядок полей внутри объекта', () => {
@@ -231,6 +297,41 @@ describe('validateSiteSettings', () => {
         ])
         expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, extra: 1 }, current)).toEqual([
             'site.json: лишнее поле «extra»'
+        ])
+    })
+})
+
+describe('checkDeletions — удалять можно только заменяемое', () => {
+    const site = siteJson as unknown
+
+    it('старая обложка и PDF после замены — можно', () => {
+        const next = clone(current)
+        next['most-venture-poopsicks'].cover = 'images/album1-cover-20261002.jpg'
+        next['most-venture-poopsicks'].lyricsBookPath = 'lyrics-books/album1-lyrics-20261002.pdf'
+        expect(
+            checkDeletions(['images/album1-cover.jpg', 'lyrics-books/album1-lyrics.pdf'], { registry: current, site }, { registry: next, site })
+        ).toEqual([])
+    })
+
+    it('убранный PDF — можно', () => {
+        const next = clone(current)
+        delete next.disinvolto.lyricsBookPath
+        expect(checkDeletions(['lyrics-books/disinvolto-lyrics.pdf'], { registry: current, site }, { registry: next, site })).toEqual([])
+    })
+
+    it('обложку, которая ещё используется, — нельзя', () => {
+        expect(checkDeletions(['images/album1-cover.jpg'], { registry: current, site }, { registry: current, site })).toEqual([
+            'файл ещё используется, удалять нельзя: images/album1-cover.jpg'
+        ])
+    })
+
+    it('mp3, тексты и чужие файлы — нельзя', () => {
+        expect(
+            checkDeletions(['audio/album1/poopsicks.mp3', 'lyrics/album1/01-poopsicks.txt', 'images/unrelated.jpg'], { registry: current, site }, { registry: current, site })
+        ).toEqual([
+            'удалять можно только заменяемую обложку или PDF: audio/album1/poopsicks.mp3',
+            'удалять можно только заменяемую обложку или PDF: lyrics/album1/01-poopsicks.txt',
+            'удалять можно только заменяемую обложку или PDF: images/unrelated.jpg'
         ])
     })
 })

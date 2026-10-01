@@ -15,6 +15,7 @@
 import { corsHeaders, isAllowedOrigin } from '../_shared/cors.ts'
 import {
     checkPath,
+    checkDeletions,
     checkRegistryChange,
     validateSiteSettings,
     validateTrackNotes
@@ -63,6 +64,15 @@ class HttpError extends Error {
 }
 
 const SHA_RE = /^[0-9a-f]{40}$/
+
+/** Запись дерева коммита; sha: null — удалить файл. */
+interface TreeEntry {
+    path: string
+    mode: '100644'
+    type: 'blob'
+    sha?: string | null
+    content?: string
+}
 const STAGING_NAME_RE = /^[0-9a-f-]{36}\.(mp3|jpg|jpeg|png|pdf)$/
 const STAGING_TTL_MS = 24 * 60 * 60 * 1000
 const CLEANUP_INTERVAL_MS = 10 * 60 * 1000
@@ -267,8 +277,9 @@ export function createHandler(deps: HandlerDeps) {
 
         const errors: string[] = []
         const seen = new Set<string>()
-        const treeEntries: { path: string; mode: '100644'; type: 'blob'; sha?: string; content?: string }[] = []
+        const treeEntries: TreeEntry[] = []
         const textByPath = new Map<string, string>()
+        const deletes: string[] = []
 
         for (const raw of files as Record<string, unknown>[]) {
             const path = raw && raw.path
@@ -283,6 +294,11 @@ export function createHandler(deps: HandlerDeps) {
                 continue
             }
             seen.add(p)
+            if (raw.delete === true) {
+                // Что именно можно удалять, проверяется ниже по реестру.
+                deletes.push(p)
+                continue
+            }
             if (check.rule.kind === 'text') {
                 if (typeof raw.content !== 'string') {
                     errors.push(`нет содержимого: ${p}`)
@@ -339,10 +355,41 @@ export function createHandler(deps: HandlerDeps) {
             }
             errors.push(...validateSiteSettings(parseJson(textByPath.get(SITE)!, SITE), registry))
         }
+        if (deletes.length) {
+            // Удалять можно только заменяемую обложку/PDF, на которую новая
+            // версия реестра (или site.json) больше не ссылается.
+            const baseReleases = await readFile(RELEASES, baseSha)
+            const baseSite = await readFile(SITE, baseSha)
+            const before = {
+                registry: baseReleases === null ? {} : parseJson(baseReleases, RELEASES),
+                site: baseSite === null ? {} : parseJson(baseSite, SITE)
+            }
+            const after = {
+                registry: textByPath.has(RELEASES) ? parseJson(textByPath.get(RELEASES)!, RELEASES) : before.registry,
+                site: textByPath.has(SITE) ? parseJson(textByPath.get(SITE)!, SITE) : before.site
+            }
+            errors.push(...checkDeletions(deletes, before, after))
+        }
         if (errors.length) throw new HttpError(422, 'validation', 'Коммит отклонён', errors)
 
-        // Защита от конфликтов: коммит строится только поверх того, что
-        // видела админка. Если ветка ушла вперёд — ничего не перезаписываем.
+        // Удаляем только то, что действительно есть в базовой версии.
+        for (const p of deletes) {
+            if (await fileExists(p, baseSha)) treeEntries.push({ path: p, mode: '100644', type: 'blob', sha: null })
+        }
+
+        return writeCommit(baseSha, message, treeEntries)
+    }
+
+    async function fileExists(path: string, ref: string): Promise<boolean> {
+        const res = await gh(`${repoPath()}/contents/${encodePath(path)}?ref=${ref}`, { allow404: true })
+        return res.status !== 404
+    }
+
+    /**
+     * Один коммит поверх baseSha: дерево → коммит → перенос ветки без force.
+     * Если ветка ушла вперёд — 409, ничего не перезаписывается.
+     */
+    async function writeCommit(baseSha: string, message: string, treeEntries: TreeEntry[]) {
         const conflict = () => new HttpError(409, 'conflict', 'Данные на сайте изменились, пока ты редактировал. Обнови страницу и повтори правку.')
         if ((await headSha()) !== baseSha) throw conflict()
 

@@ -9,7 +9,7 @@
             <h3 class="adm-h2" style="margin: 1rem 0 0.25rem">Файлы ({{ flow.state.plan.files.length }})</h3>
             <ul class="adm-file-list" data-testid="commit-files">
                 <li v-for="f in flow.state.plan.files" :key="f.path">
-                    <span class="adm-file-kind" :class="f.kind">{{ f.kind === 'new' ? 'новый' : 'изменён' }}</span>
+                    <span class="adm-file-kind" :class="f.kind">{{ KIND_LABEL[f.kind] }}</span>
                     <b>{{ f.path }}</b><template v-if="f.size !== undefined"> · {{ formatSize(f.size) }}</template>
                 </li>
             </ul>
@@ -46,6 +46,8 @@ import { computed } from 'vue'
 import type { CommitFlow } from '../composables/useCommitFlow'
 
 const props = defineProps<{ flow: CommitFlow }>()
+
+const KIND_LABEL = { new: 'новый', changed: 'изменён', deleted: 'удалён' } as const
 
 const fullMessage = computed(() => {
     const m = props.flow.state.plan?.message ?? ''

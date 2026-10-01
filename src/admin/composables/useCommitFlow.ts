@@ -10,7 +10,7 @@ import { usePublish } from './usePublish'
  */
 export interface PlannedFile {
     path: string
-    kind: 'new' | 'changed'
+    kind: 'new' | 'changed' | 'deleted'
     /** Размер в байтах (для медиафайлов). */
     size?: number
 }
