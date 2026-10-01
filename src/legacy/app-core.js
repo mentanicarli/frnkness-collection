@@ -249,6 +249,27 @@ export function initLegacyApp(deps = {}) {
         }
     })
 
+    // ── Экран блокировки (Media Session) ───────────────────────────────
+
+    // Кнопки на экране блокировки, в шторке и на наушниках делают то же, что
+    // кнопки плеера: «следующий» в Потоке — случайный трек.
+    function setupLockScreenControls() {
+        if (typeof utils.setupMediaSession !== 'function' || !dom.audio) return
+        utils.setupMediaSession({
+            audio: dom.audio,
+            getNowPlaying: () => {
+                const release = state.currentRelease
+                const track = release && release.tracks[state.currentTrackIndex]
+                return track ? { title: track.title, album: release.title, cover: release.cover } : null
+            },
+            play: () => { if (dom.audio.paused) modules.player.togglePlay() },
+            pause: () => { if (!dom.audio.paused) modules.player.togglePlay() },
+            next: () => modules.player.nextTrack(),
+            prev: () => modules.player.prevTrack(),
+            seek: time => { dom.audio.currentTime = time }
+        })
+    }
+
     // ── Init ───────────────────────────────────────────────────────────
 
     function init() {
@@ -264,6 +285,7 @@ export function initLegacyApp(deps = {}) {
         modules.ui.initStaggerAnimation()
         modules.player.setupAudioEvents()
         modules.player.setupVolumeControls()
+        setupLockScreenControls()
 
         // Прогрев первых обложек через requestIdleCallback.
         modules.player.runWhenIdle(() => {

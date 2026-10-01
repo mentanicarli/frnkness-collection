@@ -13,6 +13,7 @@ import { createMatcher, normalizeForSearch } from './utils/search'
 import { fetchTextFile } from './utils/textFiles'
 import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
 import { renderPromoCardHtml } from './utils/promoCard'
+import { setupMediaSession } from './runtime/mediaSession'
 
 const app = createApp(App)
 app.mount('#app')
@@ -66,6 +67,7 @@ const legacyDeps = {
         renderAboutHtml,
         renderLyricsHtml,
         renderPromoCardHtml,
+        setupMediaSession,
         throttle
     }
 }
