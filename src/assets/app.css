@@ -177,6 +177,8 @@ header .text-lg { font-family: 'Unbounded'; font-weight: 700; font-size: 1rem; l
   max-height: 70vh; overflow: auto; padding: 0.75rem var(--frame) 1.125rem;
   border-top: 1px solid var(--line); box-shadow: var(--shadow-pop);
 }
+/* Пустой запрос — пустой контейнер: никакой тёмной панели под полем. */
+.header-search-panel.open .header-search-results:empty { padding: 0; border-top: 0; box-shadow: none; }
 .search-backdrop { display: none !important; }
 
 /* Pages */
@@ -286,14 +288,6 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 .lyrics-action-btn { display: inline-flex; align-items: center; gap: 0.4375rem; border: 1px solid var(--line-2); border-radius: var(--r-xs); height: 2rem; padding: 0 0.75rem; font-family: 'Golos Text'; font-weight: 600; font-size: 0.75rem; color: var(--fg-muted); background: transparent; transition: opacity var(--fast), color var(--fast), border-color var(--fast); }
 .lyrics-action-btn:hover { color: var(--fg); border-color: var(--fg-muted); }
 .track-row.playing .lyrics-action-btn { opacity: 1 !important; }
-
-/* Lyrics side panel (мини) — только текст */
-.lyrics-panel { background: var(--bg-1); border-left: 1px solid var(--line-2); box-shadow: var(--shadow-pop); transform: translateX(100%); transition: transform var(--med) var(--ease); }
-.lyrics-panel.open { transform: none; }
-.lyrics-panel h4 { font-family: 'Unbounded'; font-weight: 600; }
-#lyrics-content p { color: var(--fg-muted); margin-bottom: 0.625rem; font-size: 1rem; }
-#lyrics-content .lrc-line { color: var(--fg-muted); }
-#lyrics-mode-switch { display: none !important; }
 
 /* Fullscreen player */
 .fullscreen-player { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--fs-bg); color: var(--fs-on); opacity: 0; visibility: hidden; transform: scale(1.008); transition: opacity var(--med) var(--ease), transform var(--med) var(--ease), visibility var(--med), background 0.5s var(--ease); }
@@ -457,6 +451,12 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 .lyric-line.has-note:hover { background: var(--page-accent-glow); }
 .lyric-line.has-note:focus-visible { outline: 0.125rem solid var(--page-accent); outline-offset: 0.125rem; }
 .lyric-line.has-note.open { background: var(--page-accent-glow); }
+/* Строка, к которой перешли из поиска: подсветка на пару секунд. */
+.lyric-line.lyric-line-found { animation: lyricFound 2.4s var(--ease); }
+@keyframes lyricFound {
+  0%, 60% { background: var(--page-accent-glow); box-shadow: inset 0.125rem 0 0 var(--page-accent); }
+  100% { background: transparent; box-shadow: inset 0.125rem 0 0 transparent; }
+}
 
 .lyric-note {
   margin: 0.625rem 0 0.875rem; padding: 0.875rem 1rem;
@@ -558,11 +558,6 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
   #player .play-btn, #player .close-player-btn { width: 2.75rem; height: 2.75rem; padding: 0; display: flex; align-items: center; justify-content: center; }
   /* prev есть в полноэкранном плеере; правило после .play-btn, иначе flex его перебьёт */
   #player .player-prev-btn { display: none; }
-
-  /* ── Боковая панель текста: ниже статус-бара, крестик 2.75rem ── */
-  .lyrics-panel > div:first-child { padding: calc(1rem + var(--safe-top)) 0.75rem 1rem 1.25rem; gap: 0.75rem; }
-  .lyrics-panel > div:first-child > button { width: 2.75rem; height: 2.75rem; flex-shrink: 0; }
-  #lyrics-content { padding: 1.25rem 1.25rem calc(1.5rem + var(--safe-bottom)); }
 
   /* ── Полноэкранный плеер: строго по центру, без выхода за экран ── */
   .fs-header-buttons { top: calc(0.75rem + var(--safe-top)); right: 1rem; }

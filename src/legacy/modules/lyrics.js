@@ -2,8 +2,8 @@ export function createLyricsModule(ctx) {
     const { dom, state, utils } = ctx
     const { buildAssetUrl, parseLRC } = utils
 
-    // Синхротекст трека. Используется индексом поиска, которому нужен только .lrc,
-    // поэтому обычный .txt здесь не запрашивается.
+    // Синхротекст трека. Используется запасным путём индекса поиска (когда нет
+    // собранного lyrics-index.json); .txt для треков без караоке поиск берёт сам.
     async function fetchTrackLrc(release, track) {
         const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
         try {
@@ -38,48 +38,78 @@ export function createLyricsModule(ctx) {
 
         if (newIndex !== state.currentLyricIndex) {
             state.currentLyricIndex = newIndex
-            const container = dom.fsLyricsBody
-            const lines = state.lyricsNodes.fullscreen
-            if (container && lines.length) {
-                lines.forEach((el, i) => {
-                    el.classList.remove('active', 'd1', 'd2', 'd3')
-                    const d = Math.abs(i - newIndex)
-                    if (d === 0) el.classList.add('active')
-                    else if (d === 1) el.classList.add('d1')
-                    else if (d === 2) el.classList.add('d2')
-                    else if (d === 3) el.classList.add('d3')
-                })
-                const active = lines[newIndex]
-                if (active && !state.karaokeJustOpened) {
-                    requestAnimationFrame(() => {
-                        if (!container.clientHeight) return
-                        const targetTop = active.offsetTop - container.clientHeight / 2 + active.clientHeight / 2
-                        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
-                        const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
-                        if (Math.abs(container.scrollTop - clampedTop) > 8) {
-                            container.scrollTo({ top: clampedTop, behavior: 'smooth' })
-                        }
-                    })
-                }
-            }
+            markActiveLine(newIndex)
+            if (!state.karaokeJustOpened) requestAnimationFrame(() => scrollToLine(newIndex, 'smooth'))
         }
 
         if (state.karaokeHardStart && currentTime > 1.2) state.karaokeHardStart = false
     }
 
+    function markActiveLine(index) {
+        state.lyricsNodes.fullscreen.forEach((el, i) => {
+            el.classList.remove('active', 'd1', 'd2', 'd3')
+            const d = Math.abs(i - index)
+            if (d === 0) el.classList.add('active')
+            else if (d === 1) el.classList.add('d1')
+            else if (d === 2) el.classList.add('d2')
+            else if (d === 3) el.classList.add('d3')
+        })
+    }
+
+    function scrollToLine(index, behavior) {
+        const container = dom.fsLyricsBody
+        const active = state.lyricsNodes.fullscreen[index]
+        if (!container || !active || !container.clientHeight) return
+        const targetTop = active.offsetTop - container.clientHeight / 2 + active.clientHeight / 2
+        const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
+        const clampedTop = Math.max(0, Math.min(targetTop, maxTop))
+        if (Math.abs(container.scrollTop - clampedTop) > 8) {
+            container.scrollTo({ top: clampedTop, behavior })
+        }
+    }
+
+    function lineIndexAt(time) {
+        for (let i = state.parsedLyrics.length - 1; i >= 0; i--) {
+            if (time >= state.parsedLyrics[i].time) return i
+        }
+        return 0
+    }
+
+    // Переход из поиска к строке караоке: дожидаемся текста трека и его
+    // метаданных (к этому моменту seekTo уже перемотал), подсвечиваем строку
+    // и сразу, без плавной прокрутки, ставим её по центру.
+    async function revealKaraokeAt(time) {
+        const session = state.playSession
+        await loadPromise
+        if (dom.audio.readyState < 1) {
+            await new Promise(resolve => {
+                dom.audio.addEventListener('loadedmetadata', resolve, { once: true })
+                setTimeout(resolve, 8000)
+            })
+        }
+        if (state.playSession !== session || !state.parsedLyrics.length) return
+        state.karaokeHardStart = false
+        state.karaokeJustOpened = false
+        ctx.modules.fullscreen.syncFsPlayerModeState()
+        const index = lineIndexAt(time)
+        state.currentLyricIndex = index
+        markActiveLine(index)
+        requestAnimationFrame(() => scrollToLine(index, 'auto'))
+    }
+
     function updateLyricsModeControls(hasKaraoke) {
-        ;[dom.lyricsModeSwitch, dom.fsLyricsModeSwitch].forEach(el => {
+        ;[dom.fsLyricsModeSwitch].forEach(el => {
             if (!el) return
             el.classList.toggle('hidden', !hasKaraoke)
             el.classList.toggle('flex', hasKaraoke)
         })
-        ;[dom.lyricsModeText, dom.fsLyricsModeText].forEach(btn => {
+        ;[dom.fsLyricsModeText].forEach(btn => {
             if (!btn) return
             btn.classList.toggle('bg-white/10', state.lyricsMode === 'text')
             btn.classList.toggle('text-[var(--fg)]', state.lyricsMode === 'text')
             btn.classList.toggle('text-[var(--fg-muted)]', state.lyricsMode !== 'text')
         })
-        ;[dom.lyricsModeKaraoke, dom.fsLyricsModeKaraoke].forEach(btn => {
+        ;[dom.fsLyricsModeKaraoke].forEach(btn => {
             if (!btn) return
             btn.classList.toggle('bg-white/10', state.lyricsMode === 'karaoke')
             btn.classList.toggle('text-[var(--fg)]', state.lyricsMode === 'karaoke')
@@ -98,8 +128,6 @@ export function createLyricsModule(ctx) {
             return `<p class="${cls}">${line}</p>`
         }).join('')
 
-        // Мини-панель: ВСЕГДА обычный текст
-        if (dom.lyricsContent) dom.lyricsContent.innerHTML = plainHtml
         state.lyricsNodes.regular = []
 
         // Полноэкранный: караоке, если есть синхротекст, иначе обычный текст
@@ -151,7 +179,15 @@ export function createLyricsModule(ctx) {
         return /<!doctype html|<html|<head|<link|<body/i.test(text || '')
     }
 
-    async function loadLyrics(index) {
+    // Промис последней загрузки текста: revealKaraokeAt ждёт именно его.
+    let loadPromise = Promise.resolve()
+
+    function loadLyrics(index) {
+        loadPromise = fetchAndRenderLyrics(index).catch(() => {})
+        return loadPromise
+    }
+
+    async function fetchAndRenderLyrics(index) {
         if (!state.currentRelease) return
         const track = state.currentRelease.tracks[index]
         if (!track) return
@@ -180,8 +216,6 @@ export function createLyricsModule(ctx) {
             }
         } catch { }
 
-        const lyricsTrackTitle = document.getElementById('lyrics-track-title')
-        if (lyricsTrackTitle) lyricsTrackTitle.textContent = track.title
         const fsCoverTitle = document.getElementById('fs-cover-title')
         if (fsCoverTitle) fsCoverTitle.textContent = track.title
 
@@ -195,18 +229,5 @@ export function createLyricsModule(ctx) {
         renderLyricsByMode()
     }
 
-    function showLyrics(index) {
-        loadLyrics(index)
-        if (dom.lyricsPanel) dom.lyricsPanel.classList.add('open')
-    }
-
-    function closeLyrics() {
-        if (dom.lyricsPanel) dom.lyricsPanel.classList.remove('open')
-    }
-
-    function toggleLyrics() {
-        if (dom.lyricsPanel) dom.lyricsPanel.classList.toggle('open')
-    }
-
-    return { fetchTrackLrc, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, showLyrics, closeLyrics, toggleLyrics }
+    return { fetchTrackLrc, updateKaraoke, renderLyricsByMode, setLyricsMode, loadLyrics, revealKaraokeAt }
 }

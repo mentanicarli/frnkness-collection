@@ -1,6 +1,10 @@
 export function createSearchModule(ctx) {
     const { dom, state, perf, releases, utils, LYRICS_INDEX_URL } = ctx
-    const { parseLRC, normalizeSearchText, escapeHtml, debounce } = utils
+    const { parseLRC, escapeHtml, debounce, createMatcher, normalizeForSearch } = utils
+
+    // Последняя выдача: по индексу из onclick достаём строку текста целиком,
+    // не протаскивая её через inline-обработчик.
+    let lastResults = []
 
     function toggleSearchPanel(forceState = null) {
         if (!dom.searchPanel) return
@@ -23,9 +27,12 @@ export function createSearchModule(ctx) {
 
     function renderSearchResults(results, query) {
         if (!dom.searchResults) return
-        const normalized = normalizeSearchText(query)
+        const normalized = normalizeForSearch(query)
+        lastResults = normalized ? results : []
+        // Пустой запрос — пустой контейнер: без подсказки и без тёмной
+        // панели (её отступы, рамку и тень скрывает CSS по :empty).
         if (!normalized) {
-            dom.searchResults.innerHTML = '<p class="text-sm text-[var(--fg-faint)] font-mono py-2">Введите запрос — релизы, треки и строки из текстов.</p>'
+            dom.searchResults.innerHTML = ''
             return
         }
         if (!results.length) {
@@ -33,13 +40,13 @@ export function createSearchModule(ctx) {
             return
         }
         const labels = { release: 'Релиз', track: 'Трек', lyric: 'Строка' }
-        const html = results.map(item => {
+        const html = results.map((item, index) => {
             const badge = labels[item.type] || 'Результат'
             const line = item.line ? `<p class="text-xs text-[var(--fg-muted)] mt-1 line-clamp-2 italic">${escapeHtml(item.line)}</p>` : ''
             const trackTitle = item.trackTitle ? `<p class="text-xs text-[var(--fg-muted)] mt-1">${escapeHtml(item.trackTitle)}</p>` : ''
             return `
                 <button class="w-full text-left rounded-md hover:bg-[var(--bg-2)] transition-colors p-3 mb-0.5 flex items-center justify-between gap-4"
-                    onclick="App.openSearchResult('${item.type}', '${item.releaseId}', ${item.trackIndex ?? -1}, ${item.time ?? -1})">
+                    onclick="App.openSearchResult('${item.type}', '${item.releaseId}', ${item.trackIndex ?? -1}, ${item.time ?? -1}, ${index})">
                     <div class="min-w-0">
                         <p class="text-sm font-semibold text-[var(--fg)] truncate">${escapeHtml(item.title)}</p>
                         ${trackTitle}
@@ -57,16 +64,47 @@ export function createSearchModule(ctx) {
         return release.lyricsPath + base + '.lrc'
     }
 
-    function collectLines(entries, releaseId, release, trackIndex, track, lrc) {
+    function txtKey(release, track) {
+        return release.lyricsPath + track.lyricsFile
+    }
+
+    function pushLine(entries, releaseId, release, trackIndex, track, line, time) {
+        entries.push({
+            releaseId, releaseTitle: release.title, trackIndex,
+            trackTitle: track.title, line,
+            normalized: normalizeForSearch(line), time
+        })
+    }
+
+    // Строки из .lrc — со временем: клик по ним открывает караоке.
+    function collectLrcLines(entries, releaseId, release, trackIndex, track, lrc) {
         parseLRC(lrc).forEach(item => {
             const clean = (item.text || '').trim()
-            if (!clean) return
-            entries.push({
-                releaseId, releaseTitle: release.title, trackIndex,
-                trackTitle: track.title, line: clean,
-                normalized: normalizeSearchText(clean), time: item.time
-            })
+            if (clean) pushLine(entries, releaseId, release, trackIndex, track, clean, item.time)
         })
+    }
+
+    // Строки из .txt (трек без караоке) — без времени: клик ведёт на страницу
+    // трека. Пустые строки и метки вида [Припев] не ищутся.
+    function collectTxtLines(entries, releaseId, release, trackIndex, track, txt) {
+        String(txt).split('\n').forEach(raw => {
+            const clean = raw.trim()
+            if (!clean || /^\[.+\]$/.test(clean)) return
+            pushLine(entries, releaseId, release, trackIndex, track, clean, -1)
+        })
+    }
+
+    // Запасной путь без собранного индекса: .lrc, а если его нет — .txt.
+    async function fetchTrackTxt(release, track) {
+        try {
+            const res = await fetch(release.lyricsPath + track.lyricsFile)
+            if (!res.ok) return ''
+            const text = await res.text()
+            const type = (res.headers.get('content-type') || '').toLowerCase()
+            return type.includes('text/html') || /<!doctype html|<html/i.test(text) ? '' : text
+        } catch {
+            return ''
+        }
     }
 
     // Индекс, собранный на этапе сборки: один файл вместо запроса на трек.
@@ -96,13 +134,19 @@ export function createSearchModule(ctx) {
                 release.tracks.forEach((track, trackIndex) => {
                     if (prebuilt) {
                         const lrc = prebuilt[lrcKey(release, track)]
-                        if (lrc) collectLines(entries, releaseId, release, trackIndex, track, lrc)
+                        const txt = prebuilt[txtKey(release, track)]
+                        if (lrc) collectLrcLines(entries, releaseId, release, trackIndex, track, lrc)
+                        else if (txt) collectTxtLines(entries, releaseId, release, trackIndex, track, txt)
                         return
                     }
                     tasks.push(async () => {
                         const lrc = await ctx.modules.lyrics.fetchTrackLrc(release, track)
-                        if (!lrc) return
-                        collectLines(entries, releaseId, release, trackIndex, track, lrc)
+                        if (lrc) {
+                            collectLrcLines(entries, releaseId, release, trackIndex, track, lrc)
+                            return
+                        }
+                        const txt = await fetchTrackTxt(release, track)
+                        if (txt) collectTxtLines(entries, releaseId, release, trackIndex, track, txt)
                     })
                 })
             })
@@ -126,39 +170,47 @@ export function createSearchModule(ctx) {
         try { await state.lyricsIndexPromise } finally { state.lyricsIndexPromise = null }
     }
 
+    // Совпадение только с начала слова (см. utils/search.ts). Сначала
+    // результаты, где слово совпало целиком, потом — по началу слова;
+    // внутри одного ранга порядок прежний: релизы, треки, строки.
     function searchCatalog(query) {
-        const normalized = normalizeSearchText(query)
+        const normalized = normalizeForSearch(query)
         if (!normalized) return []
 
         const cacheKey = `${normalized}|${state.lyricsIndexReady ? 1 : 0}|${state.lyricsIndex.length}`
         const cached = perf.searchCache.get(cacheKey)
         if (cached) return cached
 
+        const match = createMatcher(normalized)
         const results = []
 
         Object.entries(releases).forEach(([releaseId, release]) => {
-            if (normalizeSearchText(release.title).includes(normalized)) {
-                results.push({ type: 'release', releaseId, title: release.title, trackIndex: -1, line: '', time: -1 })
+            const releaseRank = match(release.title)
+            if (releaseRank) {
+                results.push({ type: 'release', releaseId, title: release.title, trackIndex: -1, line: '', time: -1, rank: releaseRank })
             }
             release.tracks.forEach((track, trackIndex) => {
-                if (normalizeSearchText(track.title).includes(normalized)) {
-                    results.push({ type: 'track', releaseId, title: release.title, trackTitle: track.title, trackIndex, line: '', time: -1 })
+                const trackRank = match(track.title)
+                if (trackRank) {
+                    results.push({ type: 'track', releaseId, title: release.title, trackTitle: track.title, trackIndex, line: '', time: -1, rank: trackRank })
                 }
             })
         })
 
         if (state.lyricsIndexReady) {
             const seenLyricKeys = new Set()
-            state.lyricsIndex
-                .filter(item => item.normalized.includes(normalized))
-                .forEach(item => {
-                    const dedupeKey = `${item.releaseId}|${item.trackIndex}|${item.normalized}`
-                    if (seenLyricKeys.has(dedupeKey)) return
-                    seenLyricKeys.add(dedupeKey)
-                    results.push({ type: 'lyric', releaseId: item.releaseId, title: item.releaseTitle, trackTitle: item.trackTitle, trackIndex: item.trackIndex, line: item.line, time: item.time })
-                })
+            state.lyricsIndex.forEach(item => {
+                const rank = match(item.normalized)
+                if (!rank) return
+                const dedupeKey = `${item.releaseId}|${item.trackIndex}|${item.normalized}`
+                if (seenLyricKeys.has(dedupeKey)) return
+                seenLyricKeys.add(dedupeKey)
+                results.push({ type: 'lyric', releaseId: item.releaseId, title: item.releaseTitle, trackTitle: item.trackTitle, trackIndex: item.trackIndex, line: item.line, time: item.time, rank })
+            })
         }
 
+        // sort стабильный: внутри ранга сохраняется исходный порядок.
+        results.sort((a, b) => b.rank - a.rank)
         const output = results.slice(0, 28)
         perf.searchCache.set(cacheKey, output)
         if (perf.searchCache.size > 45) perf.searchCache.delete(perf.searchCache.keys().next().value)
@@ -166,14 +218,14 @@ export function createSearchModule(ctx) {
     }
 
     function handleSearchInput(value) {
-        const query = normalizeSearchText(value)
+        const query = normalizeForSearch(value)
         const baseResults = searchCatalog(query)
         renderSearchResults(baseResults, query)
         if (!query || state.lyricsIndexReady || state.lyricsIndexPromise) return
         ensureLyricsIndex().then(() => {
             perf.searchCache.clear()
             if (!dom.searchInput) return
-            const freshQuery = normalizeSearchText(dom.searchInput.value)
+            const freshQuery = normalizeForSearch(dom.searchInput.value)
             if (!freshQuery) return
             renderSearchResults(searchCatalog(freshQuery), freshQuery)
         })
@@ -194,18 +246,35 @@ export function createSearchModule(ctx) {
         renderSearchResults([], '')
     }
 
-    function openSearchResult(type, releaseId, trackIndex, time = -1) {
-        if (!releases[releaseId]) return
+    function openSearchResult(type, releaseId, trackIndex, time = -1, resultIndex = -1) {
+        const release = releases[releaseId]
+        if (!release) return
+        // Строку берём до закрытия панели: toggleSearchPanel очищает выдачу.
+        const result = lastResults[resultIndex]
+        const line = result && result.releaseId === releaseId && result.trackIndex === trackIndex ? result.line : ''
         toggleSearchPanel(false)
+
+        if (type === 'lyric' && trackIndex >= 0 && release.tracks[trackIndex]) {
+            if (Number.isFinite(time) && time >= 0) {
+                // Есть .lrc: трек с этой строки, полноэкранный плеер в караоке.
+                ctx.modules.router.goRelease(releaseId)
+                ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
+                ctx.modules.player.seekTo(time)
+                ctx.modules.lyrics.revealKaraokeAt(time)
+                ctx.modules.fullscreen.openFsLyrics()
+            } else {
+                // Нет .lrc: страница трека, прокрутка к строке, трек не запускаем.
+                ctx.modules.router.goTrack(releaseId, trackIndex)
+                if (line) ctx.modules.track.focusLyricLine(releaseId, trackIndex, line)
+            }
+            return
+        }
+
         ctx.modules.router.goRelease(releaseId)
         if (type === 'release' || trackIndex < 0) return
         // Трек запускаем явно по (релиз, индекс): на отрисовку страницы
         // релиза не рассчитываем — она плеер не трогает.
         ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
-        if (type === 'lyric') {
-            ctx.modules.lyrics.showLyrics(trackIndex)
-            if (Number.isFinite(time) && time >= 0) ctx.modules.player.seekTo(time)
-        }
     }
 
     return { toggleSearchPanel, renderSearchResults, ensureLyricsIndex, searchCatalog, handleSearchInput, initGlobalSearch, openSearchResult }

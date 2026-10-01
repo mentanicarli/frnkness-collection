@@ -66,10 +66,8 @@ export function initLegacyApp(deps = {}) {
         dom.progress = $('progress-bar')
         dom.iconPlay = $('icon-play')
         dom.iconPause = $('icon-pause')
-        dom.lyricsPanel = $('lyrics-panel')
         dom.downloadContainer = $('download-container')
         dom.downloadBtn = $('download-lyrics-btn')
-        dom.lyricsContent = $('lyrics-content')
         dom.videoContainer = $('video-container')
         dom.videoIframe = $('video-iframe')
         dom.volumeSlider = $('volume-slider')
@@ -115,9 +113,6 @@ export function initLegacyApp(deps = {}) {
         dom.albumsSection = dom.albumsGrid ? dom.albumsGrid.closest('section') : null
         dom.singlesSection = dom.singlesGrid ? dom.singlesGrid.closest('section') : null
         dom.trackPage = $('page-track')
-        dom.lyricsModeSwitch = $('lyrics-mode-switch')
-        dom.lyricsModeText = $('lyrics-mode-text')
-        dom.lyricsModeKaraoke = $('lyrics-mode-karaoke')
         dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch')
         dom.fsLyricsModeText = $('fs-lyrics-mode-text')
         dom.fsLyricsModeKaraoke = $('fs-lyrics-mode-karaoke')
@@ -215,15 +210,12 @@ export function initLegacyApp(deps = {}) {
         playTrackFromPage: (r, i) => modules.track.playTrackFromPage(r, i),
         copyTrackLink: btn => modules.track.copyTrackLink(btn),
         handleTrackClick: (i, src) => modules.player.handleTrackClick(i, src),
-        showLyrics: i => modules.lyrics.showLyrics(i),
         setLyricsMode: m => modules.lyrics.setLyricsMode(m),
         toggleFlowMode: () => modules.player.toggleFlowMode(),
         startFlowMode: () => modules.player.startFlowMode(),
         stopFlowMode: () => modules.player.stopFlowMode(),
         openFsPlayer: () => modules.fullscreen.openFsPlayer(),
         closeFsPlayer: () => modules.fullscreen.closeFsPlayer(),
-        closeLyrics: () => modules.lyrics.closeLyrics(),
-        toggleLyrics: () => modules.lyrics.toggleLyrics(),
         toggleFsLyrics: () => modules.fullscreen.toggleFsLyrics(),
         togglePlay: () => modules.player.togglePlay(),
         prevTrack: () => modules.player.prevTrack(),
@@ -237,7 +229,7 @@ export function initLegacyApp(deps = {}) {
             else modules.ui.showPage(n)
         },
         playChart: (r, i) => modules.chart.playChart(r, i),
-        openSearchResult: (t, r, i, time) => modules.search.openSearchResult(t, r, i, time),
+        openSearchResult: (t, r, i, time, n) => modules.search.openSearchResult(t, r, i, time, n),
         toggleSearchPanel: s => modules.search.toggleSearchPanel(s),
         toggleMute: () => modules.player.toggleMute(),
         closeMiniPlayer: () => modules.player.closeMiniPlayer()
@@ -249,7 +241,6 @@ export function initLegacyApp(deps = {}) {
         if (e.key === 'Escape') {
             if (dom.fsPlayer && dom.fsPlayer.classList.contains('open')) modules.fullscreen.closeFsPlayer()
             else if (dom.searchPanel && dom.searchPanel.classList.contains('open')) modules.search.toggleSearchPanel(false)
-            else modules.lyrics.closeLyrics()
         }
         const activeTag = document.activeElement ? document.activeElement.tagName : ''
         if (e.key === ' ' && !['BUTTON', 'INPUT', 'TEXTAREA'].includes(activeTag)) {

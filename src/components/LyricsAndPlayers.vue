@@ -1,27 +1,4 @@
 <template>
-  <!-- Мини-панель текста: ТОЛЬКО обычный текст -->
-  <div id="lyrics-panel" class="lyrics-panel fixed top-0 right-0 w-full sm:w-[25rem] h-full z-50 overflow-hidden flex flex-col">
-    <div class="p-6 border-b border-white/5 flex items-center justify-between flex-shrink-0">
-      <div>
-        <h4 id="lyrics-track-title" class="font-semibold text-lg"></h4>
-        <p class="text-sm text-[var(--fg-muted)]">frnk ness</p>
-      </div>
-      <!-- переключатель режимов скрыт: караоке доступно только в полноэкранном -->
-      <div id="lyrics-mode-switch" class="hidden">
-        <button @click="setLyricsModeText" id="lyrics-mode-text">Текст</button>
-        <button @click="setLyricsModeKaraoke" id="lyrics-mode-karaoke">Караоке</button>
-      </div>
-      <button @click="closeLyrics" class="flex items-center justify-center w-9 h-9 bg-white/5 hover:bg-white/10 rounded-md text-sm transition-colors" aria-label="Закрыть текст">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-    <div id="lyrics-content" class="flex-1 overflow-y-auto p-6 text-base leading-loose text-[var(--fg-muted)]">
-      <p class="italic">Текст загружается...</p>
-    </div>
-  </div>
-
   <!-- Полноэкранный плеер: по умолчанию обложка, караоке по кнопке -->
   <div id="fullscreen-player" class="fullscreen-player">
     <div id="fs-bg" class="fullscreen-bg"></div>
@@ -180,7 +157,6 @@ import { legacyBridge } from '@/runtime/legacyBridge'
 
 const setLyricsModeText = () => legacyBridge.setLyricsMode('text')
 const setLyricsModeKaraoke = () => legacyBridge.setLyricsMode('karaoke')
-const closeLyrics = () => legacyBridge.closeLyrics()
 const toggleFsLyrics = () => legacyBridge.toggleFsLyrics()
 const closeFsPlayer = () => legacyBridge.closeFsPlayer()
 const seekTrackFs = (event: MouseEvent) => legacyBridge.seekTrackFs(event)

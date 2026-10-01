@@ -7,9 +7,10 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 import fs from 'fs'
 
-// Склеивает все .lrc в один JSON, чтобы поиску по строкам текстов не
-// приходилось делать отдельный запрос на каждый трек. Файл отдаётся и в
-// dev через middleware, поэтому обе среды идут по одному и тому же пути.
+// Склеивает тексты в один JSON, чтобы поиску по строкам не приходилось
+// делать отдельный запрос на каждый трек: .lrc (строки со временем), а для
+// треков без караоке — обычный .txt. Файл отдаётся и в dev через
+// middleware, поэтому обе среды идут по одному и тому же пути.
 const LYRICS_INDEX_FILE = 'lyrics-index.json'
 const TRACK_NOTES_FILE = 'track-notes.json'
 
@@ -19,11 +20,18 @@ function buildLyricsIndex() {
     const walk = (dir: string) => {
         for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
             const full = path.join(dir, entry.name)
-            if (entry.isDirectory()) walk(full)
-            else if (entry.name.toLowerCase().endsWith('.lrc')) {
-                const rel = path.relative(__dirname, full).split(path.sep).join('/')
-                index[rel] = fs.readFileSync(full, 'utf-8')
+            if (entry.isDirectory()) {
+                walk(full)
+                continue
             }
+            const name = entry.name.toLowerCase()
+            const isLrc = name.endsWith('.lrc')
+            // .txt берём, только если у трека нет .lrc: иначе строки задвоятся,
+            // а у строк из .lrc есть время для перехода в караоке.
+            const isTxtWithoutLrc = name.endsWith('.txt') && !fs.existsSync(full.replace(/\.txt$/i, '.lrc'))
+            if (!isLrc && !isTxtWithoutLrc) continue
+            const rel = path.relative(__dirname, full).split(path.sep).join('/')
+            index[rel] = fs.readFileSync(full, 'utf-8')
         }
     }
     if (fs.existsSync(root)) walk(root)

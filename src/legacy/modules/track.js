@@ -4,7 +4,7 @@
  */
 export function createTrackModule(ctx) {
     const { dom, state, releases, utils, TRACK_NOTES_URL } = ctx
-    const { buildAssetUrl, escapeHtml, getTrackSlug, buildNoteMap, renderLyricsHtml, renderAboutHtml } = utils
+    const { buildAssetUrl, escapeHtml, getTrackSlug, buildNoteMap, renderLyricsHtml, renderAboutHtml, normalizeForSearch } = utils
     // Сопоставление разборов со строками живёт в src/utils/trackNotes.ts:
     // тем же кодом рендерит предпросмотр админка.
 
@@ -91,6 +91,33 @@ export function createTrackModule(ctx) {
         })
     }
 
+    // Переход из поиска к строке текста: страница трека дорисовывается
+    // асинхронно, поэтому запрос ждёт, пока текст этого трека появится на экране.
+    let pendingLineFocus = null
+    let renderedLyricsKey = null
+
+    function focusLyricLine(releaseId, trackIndex, line) {
+        pendingLineFocus = { key: `${releaseId}:${trackIndex}`, line }
+        applyPendingLineFocus()
+    }
+
+    function applyPendingLineFocus() {
+        const request = pendingLineFocus
+        const page = dom.trackPage
+        if (!request || !page || request.key !== renderedLyricsKey || !page.classList.contains('active')) return
+        pendingLineFocus = null
+        const target = normalizeForSearch(request.line)
+        const lines = page.querySelectorAll('.track-lyrics-body .lyric-line:not(.is-blank)')
+        const found = Array.from(lines).find(el => normalizeForSearch(el.textContent) === target)
+        if (!found) return
+        found.scrollIntoView({ block: 'center' })
+        // Перезапуск анимации, если строку уже подсвечивали.
+        found.classList.remove('lyric-line-found')
+        void found.offsetWidth
+        found.classList.add('lyric-line-found')
+        setTimeout(() => found.classList.remove('lyric-line-found'), 2600)
+    }
+
     // Токен последней отрисовки: асинхронные куски (текст, разборы, счётчик)
     // применяются только если пользователь ещё не ушёл на другой трек.
     let renderToken = 0
@@ -102,6 +129,7 @@ export function createTrackModule(ctx) {
         if (!container || !track) return
 
         const token = ++renderToken
+        renderedLyricsKey = null
         const cover = release.cover
         const kind = release.type === 'album' ? 'Альбом' : 'Сингл'
         const dateDisplay = release.releaseDate || release.year
@@ -169,6 +197,8 @@ export function createTrackModule(ctx) {
             </section>
         `
         bindNoteToggles(dynamic)
+        renderedLyricsKey = `${releaseId}:${trackIndex}`
+        applyPendingLineFocus()
 
         // Счётчик прослушиваний приходит позже и не блокирует отрисовку.
         ctx.modules.chart.getTrackPlayCount(releaseId, trackIndex).then(plays => {
@@ -217,5 +247,5 @@ export function createTrackModule(ctx) {
         }
     }
 
-    return { renderTrackPage, playTrackFromPage, copyTrackLink }
+    return { renderTrackPage, playTrackFromPage, copyTrackLink, focusLyricLine }
 }

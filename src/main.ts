@@ -9,6 +9,7 @@ import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedStat
 import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
 import { buildTrackHash, findTrackRefBySlug, getTrackSlug } from './utils/slug'
+import { createMatcher, normalizeForSearch } from './utils/search'
 import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
 import { renderPromoCardHtml } from './utils/promoCard'
 
@@ -47,6 +48,7 @@ const legacyDeps = {
         buildAssetUrl,
         buildNoteMap,
         buildTrackHash,
+        createMatcher,
         debounce,
         escapeHtml,
         findTrackRefBySlug,
@@ -54,6 +56,7 @@ const legacyDeps = {
         getAllTrackRefs,
         getTrackSlug,
         isSameTrackRef,
+        normalizeForSearch,
         normalizeSearchText,
         parseLRC,
         parseTrackKey,

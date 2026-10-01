@@ -14,6 +14,12 @@ export function createFullscreenModule(ctx) {
         }
     }
 
+    // Полноэкранный плеер сразу с открытым текстом (переход из поиска к строке).
+    function openFsLyrics() {
+        state.fsLyricsOpen = true
+        openFsPlayer()
+    }
+
     function closeFsPlayer() {
         if (dom.fsPlayer) {
             dom.fsPlayer.classList.remove('open')
@@ -132,5 +138,5 @@ export function createFullscreenModule(ctx) {
         }
     }
 
-    return { openFsPlayer, closeFsPlayer, updateFullscreen, animateCover, updateFsPlayPauseIcon, syncFsPlayerModeState, toggleFsLyrics }
+    return { openFsPlayer, openFsLyrics, closeFsPlayer, updateFullscreen, animateCover, updateFsPlayPauseIcon, syncFsPlayerModeState, toggleFsLyrics }
 }

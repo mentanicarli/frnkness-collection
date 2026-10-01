@@ -5,7 +5,6 @@ export type PageName = 'home' | 'chart' | 'release'
 // который разрешено вызывать из Vue-компонентов.
 export interface LegacyAppApi {
     setLyricsMode(mode: LyricsMode): void
-    closeLyrics(): void
     toggleFsLyrics(): void
     closeFsPlayer(): void
     seekTrackFs(event: MouseEvent): void
@@ -15,7 +14,6 @@ export interface LegacyAppApi {
     toggleMute(): void
     seekTrack(event: MouseEvent): void
     openFsPlayer(): void
-    toggleLyrics(): void
     openCurrentTrackPage(): void
     closeMiniPlayer(): void
     showPage(name: PageName): void
@@ -46,9 +44,6 @@ export const legacyBridge = {
     setLyricsMode(mode: LyricsMode) {
         invoke('setLyricsMode', mode)
     },
-    closeLyrics() {
-        invoke('closeLyrics')
-    },
     toggleFsLyrics() {
         invoke('toggleFsLyrics')
     },
@@ -75,9 +70,6 @@ export const legacyBridge = {
     },
     openFsPlayer() {
         invoke('openFsPlayer')
-    },
-    toggleLyrics() {
-        invoke('toggleLyrics')
     },
     openCurrentTrackPage() {
         invoke('openCurrentTrackPage')
