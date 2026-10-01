@@ -174,9 +174,9 @@ npm run dev
 | `20261002120000_play_events_tracking.sql` | `increment_play_count` дополнительно пишет каждое прослушивание в `play_events` (счётчик `play_counts` работает как раньше); RPC дашборда для админа; дата запуска журнала. Перед заменой функции миграция проверяет, что `normalize_track_key` даёт те же ключи, — иначе откатывается целиком. |
 | `20261002120100_play_counts_lockdown.sql` | Закрывает прямую запись в `play_counts` (до этого RLS был выключен, и любой с публичным ключом мог удалить или накрутить статистику). Чтение открыто — чарт и счётчики сайта работают как раньше. |
 
-Проверка счётчика без изменения данных — `supabase/audit/verify_stage2.sql`
-(результат — строка «ТЕСТ … plays N → N+1, событий X → X+1»).
-Откат к состоянию до этапа 2 — `supabase/audit/rollback_stage2.sql`.
+Проверка счётчика без изменения данных — `supabase/audit/verify_play_counter.sql`
+(результат — строка «ТЕСТ … plays N → N+1, событий X → X+1»). Её стоит запускать
+после любой новой миграции, которая трогает статистику.
 
 Графики по дням начинаются с момента применения первой миграции: раньше события не
 записывались. Итог «Всего» и топы «За всё время» берутся из `play_counts` и включают
@@ -188,7 +188,8 @@ npm run dev
 
 | Что | Где |
 | --- | --- |
-| Аудит статистики | `supabase/audit/play_counts_audit.sql` |
+| Аудит статистики (только чтение) | `supabase/audit/play_counts_audit.sql` |
+| Проверка счётчика (с откатом) | `supabase/audit/verify_play_counter.sql` |
 | Миграции | `supabase/migrations/` (тесты на PGlite — `supabase/tests/`) |
 | Edge Function | `supabase/functions/admin-content/` (`index.ts` — Deno, `handler.ts` — логика) |
 | Белый список путей и проверки | `supabase/functions/_shared/rules.ts` |
