@@ -1,6 +1,6 @@
 <template>
   <!-- Мини-панель текста: ТОЛЬКО обычный текст -->
-  <div id="lyrics-panel" class="lyrics-panel fixed top-0 right-0 w-full sm:w-[400px] h-full z-50 overflow-hidden flex flex-col">
+  <div id="lyrics-panel" class="lyrics-panel fixed top-0 right-0 w-full sm:w-[25rem] h-full z-50 overflow-hidden flex flex-col">
     <div class="p-6 border-b border-white/5 flex items-center justify-between flex-shrink-0">
       <div>
         <h4 id="lyrics-track-title" class="font-semibold text-lg"></h4>
@@ -103,9 +103,9 @@
     <div class="progress-container" @click="seekTrack">
       <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
     </div>
-    <div style="width: 100%; padding: 0 clamp(12px, 2vw, 20px);">
-      <div class="py-3 flex items-center justify-between w-full" style="gap: clamp(8px, 1.5vw, 16px);">
-        <div class="player-main flex items-center flex-1 min-w-0" style="gap: clamp(12px, 2vw, 16px);" @click="openFsFromMiniPlayer">
+    <div style="width: 100%; padding: 0 clamp(0.75rem, 2vw, 1.25rem);">
+      <div class="py-3 flex items-center justify-between w-full" style="gap: clamp(0.5rem, 1.5vw, 1rem);">
+        <div class="player-main flex items-center flex-1 min-w-0" style="gap: clamp(0.75rem, 2vw, 1rem);" @click="openFsFromMiniPlayer">
           <div id="player-cover" class="w-12 h-12 bg-[var(--bg-card)] flex-shrink-0 overflow-hidden">
             <div class="cover-overlay">
               <button @click.stop="openFsPlayer" class="fullscreen-trigger-btn" aria-label="Открыть на весь экран">
@@ -115,7 +115,7 @@
               </button>
             </div>
           </div>
-          <div class="min-w-0 flex items-center" style="gap: clamp(8px, 1.5vw, 12px);">
+          <div class="min-w-0 flex items-center" style="gap: clamp(0.5rem, 1.5vw, 0.75rem);">
             <div class="min-w-0">
               <p id="player-track" class="truncate text-sm"></p>
               <p class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
@@ -131,7 +131,7 @@
             </button>
           </div>
         </div>
-        <div class="flex items-center flex-shrink-0" style="gap: clamp(6px, 1.2vw, 12px);">
+        <div class="flex items-center flex-shrink-0" style="gap: clamp(0.375rem, 1.2vw, 0.75rem);">
           <button @click="prevTrack" class="play-btn player-prev-btn p-2 transition-colors" aria-label="Предыдущий трек">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
           </button>
@@ -143,7 +143,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
           </button>
         </div>
-        <div class="hidden sm:flex items-center flex-1 justify-end ml-auto" style="gap: clamp(8px, 1.5vw, 16px);">
+        <div class="hidden sm:flex items-center flex-1 justify-end ml-auto" style="gap: clamp(0.5rem, 1.5vw, 1rem);">
           <div class="flex items-center gap-2 text-xs text-[var(--fg-muted)] font-mono">
             <span id="time-current">0:00</span>
             <span>/</span>

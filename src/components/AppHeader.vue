@@ -1,11 +1,11 @@
 <template>
   <header>
     <div
-      style="height: 62px; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(16px, 2.4vw, 48px); width: 100%; position: relative;"
+      style="height: 3.875rem; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(1rem, 2.4vw, 3rem); width: 100%; position: relative;"
     >
       <button @click="showHome" class="flex items-center gap-2 group" aria-label="На главную">
         <span class="text-lg text-white/95 group-hover:text-white transition-colors">frnk ness</span>
-        <span class="font-mono text-[9px] tracking-[0.2em] uppercase text-[var(--fg-faint)]">collection</span>
+        <span class="font-mono text-[0.5625rem] tracking-[0.2em] uppercase text-[var(--fg-faint)]">collection</span>
       </button>
 
       <!-- inline search field (раскрывается между логотипом и кнопками) -->

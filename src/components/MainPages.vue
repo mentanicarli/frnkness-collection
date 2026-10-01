@@ -1,16 +1,16 @@
 <template>
   <main class="min-h-screen relative z-10">
     <div id="page-home" class="page active">
-      <div class="shell px-6" style="padding-top: clamp(28px,5vw,64px); padding-bottom: 8px;">
-        <section class="stagger-item" style="margin-bottom: clamp(26px,4vw,52px);">
+      <div class="shell px-6" style="padding-top: clamp(1.75rem,5vw,4rem); padding-bottom: 0.5rem;">
+        <section class="stagger-item" style="margin-bottom: clamp(1.625rem,4vw,3.25rem);">
           <h1 class="hero-title">Pupsiks<br><span class="hero-accent">Saga</span></h1>
-          <p class="text-[var(--fg-muted)] max-w-xl leading-relaxed" style="margin-top: 24px; font-size: clamp(15px,1.4vw,17px);">Полная коллекция релизов frnk ness про компанию Пупсиков. Альбомы, синглы и тексты песен в одном месте.</p>
+          <p class="text-[var(--fg-muted)] max-w-xl leading-relaxed" style="margin-top: 1.5rem; font-size: clamp(0.9375rem,1.4vw,1.0625rem);">Полная коллекция релизов frnk ness про компанию Пупсиков. Альбомы, синглы и тексты песен в одном месте.</p>
           <div class="mt-8 flex flex-wrap items-center gap-3">
             <button
               id="flow-mode-btn"
               @click="toggleFlowMode"
               class="chart-btn flow-btn flex items-center gap-2 px-7 transition-all"
-              style="height: 50px;"
+              style="height: 3.125rem;"
               aria-pressed="false"
               aria-label="Включить поток"
             >
@@ -23,8 +23,8 @@
             </button>
           </div>
         </section>
-        <section id="home-promo" class="stagger-item" style="margin-bottom: clamp(26px,4vw,52px);"></section>
-        <section class="stagger-item" style="animation-delay: 0.1s; margin-bottom: clamp(26px,3.5vw,46px);">
+        <section id="home-promo" class="stagger-item" style="margin-bottom: clamp(1.625rem,4vw,3.25rem);"></section>
+        <section class="stagger-item" style="animation-delay: 0.1s; margin-bottom: clamp(1.625rem,3.5vw,2.875rem);">
           <h2 class="text-xs mb-5">Альбомы</h2>
           <div id="albums-grid"></div>
         </section>
@@ -36,7 +36,7 @@
     </div>
 
     <div id="page-chart" class="page">
-      <div class="shell shell-narrow px-6" style="padding-top: 24px; padding-bottom: 130px;">
+      <div class="shell shell-narrow px-6" style="padding-top: 1.5rem; padding-bottom: 8.125rem;">
         <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors mb-8 group">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
             <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -51,14 +51,14 @@
     </div>
 
     <div id="page-release" class="page">
-      <div class="shell px-6" style="padding-top: 24px; padding-bottom: 8px;">
+      <div class="shell px-6" style="padding-top: 1.5rem; padding-bottom: 0.5rem;">
         <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors mb-8 group">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
           <span class="text-sm">Назад</span>
         </button>
-        <div class="flex flex-col lg:flex-row gap-8 lg:gap-16" style="padding-bottom: 130px;">
+        <div class="flex flex-col lg:flex-row gap-8 lg:gap-16" style="padding-bottom: 8.125rem;">
           <div class="lg:w-80 flex-shrink-0">
             <div id="release-cover" class="aspect-square overflow-hidden bg-[var(--bg-card)] mb-6"></div>
             <h1 id="release-title" class="text-3xl mb-3 leading-tight"></h1>

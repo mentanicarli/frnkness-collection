@@ -45,7 +45,7 @@ export function createSearchModule(ctx) {
                         ${trackTitle}
                         ${line}
                     </div>
-                    <span class="font-mono text-[9px] uppercase tracking-wider text-[var(--fg-faint)] flex-shrink-0 border border-white/10 rounded px-2 py-1">${badge}</span>
+                    <span class="font-mono text-[0.5625rem] uppercase tracking-wider text-[var(--fg-faint)] flex-shrink-0 border border-white/10 rounded px-2 py-1">${badge}</span>
                 </button>
             `
         }).join('')
