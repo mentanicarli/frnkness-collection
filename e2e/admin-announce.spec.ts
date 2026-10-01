@@ -157,10 +157,11 @@ test('главная: анонс первым, под ним последний 
 })
 
 test('главная: когда время вышло, анонс исчезает сам', async ({ page }) => {
-    await openSiteWithAnnounce(page, { ...EXISTING, releaseAt: '2026-10-02T12:00:03+03:00' })
+    // Запас 20 с: часы в тесте идут, загрузка под нагрузкой бывает долгой.
+    await openSiteWithAnnounce(page, { ...EXISTING, releaseAt: '2026-10-02T12:00:20+03:00' })
     const announce = page.locator('#home-promo .announce-card')
-    await expect(announce.locator('.announce-countdown')).toHaveText('0 дн. 00:00:03')
-    await page.clock.runFor(4000)
+    await expect(announce.locator('.announce-countdown')).toHaveText(/^0 дн\. 00:00:\d\d$/)
+    await page.clock.runFor(25_000)
     await expect(announce).toHaveCount(0)
     await expect(page.locator('#home-promo .promo-release-card')).toHaveCount(1)
 })

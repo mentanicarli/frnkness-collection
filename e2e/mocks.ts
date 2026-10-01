@@ -62,18 +62,32 @@ export interface MockOptions {
 // Содержимое репозитория для мока read — из HEAD, а не из рабочей копии:
 // мок изображает GitHub, а в рабочей копии могут лежать черновики.
 const ROOT = path.resolve(__dirname, '..')
-const fileCache = new Map<string, string | null>()
-export function repoFile(rel: string): string | null {
-    if (!fileCache.has(rel)) {
-        let content: string | null
-        try {
-            content = execFileSync('git', ['show', `HEAD:${rel}`], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-        } catch {
-            content = null
-        }
-        fileCache.set(rel, content)
+let textFiles: Map<string, string> | null = null
+
+// Все текстовые файлы HEAD одним вызовом git cat-file --batch: по git show на
+// файл в параллельных тестах на Windows выходило слишком медленно.
+function loadTextFiles(): Map<string, string> {
+    const paths = repoTree()
+        .map((f) => f.path)
+        .filter((p) => /\.(txt|lrc|json)$/i.test(p))
+    const out = execFileSync('git', ['cat-file', '--batch'], { cwd: ROOT, input: paths.map((p) => `HEAD:${p}`).join('\n') + '\n', maxBuffer: 64 * 1024 * 1024 })
+    const files = new Map<string, string>()
+    let pos = 0
+    for (const p of paths) {
+        const nl = out.indexOf(10, pos)
+        const header = out.subarray(pos, nl).toString('utf8').split(' ')
+        pos = nl + 1
+        if (header[1] !== 'blob') continue
+        const size = Number(header[2])
+        files.set(p, out.subarray(pos, pos + size).toString('utf8'))
+        pos += size + 1
     }
-    return fileCache.get(rel)!
+    return files
+}
+
+export function repoFile(rel: string): string | null {
+    if (!textFiles) textFiles = loadTextFiles()
+    return textFiles.get(rel) ?? null
 }
 
 // Дерево репозитория для мока head: файлы из git с реальными размерами.
