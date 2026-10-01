@@ -319,3 +319,7 @@ kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3
 .adm-lrc-text { overflow-wrap: anywhere; }
 .adm-lrc-nudge { display: inline-flex; flex-shrink: 0; }
 .adm-karaoke { position: relative; --fs-on: #ffffff; background: var(--fs-bg); border: 1px solid var(--line-2); border-radius: var(--r-md); height: 60vh; min-height: 18rem; overflow: auto; padding: 30vh 1rem; scroll-behavior: smooth; }
+
+/* ── Промо ─────────────────────────────────────────────────────────── */
+/* Карточка — разметка сайта; клики в превью не нужны (на сайте ведут в релиз). */
+.adm-promo-preview { pointer-events: none; }
