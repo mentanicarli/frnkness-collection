@@ -1,6 +1,6 @@
 {
     "promo": {
-        "enabled": true,
+        "enabled": false,
         "releaseId": "zlaya-nostalgia"
     },
     "announce": {
