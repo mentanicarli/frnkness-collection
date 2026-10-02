@@ -127,9 +127,10 @@ describe('отчёт по настоящему репозиторию', () => {
         // Все mp3 и обложки на месте.
         expect(all.every((t) => t.audio)).toBe(true)
         expect(report.releases.every((r) => r.cover)).toBe(true)
-        // Пустые тексты в репозитории — «Текст будет позже».
+        // Пустых текстов в репозитории больше нет: тексты есть у всех треков.
         const empty = all.filter((t) => t.txt === 'empty').map((t) => t.title)
-        expect(empty).toEqual(expect.arrayContaining(['COMЁ N TEAM', 'ПУПСАСТИЯ']))
+        expect(empty).toEqual([])
+        expect(all.every((t) => t.txt === 'ok')).toBe(true)
         // У POOPSICKS есть .lrc и разборы.
         expect(all[0]).toMatchObject({ title: 'POOPSICKS', lrc: true, notes: 'ok' })
         expect(all[0].annotations).toBeGreaterThan(0)

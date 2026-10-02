@@ -30,9 +30,9 @@ const lyricsInput = (page: Page) => page.getByRole('textbox', { name: 'Текс�
 
 test('загрузка текста и разборов, предпросмотр как на сайте', async ({ page }) => {
     const mocks = await openEditor(page, '#/lyrics/most-venture-poopsicks/0')
-    await expect(lyricsInput(page)).toHaveValue(/^\[Припев\]\nПупсики \(смешное имя\),/)
+    await expect(lyricsInput(page)).toHaveValue(/^\[Припев\]\nПупсики \(смешное имя\)\n/)
     await expect(page.getByRole('textbox', { name: 'О треке' })).toHaveValue(/Трек, с которого началась/)
-    await expect(page.getByTestId('lines').locator('.adm-line.has-note').first()).toContainText('Пупсики (смешное имя),')
+    await expect(page.getByTestId('lines').locator('.adm-line.has-note').first()).toContainText('Пупсики (смешное имя)')
     await expect(page.getByTestId('dangling')).toHaveCount(0)
     await expect(page.getByText('Изменений нет')).toBeVisible()
 
@@ -51,7 +51,7 @@ test('загрузка текста и разборов, предпросмот�
 
 test('добавить разбор и сохранить: подтверждение, один коммит, статус публикации', async ({ page }) => {
     const mocks = await openEditor(page, '#/lyrics/most-venture-poopsicks/0')
-    const line = page.getByTestId('lines').locator('.adm-line', { hasText: 'Темки, темки, темки —' }).first()
+    const line = page.getByTestId('lines').locator('.adm-line', { hasText: 'Темки, темки, темки' }).first()
     await line.click()
     await page.getByRole('textbox', { name: 'Разбор строки' }).fill('Новый разбор')
     await page.getByRole('button', { name: 'Готово' }).click()
@@ -71,7 +71,7 @@ test('добавить разбор и сохранить: подтвержде�
     const files = commit.body.files as { path: string; content: string }[]
     expect(files.map((f) => f.path)).toEqual(['lyrics/album1/01-poopsicks.notes.json'])
     const saved = JSON.parse(files[0].content)
-    expect(saved.annotations.some((a: { line: string; note: string }) => a.line === 'Темки, темки, темки —' && a.note === 'Новый разбор')).toBe(true)
+    expect(saved.annotations.some((a: { line: string; note: string }) => a.line === 'Темки, темки, темки' && a.note === 'Новый разбор')).toBe(true)
     expect(files[0].content.endsWith('\n')).toBe(true)
 
     await expect(page.getByTestId('publish-status')).toContainText('Публикуется')
@@ -102,9 +102,12 @@ test('правка текста: висящий разбор, текст и ра
     expect(commits[0].body.message).toBe('текст, описание и разборы «POOPSICKS» (Most Venture Poopsicks / Last Over V)')
 })
 
-test('пустой трек: «Текст будет позже», .notes.json не создаётся без разборов', async ({ page }) => {
+test('пустой текст: «Текст будет позже», .notes.json не создаётся без разборов', async ({ page }) => {
+    // У COMЁ N TEAM нет .notes.json, так что на нём и проверяем, что без
+    // разборов файл не создаётся. Текст очищаем руками: пустых треков в
+    // репозитории больше нет.
     const mocks = await openEditor(page, '#/lyrics/born-to-be-deluxe/2')
-    await expect(lyricsInput(page)).toHaveValue('')
+    await lyricsInput(page).fill('')
     await page.getByRole('tab', { name: 'Предпросмотр' }).click()
     await expect(page.getByTestId('preview')).toContainText('Текст будет позже...')
     await lyricsInput(page).fill('[Куплет 1]\nПервая строка\n')

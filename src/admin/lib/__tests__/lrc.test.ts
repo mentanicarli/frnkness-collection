@@ -21,18 +21,23 @@ const LYRICS = path.resolve(__dirname, '../../../../lyrics')
 const read = (rel: string) => fs.readFileSync(path.join(LYRICS, rel), 'utf8').replace(/\r\n?/g, '\n')
 
 describe('строки для LRC из .txt', () => {
-    it('убирает знаки в конце строки так же, как в существующих .lrc', () => {
-        expect(cleanLrcText('Пупсики (смешное имя),')).toBe('Пупсики (смешное имя)')
-        expect(cleanLrcText('Один спортзал, один футбол, один IT.')).toBe('Один спортзал, один футбол, один IT')
-        expect(cleanLrcText('Темки, темки, темки —')).toBe('Темки, темки, темки')
-        expect(cleanLrcText('(Бля, не помню.)')).toBe('(Бля, не помню)')
+    it('переносит текст дословно, ничего не срезая с конца', () => {
+        expect(cleanLrcText('Пупсики (смешное имя)')).toBe('Пупсики (смешное имя)')
+        expect(cleanLrcText('(Бля, не помню.)')).toBe('(Бля, не помню.)')
         expect(cleanLrcText('Кто здесь?')).toBe('Кто здесь?')
         expect(cleanLrcText('Давай!')).toBe('Давай!')
         expect(cleanLrcText('«Маке»')).toBe('«Маке»')
+        // Если знак в конце всё же есть, он остаётся: .lrc должен совпасть с .txt.
+        expect(cleanLrcText('Один спортзал, один футбол, один IT.')).toBe('Один спортзал, один футбол, один IT.')
+        expect(cleanLrcText('Темки, темки, темки —')).toBe('Темки, темки, темки —')
+    })
+
+    it('схлопывает пробелы', () => {
+        expect(cleanLrcText('  Раз   два  ')).toBe('Раз два')
     })
 
     it('пропускает пустые строки и метки секций', () => {
-        expect(linesFromTxt('[Припев]\nРаз,\n\n  [Куплет 1]  \nДва.\r\n')).toEqual(['Раз', 'Два'])
+        expect(linesFromTxt('[Припев]\nРаз\n\n  [Куплет 1]  \nДва\r\n')).toEqual(['Раз', 'Два'])
     })
 
     it('совпадает с готовым .lrc для POOPSICKS (кроме разговорной вставки)', () => {
@@ -40,6 +45,14 @@ describe('строки для LRC из .txt', () => {
         const fromLrc = linesFromLrc(read('album1/01-poopsicks.lrc')).map((l) => l.text)
         // Первые 29 строк совпадают один в один; дальше в .lrc реплика склеена в одну строку.
         expect(fromTxt.slice(0, 29)).toEqual(fromLrc.slice(0, 29))
+    })
+
+    it('каждая строка готового .lrc дословно есть в .txt', () => {
+        for (const slug of ['album1/02-back-to-poopsicks-2', 'singles/p-team', 'singles/boxik']) {
+            const fromTxt = linesFromTxt(read(`${slug}.txt`))
+            const fromLrc = linesFromLrc(read(`${slug}.lrc`)).map((l) => l.text)
+            for (const line of fromLrc) expect(fromTxt).toContain(line)
+        }
     })
 })
 

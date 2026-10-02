@@ -16,7 +16,9 @@ async function openCatalog(page: Page, extraFiles: { path: string; size: number 
 }
 
 test('таблица по трекам и релизам по настоящему репозиторию', async ({ page }) => {
-    const mocks = await openCatalog(page)
+    // Пустых текстов в репозитории больше нет, поэтому пустоту одного трека
+    // подменяем в дереве: размер 0 — это и есть признак пустого текста.
+    const mocks = await openCatalog(page, [{ path: 'lyrics/album3/03-come-n-team.txt', size: 0 }])
     const poopsicks = page.getByTestId('track-most-venture-poopsicks-0')
     await expect(poopsicks).toContainText('POOPSICKS')
     await expect(poopsicks).toContainText('всё на месте')
