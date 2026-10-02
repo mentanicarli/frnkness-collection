@@ -84,7 +84,7 @@ test('убрать PDF', async ({ page }) => {
     await page.getByRole('dialog').getByRole('button', { name: 'Опубликовать' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
     const files = committed(mocks)
-    expect(files.find((f) => f.delete)!.path).toBe('lyrics-books/disinvolto-lyrics.pdf')
+    expect(files.find((f) => f.delete)!.path).toBe('lyrics-books/disinvolto.pdf')
     expect(JSON.parse(files[0].content!).disinvolto.lyricsBookPath).toBeUndefined()
 })
 

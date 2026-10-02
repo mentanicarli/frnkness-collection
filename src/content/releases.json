@@ -7,7 +7,7 @@
         "cover": "images/album1-cover.jpg",
         "audioPath": "audio/album1/",
         "lyricsPath": "lyrics/album1/",
-        "lyricsBookPath": "lyrics-books/album1-lyrics.pdf",
+        "lyricsBookPath": "lyrics-books/most-venture-poopsicks.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -49,7 +49,7 @@
         "cover": "images/single1-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
-        "lyricsBookPath": "lyrics-books/disinvolto-lyrics.pdf",
+        "lyricsBookPath": "lyrics-books/disinvolto.pdf",
         "videoUrl": "https://www.youtube.com/embed/vI_8FLsAn50",
         "tracks": [
             {
@@ -68,7 +68,7 @@
         "cover": "images/album2-cover.jpg",
         "audioPath": "audio/album2/",
         "lyricsPath": "lyrics/album2/",
-        "lyricsBookPath": "lyrics-books/album2-lyrics.pdf",
+        "lyricsBookPath": "lyrics-books/six-senses-pupsiks.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -116,6 +116,7 @@
         "cover": "images/single2-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/nypupsoids.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -133,6 +134,7 @@
         "cover": "images/single3-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/thermoland.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -150,6 +152,7 @@
         "cover": "images/single4-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/boxik.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -167,6 +170,7 @@
         "cover": "images/single5-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/p-team.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -184,6 +188,7 @@
         "cover": "images/single6-cover.jpg",
         "audioPath": "audio/singles/",
         "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/faaa.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -201,6 +206,7 @@
         "cover": "images/album3-cover.jpg",
         "audioPath": "audio/album 3/",
         "lyricsPath": "lyrics/album3/",
+        "lyricsBookPath": "lyrics-books/born-to-be-deluxe.pdf",
         "tracks": [
             {
                 "num": 1,
@@ -266,6 +272,7 @@
         "cover": "images/album4-cover.jpg",
         "audioPath": "audio/album4/",
         "lyricsPath": "lyrics/album4/",
+        "lyricsBookPath": "lyrics-books/zlaya-nostalgia.pdf",
         "tracks": [
             {
                 "num": 1,

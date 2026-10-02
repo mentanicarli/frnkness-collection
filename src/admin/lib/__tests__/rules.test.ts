@@ -23,7 +23,7 @@ describe('checkPath — белый список', () => {
         ['audio/album 3/Última historia.mp3', 'binary'],
         ['images/album5-cover.jpg', 'binary'],
         ['images/single7-cover.PNG', 'binary'],
-        ['lyrics-books/album5-lyrics.pdf', 'binary'],
+        ['lyrics-books/novyy-albom.pdf', 'binary'],
         ['src/content/releases.json', 'text'],
         ['src/content/site.json', 'text']
     ])('разрешает %s', (path, kind) => {
@@ -158,7 +158,7 @@ describe('checkRegistryChange — защита статистики', () => {
             releaseDate: '1 сентября 2026',
             cover: 'images/album4-cover-20261002.jpg',
             videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-            lyricsBookPath: 'lyrics-books/album4-lyrics-20261002.pdf'
+            lyricsBookPath: 'lyrics-books/zlaya-nostalgia-20261002.pdf'
         })
         expect(checkRegistryChange(current, next)).toEqual([])
 
@@ -307,16 +307,16 @@ describe('checkDeletions — удалять можно только заменя
     it('старая обложка и PDF после замены — можно', () => {
         const next = clone(current)
         next['most-venture-poopsicks'].cover = 'images/album1-cover-20261002.jpg'
-        next['most-venture-poopsicks'].lyricsBookPath = 'lyrics-books/album1-lyrics-20261002.pdf'
+        next['most-venture-poopsicks'].lyricsBookPath = 'lyrics-books/most-venture-poopsicks-20261002.pdf'
         expect(
-            checkDeletions(['images/album1-cover.jpg', 'lyrics-books/album1-lyrics.pdf'], { registry: current, site }, { registry: next, site })
+            checkDeletions(['images/album1-cover.jpg', 'lyrics-books/most-venture-poopsicks.pdf'], { registry: current, site }, { registry: next, site })
         ).toEqual([])
     })
 
     it('убранный PDF — можно', () => {
         const next = clone(current)
         delete next.disinvolto.lyricsBookPath
-        expect(checkDeletions(['lyrics-books/disinvolto-lyrics.pdf'], { registry: current, site }, { registry: next, site })).toEqual([])
+        expect(checkDeletions(['lyrics-books/disinvolto.pdf'], { registry: current, site }, { registry: next, site })).toEqual([])
     })
 
     it('обложку, которая ещё используется, — нельзя', () => {

@@ -77,7 +77,7 @@ function setup() {
             'src/content/site.json': JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' } }),
             'lyrics/singles/faaa.txt': 'Строка\n',
             'images/single6-cover.jpg': 'jpeg',
-            'lyrics-books/disinvolto-lyrics.pdf': 'pdf'
+            'lyrics-books/disinvolto.pdf': 'pdf'
         },
         calls: [],
         tokenInvalid: false,
@@ -366,7 +366,7 @@ describe('admin-content: правка релиза и удаление заме�
             message: 'x',
             files: [
                 { path: 'src/content/releases.json', content: JSON.stringify(next) },
-                { path: 'lyrics-books/disinvolto-lyrics.pdf', delete: true }
+                { path: 'lyrics-books/disinvolto.pdf', delete: true }
             ]
         })
         expect(res.status).toBe(200)
