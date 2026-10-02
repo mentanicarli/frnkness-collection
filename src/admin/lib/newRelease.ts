@@ -13,9 +13,9 @@ import { formatRuDate, isValidIsoDate, type IsoDate } from './dates'
  * проверка, что в реестре меняется только добавление этого релиза.
  *
  *   альбом: audio/albumN/<slug>.mp3, lyrics/albumN/NN-<slug>.txt,
- *           images/albumN-cover.jpg, lyrics-books/albumN-lyrics.pdf
+ *           images/albumN-cover.jpg, lyrics-books/<id>.pdf
  *   сингл:  audio/singles/<slug>.mp3, lyrics/singles/<slug>.txt,
- *           images/singleN-cover.jpg, lyrics-books/<id>-lyrics.pdf
+ *           images/singleN-cover.jpg, lyrics-books/<id>.pdf
  */
 
 const MAP: Record<string, string> = {
@@ -110,7 +110,7 @@ export function planRelease(draft: ReleaseDraft, releases: Releases, files: { pa
     const audioPath = isAlbum ? `audio/album${n}/` : 'audio/singles/'
     const lyricsPath = isAlbum ? `lyrics/album${n}/` : 'lyrics/singles/'
     const cover = isAlbum ? `images/album${n}-cover.jpg` : `images/single${n}-cover.jpg`
-    const pdf = draft.pdf ? (isAlbum ? `lyrics-books/album${n}-lyrics.pdf` : `lyrics-books/${draft.id}-lyrics.pdf`) : null
+    const pdf = draft.pdf ? `lyrics-books/${draft.id}.pdf` : null
     const tracks = draft.tracks.map((t, i) => ({
         num: i + 1,
         title: t.title.trim(),

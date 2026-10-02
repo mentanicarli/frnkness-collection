@@ -46,7 +46,7 @@ describe('planEdit', () => {
         expect(plan.release).toMatchObject({ title: 'Злая Ностальгия (Deluxe)', year: '2026', releaseDate: '1 сентября 2026', videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50' })
         // Треки и служебные поля — те же объекты.
         expect(plan.release.tracks).toBe(releases['zlaya-nostalgia'].tracks)
-        expect(Object.keys(plan.release)).toEqual(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'videoUrl', 'tracks'])
+        expect(Object.keys(plan.release)).toEqual(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'lyricsBookPath', 'videoUrl', 'tracks'])
         // Порядок релизов не меняется, остальные записи — без изменений.
         expect(Object.keys(plan.next)).toEqual(Object.keys(releases))
         for (const id of Object.keys(releases)) if (id !== 'zlaya-nostalgia') expect(plan.next[id]).toBe(releases[id])
@@ -60,16 +60,20 @@ describe('planEdit', () => {
 
     it('PDF: заменить, убрать, добавить', () => {
         const replace = planEdit(releases, 'disinvolto', { ...formFromRelease(releases.disinvolto), pdf: 'replace' }, files, TODAY)
-        expect(replace.uploads).toEqual([{ kind: 'pdf', path: 'lyrics-books/disinvolto-lyrics-20261002.pdf' }])
-        expect(replace.deletes).toEqual(['lyrics-books/disinvolto-lyrics.pdf'])
+        expect(replace.uploads).toEqual([{ kind: 'pdf', path: 'lyrics-books/disinvolto-20261002.pdf' }])
+        expect(replace.deletes).toEqual(['lyrics-books/disinvolto.pdf'])
 
         const remove = planEdit(releases, 'disinvolto', { ...formFromRelease(releases.disinvolto), pdf: 'remove' }, files, TODAY)
         expect(remove.release.lyricsBookPath).toBeUndefined()
-        expect(remove.deletes).toEqual(['lyrics-books/disinvolto-lyrics.pdf'])
+        expect(remove.deletes).toEqual(['lyrics-books/disinvolto.pdf'])
         expect(remove.changes).toEqual(['PDF убран'])
 
-        const add = planEdit(releases, 'faaa', { ...formFromRelease(releases.faaa), pdf: 'replace' }, files, TODAY)
-        expect(add.uploads).toEqual([{ kind: 'pdf', path: 'lyrics-books/faaa-lyrics.pdf' }])
+        // У всех релизов уже есть PDF — для «добавить» убираем его у FAAA.
+        const { lyricsBookPath: _, ...faaaNoPdf } = releases.faaa
+        const noPdf = { ...releases, faaa: faaaNoPdf }
+        const noPdfFiles = files.filter((f) => f.path !== 'lyrics-books/faaa.pdf')
+        const add = planEdit(noPdf, 'faaa', { ...formFromRelease(faaaNoPdf), pdf: 'replace' }, noPdfFiles, TODAY)
+        expect(add.uploads).toEqual([{ kind: 'pdf', path: 'lyrics-books/faaa.pdf' }])
         expect(add.deletes).toEqual([])
         expect(Object.keys(add.release)).toEqual(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'lyricsBookPath', 'tracks'])
     })

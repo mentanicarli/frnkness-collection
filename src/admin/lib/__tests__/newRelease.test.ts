@@ -102,7 +102,7 @@ describe('planRelease', () => {
             cover: 'images/album5-cover.jpg',
             audioPath: 'audio/album5/',
             lyricsPath: 'lyrics/album5/',
-            lyricsBookPath: 'lyrics-books/album5-lyrics.pdf',
+            lyricsBookPath: 'lyrics-books/novyy-albom.pdf',
             tracks: [
                 { num: 1, title: 'Первый трек', file: 'pervy-trek.mp3', lyricsFile: '01-pervy-trek.txt' },
                 { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt' }

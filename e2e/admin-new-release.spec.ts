@@ -62,7 +62,7 @@ test('альбом: форма → подтверждение → загрузк
         'src/content/releases.json',
         'src/content/site.json',
         'images/album5-cover.jpg',
-        'lyrics-books/album5-lyrics.pdf',
+        'lyrics-books/testovy-albom.pdf',
         'audio/album5/vtoroy.mp3',
         'audio/album5/pervy.mp3',
         'lyrics/album5/01-vtoroy.txt',
@@ -77,7 +77,7 @@ test('альбом: форма → подтверждение → загрузк
     expect(mocks.uploads.every((u) => /^[0-9a-f-]{36}\.(jpg|pdf|mp3)$/.test(u.name))).toBe(true)
     expect(mocks.uploads.map((u) => u.contentType)).toEqual(['image/jpeg', 'application/pdf', 'audio/mpeg', 'audio/mpeg'])
     const staged = mocks.calls.filter((c) => c.action === 'stage-blob')
-    expect(staged.map((c) => c.body.path)).toEqual(['images/album5-cover.jpg', 'lyrics-books/album5-lyrics.pdf', 'audio/album5/vtoroy.mp3', 'audio/album5/pervy.mp3'])
+    expect(staged.map((c) => c.body.path)).toEqual(['images/album5-cover.jpg', 'lyrics-books/testovy-albom.pdf', 'audio/album5/vtoroy.mp3', 'audio/album5/pervy.mp3'])
     expect(staged.map((c) => c.body.stagingPath)).toEqual(mocks.uploads.map((u) => u.name))
 
     // Один коммит: реестр, промо, пустые тексты, медиа по подписанным blob.
@@ -98,7 +98,7 @@ test('альбом: форма → подтверждение → загрузк
         cover: 'images/album5-cover.jpg',
         audioPath: 'audio/album5/',
         lyricsPath: 'lyrics/album5/',
-        lyricsBookPath: 'lyrics-books/album5-lyrics.pdf',
+        lyricsBookPath: 'lyrics-books/testovy-albom.pdf',
         tracks: [
             { num: 1, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '01-vtoroy.txt' },
             { num: 2, title: 'Первый', file: 'pervy.mp3', lyricsFile: '02-pervy.txt' }

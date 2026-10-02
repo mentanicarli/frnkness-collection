@@ -1,3 +1,5 @@
+import { lyricsBookFilename } from '../../utils/lyricsBook'
+
 export function createUiModule(ctx) {
     const { dom, state, releases, utils, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, ANNOUNCE } = ctx
     const { throttle, escapeHtml, renderPromoCardHtml, renderAnnounceCardHtml, isAnnounceActive, startAnnounceCountdown } = utils
@@ -113,6 +115,7 @@ export function createUiModule(ctx) {
         if (dom.downloadContainer) {
             if (!r.upcoming && r.lyricsBookPath && dom.downloadBtn) {
                 dom.downloadBtn.href = r.lyricsBookPath
+                dom.downloadBtn.download = lyricsBookFilename(r.title)
                 dom.downloadContainer.classList.remove('hidden')
             } else {
                 dom.downloadContainer.classList.add('hidden')

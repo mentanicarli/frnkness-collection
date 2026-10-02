@@ -119,11 +119,9 @@ export function planEdit(
     }
 
     if (form.pdf === 'replace') {
-        const path = old.lyricsBookPath
-            ? versionedPath(old.lyricsBookPath, 'pdf', today, taken, `${id}-lyrics`)
-            : taken.has(`lyrics-books/${id}-lyrics.pdf`)
-              ? versionedPath(`lyrics-books/${id}-lyrics.pdf`, 'pdf', today, taken, `${id}-lyrics`)
-              : `lyrics-books/${id}-lyrics.pdf`
+        // PDF всегда называется по id релиза; при замене — с датой (кэш).
+        const base = `lyrics-books/${id}.pdf`
+        const path = old.lyricsBookPath || taken.has(base) ? versionedPath(base, 'pdf', today, taken, id) : base
         edited.lyricsBookPath = path
         uploads.push({ kind: 'pdf', path })
         if (old.lyricsBookPath) deletes.push(old.lyricsBookPath)

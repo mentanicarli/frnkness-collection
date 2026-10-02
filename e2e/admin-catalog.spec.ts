@@ -35,7 +35,7 @@ test('таблица по трекам и релизам по настоящем
 
     // Релизы: обложка и PDF.
     await expect(page.getByTestId('release-most-venture-poopsicks')).toContainText('PDF есть')
-    await expect(page.getByTestId('release-faaa')).toContainText('без PDF')
+    await expect(page.getByTestId('release-faaa')).toContainText('PDF есть')
 
     // Разборы читаются пачками не больше 60 путей.
     const reads = mocks.calls.filter((c) => c.action === 'read' && (c.body.paths as string[]).some((p) => p.endsWith('.notes.json')))
