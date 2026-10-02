@@ -208,3 +208,78 @@ export function releaseWindow(
 export function dayNumber(releaseDate: IsoDate, day: IsoDate): number {
     return diffDays(releaseDate, day) + 1
 }
+
+// ── Дослушивают или пропускают ───────────────────────────────────────
+
+export interface ListenRow {
+    track_key: string
+    sessions: number
+    completed: number
+    avg_share: number
+}
+
+export interface TrackListen {
+    releaseId: string
+    trackIndex: number
+    title: string
+    releaseTitle: string
+    sessions: number
+    /** Доля дослушанных, 0..1. */
+    completedShare: number
+    /** Средняя доля прослушанного, 0..1. */
+    avgShare: number
+}
+
+/**
+ * Сводит строки по ключам к трекам. Оба формата ключа складываются;
+ * средняя доля — взвешенная по числу сессий.
+ */
+export function aggregateListen(rows: ListenRow[], releases: Releases): TrackListen[] {
+    const acc = new Map<string, { releaseId: string; trackIndex: number; sessions: number; completed: number; shareSum: number }>()
+    for (const r of rows) {
+        const ref = parseTrackKey(r.track_key)
+        if (!ref || !releases[ref.releaseId]?.tracks[ref.trackIndex] || !r.sessions) continue
+        const id = `${ref.releaseId}\u0000${ref.trackIndex}`
+        const a = acc.get(id) ?? { releaseId: ref.releaseId, trackIndex: ref.trackIndex, sessions: 0, completed: 0, shareSum: 0 }
+        a.sessions += r.sessions
+        a.completed += r.completed
+        a.shareSum += r.avg_share * r.sessions
+        acc.set(id, a)
+    }
+    return [...acc.values()]
+        .map((a) => ({
+            releaseId: a.releaseId,
+            trackIndex: a.trackIndex,
+            title: releases[a.releaseId].tracks[a.trackIndex].title,
+            releaseTitle: releases[a.releaseId].title,
+            sessions: a.sessions,
+            completedShare: a.completed / a.sessions,
+            avgShare: a.shareSum / a.sessions
+        }))
+        .sort((x, y) => y.sessions - x.sessions || x.releaseId.localeCompare(y.releaseId) || x.trackIndex - y.trackIndex)
+}
+
+/** Удержание в процентах на каждой 5-й секунде. */
+export function retentionPercents(rows: { second: number; listeners: number; sessions: number }[]): { second: number; percent: number }[] {
+    return rows.map((r) => ({ second: r.second, percent: r.sessions ? Math.round((r.listeners / r.sessions) * 100) : 0 }))
+}
+
+/** Период для данных сессий: не раньше начала их сбора. */
+export function clipToStart(period: Period, startedAt: string | null): Period | null {
+    if (!startedAt) return null
+    const start = moscowDateOf(startedAt)
+    if (period.to < start) return null
+    return { from: period.from < start ? start : period.from, to: period.to }
+}
+
+/** 0.873 → «87%». */
+export function percent(share: number): string {
+    return `${Math.round(share * 100)}%`
+}
+
+/** 125 → «2:05». */
+export function formatSeconds(total: number): string {
+    const m = Math.floor(total / 60)
+    const s = Math.round(total % 60)
+    return `${m}:${String(s).padStart(2, '0')}`
+}

@@ -272,6 +272,22 @@ export function initLegacyApp(deps = {}) {
         })
     }
 
+    // ── Сессии прослушивания (дослушивают или пропускают) ──────────────
+
+    function setupListenSessions() {
+        if (typeof utils.setupListenTracker !== 'function' || typeof utils.sendListenSession !== 'function' || !dom.audio) return
+        utils.setupListenTracker({
+            audio: dom.audio,
+            getTrackKey: () => {
+                const release = state.currentRelease
+                const index = state.currentTrackIndex
+                if (!release || !state.currentReleaseId || !Number.isInteger(index) || !release.tracks[index]) return null
+                return `${state.currentReleaseId}-${index}`
+            },
+            send: utils.sendListenSession
+        })
+    }
+
     // ── Init ───────────────────────────────────────────────────────────
 
     function init() {
@@ -288,6 +304,7 @@ export function initLegacyApp(deps = {}) {
         modules.player.setupAudioEvents()
         modules.player.setupVolumeControls()
         setupLockScreenControls()
+        setupListenSessions()
 
         // Прогрев первых обложек через requestIdleCallback.
         modules.player.runWhenIdle(() => {

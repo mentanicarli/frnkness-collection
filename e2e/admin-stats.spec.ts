@@ -19,12 +19,33 @@ interface StatsMock {
     trackingSince?: string
     rpcCalls: { name: string; body: any }[]
     forbidden?: boolean
+    /** Миграция сессий применена. */
+    listen?: boolean
+    retentionCalls?: any[]
 }
 
 function statsRpc(mock: StatsMock): MockOptions['rpc'] {
     return (name, body: any) => {
         mock.rpcCalls.push({ name, body })
         if (mock.forbidden) return { status: 403, body: { code: '42501', message: 'Нет доступа', details: null, hint: null } }
+        // Сессии прослушивания: по умолчанию — как до применения миграции.
+        if (name.startsWith('admin_listen_') && !mock.listen) {
+            return { status: 404, body: { code: 'PGRST202', message: 'Could not find the function', details: null, hint: null } }
+        }
+        if (name === 'admin_listen_meta') return { body: { started_at: '2026-09-25T10:00:00+00:00', sessions: 42 } }
+        if (name === 'admin_listen_by_key') {
+            return {
+                body: [
+                    { track_key: 'zlaya-nostalgia-6', sessions: 20, completed: 15, avg_share: 0.86 },
+                    { track_key: 'zlaya-nostalgia-0', sessions: 10, completed: 2, avg_share: 0.31 },
+                    { track_key: 'boxik-0', sessions: 4, completed: 4, avg_share: 1 }
+                ]
+            }
+        }
+        if (name === 'admin_listen_retention') {
+            mock.retentionCalls?.push(body)
+            return { body: [0, 5, 10, 15].map((second, i) => ({ second, listeners: 10 - i * 3, sessions: 10 })) }
+        }
         if (name === 'admin_stats_overview') {
             return {
                 body: { total: 548, today: 3, last7: 21, last30: 77, tracking_since: mock.trackingSince ?? '2026-08-01T09:00:00+00:00', today_date: TODAY }
@@ -171,4 +192,45 @@ test('телефон: дашборд без горизонтальной про�
     await expect(page.getByTestId('release-card').locator('.adm-chart-bar').first()).toBeAttached()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow).toBeLessThanOrEqual(0)
+})
+
+test('сессии: миграция не применена — понятная подсказка, остальной дашборд работает', async ({ page }) => {
+    const mocks = await openStats(page, { rpcCalls: [] })
+    await expect(page.getByTestId('listen-note')).toContainText('Сбор ещё не запущен — примени миграцию 20261003120000_listen_sessions.sql')
+    await expect(page.getByTestId('tiles')).toContainText('Всего548')
+    await expect(page.getByTestId('release-card').locator('th', { hasText: 'Сессий' })).toHaveCount(0)
+    expect(mocks.unexpected).toEqual([])
+})
+
+test('сессии: доля дослушанных, средняя доля, удержание выбранного трека', async ({ page }) => {
+    const mock: StatsMock = { rpcCalls: [], listen: true, retentionCalls: [] }
+    const mocks = await openStats(page, mock)
+    const listen = page.getByTestId('listen')
+    // Сбор с 25 сен; период 30 дней обрезается по началу сбора.
+    await expect(page.getByTestId('listen-note')).toContainText('Данные собираются с 25 сен 2026 — с применения миграции.')
+    await expect(page.getByTestId('listen-note')).toContainText('Период: 25 сен 2026 — 1 окт 2026.')
+    expect(mock.rpcCalls.find((c) => c.name === 'admin_listen_by_key')!.body).toEqual({ p_from: '2026-09-25', p_to: '2026-10-01' })
+    const rows = listen.locator('tbody tr')
+    await expect(rows.nth(0)).toContainText('ГОУТЫ')
+    await expect(rows.nth(0)).toContainText('20')
+    await expect(rows.nth(0)).toContainText('75%')
+    await expect(rows.nth(0)).toContainText('86%')
+
+    // Карточка релиза: колонки по трекам и удержание.
+    const card = page.getByTestId('release-card')
+    await expect(card.locator('tbody tr').nth(0)).toContainText('20%') // Маканочки: 2 из 10
+    await expect(card.locator('tbody tr').nth(1)).toContainText('—') // нет сессий
+    await expect.poll(() => mock.retentionCalls!.length).toBeGreaterThan(0)
+    expect(mock.retentionCalls![mock.retentionCalls!.length - 1]).toEqual({ p_track_key: 'zlaya-nostalgia-0', p_from: '2026-09-25', p_to: '2026-10-01' })
+    await expect(page.getByTestId('retention-note')).toHaveText('Сколько слушателей ещё слушают на каждой 5-й секунде (из 10 сессий).')
+    await expect(card.locator('[data-testid="retention-chart"] .adm-chart-bar')).toHaveCount(4)
+
+    // Клик по треку в таблице «Дослушивают» — его удержание.
+    await rows.nth(0).click()
+    await expect(card.getByRole('combobox', { name: 'Трек для удержания' })).toHaveValue('6')
+    await expect.poll(() => mock.retentionCalls![mock.retentionCalls!.length - 1].p_track_key).toBe('zlaya-nostalgia-6')
+    const table = card.locator('[data-testid="retention-chart"]')
+    await table.getByText('Таблица').click()
+    await expect(table.locator('.adm-chart-table tbody tr').nth(1)).toHaveText('На 0:0570%')
+    expect(mocks.unexpected).toEqual([])
 })

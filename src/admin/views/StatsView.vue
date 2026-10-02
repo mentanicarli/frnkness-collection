@@ -103,6 +103,38 @@
             </section>
         </div>
 
+        <!-- Дослушивают или пропускают -->
+        <section class="adm-card" style="margin-top: 1rem" data-testid="listen">
+            <h2 class="adm-h2">Дослушивают или пропускают</h2>
+            <p class="adm-small adm-faint" style="margin-top: 0" data-testid="listen-note">{{ listenNote }}</p>
+            <template v-if="listenTracks.length">
+                <div class="adm-table-scroll">
+                    <table class="adm-table adm-listen-table" :class="{ 'is-busy': loadingListen }">
+                        <thead>
+                            <tr>
+                                <th>Трек</th>
+                                <th class="num">Сессий</th>
+                                <th class="num" title="Событие «конец трека» или прослушано ≥ 95%">Дослушали</th>
+                                <th class="num">Ср. доля</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="t in listenTracks.slice(0, listenLimit)" :key="t.releaseId + t.trackIndex" class="adm-click-row" @click="openListenTrack(t.releaseId, t.trackIndex)">
+                                <td>
+                                    <span class="adm-top-title">{{ t.title }}</span>
+                                    <span class="adm-top-sub" style="display: block">{{ t.releaseTitle }}</span>
+                                </td>
+                                <td class="num">{{ formatNumber(t.sessions) }}</td>
+                                <td class="num">{{ percent(t.completedShare) }}</td>
+                                <td class="num">{{ percent(t.avgShare) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button v-if="listenTracks.length > listenLimit" class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click="listenLimit += 20">Показать ещё</button>
+            </template>
+        </section>
+
         <!-- Карточка релиза -->
         <section ref="releaseCard" class="adm-card adm-release-card" data-testid="release-card">
             <div class="adm-row adm-release-head">
@@ -125,17 +157,53 @@
                             <th>Трек</th>
                             <th class="num">Всего</th>
                             <th v-if="preset !== 'all' && period" class="num">За период</th>
+                            <template v-if="listenPeriod">
+                                <th class="num">Сессий</th>
+                                <th class="num">Дослушали</th>
+                                <th class="num">Ср. доля</th>
+                            </template>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(t, i) in release.tracks" :key="i">
+                        <tr
+                            v-for="(t, i) in release.tracks"
+                            :key="i"
+                            :class="{ 'adm-click-row': listenPeriod, 'is-selected': listenPeriod && i === listenTrackIndex }"
+                            @click="listenPeriod && (listenTrackIndex = i)"
+                        >
                             <td class="num adm-faint">{{ t.num }}</td>
                             <td>{{ t.title }}</td>
                             <td class="num">{{ formatNumber(trackAllTime[i] || 0) }}</td>
                             <td v-if="preset !== 'all' && period" class="num">{{ formatNumber(trackPeriod[i] || 0) }}</td>
+                            <template v-if="listenPeriod">
+                                <td class="num">{{ releaseListen[i] ? formatNumber(releaseListen[i]!.sessions) : '—' }}</td>
+                                <td class="num">{{ releaseListen[i] ? percent(releaseListen[i]!.completedShare) : '—' }}</td>
+                                <td class="num">{{ releaseListen[i] ? percent(releaseListen[i]!.avgShare) : '—' }}</td>
+                            </template>
                         </tr>
                     </tbody>
                 </table>
+
+                <template v-if="listenPeriod">
+                    <div class="adm-row adm-window-head">
+                        <h3 class="adm-h2" style="margin: 0">Удержание</h3>
+                        <select v-model.number="listenTrackIndex" class="adm-select adm-release-select" aria-label="Трек для удержания">
+                            <option v-for="(t, i) in release.tracks" :key="i" :value="i">{{ t.num }}. {{ t.title }}</option>
+                        </select>
+                    </div>
+                    <p class="adm-small adm-faint" data-testid="retention-note">{{ retentionNote }}</p>
+                    <BarChart
+                        v-if="retentionPoints.length"
+                        :points="retentionPoints"
+                        :busy="loadingRetention"
+                        column-label="Секунда трека"
+                        value-label="Ещё слушают"
+                        :format="(v: number) => `${v}%`"
+                        empty-text="Нет данных"
+                        :aria-label="`Удержание слушателей трека ${release.tracks[listenTrackIndex]?.title ?? ''}`"
+                        data-testid="retention-chart"
+                    />
+                </template>
 
                 <div class="adm-row adm-window-head">
                     <h3 class="adm-h2" style="margin: 0">Первые дни после релиза</h3>
@@ -165,10 +233,28 @@ import type { Releases } from '@/types'
 import BarChart, { type BarPoint } from '../components/BarChart.vue'
 import { useRepo } from '../composables/useRepo'
 import { AdminApiError } from '../api/content'
-import { fetchAllTime, fetchByKey, fetchDaily, fetchDailyByKey, fetchOverview, type StatsOverview } from '../api/stats'
+import {
+    fetchAllTime,
+    fetchByKey,
+    fetchDaily,
+    fetchDailyByKey,
+    fetchListenByKey,
+    fetchListenMeta,
+    fetchOverview,
+    fetchRetention,
+    type ListenKeyRow,
+    type ListenMeta,
+    type RetentionRow,
+    type StatsOverview
+} from '../api/stats'
 import { addDays, diffDays, formatMediumDate, formatShortDate, isValidIsoDate, moscowDateOf } from '../lib/dates'
 import {
+    aggregateListen,
     aggregatePlays,
+    clipToStart,
+    formatSeconds,
+    percent,
+    retentionPercents,
     dayNumber,
     fillDays,
     releaseDailySeries,
@@ -311,9 +397,122 @@ async function openRelease(id: string) {
 // ── Загрузка ─────────────────────────────────────────────────────────
 const message = (e: unknown) => (e instanceof AdminApiError ? e.message : `Ошибка: ${(e as Error).message}`)
 
+// ── Дослушивают или пропускают ───────────────────────────────────────
+const listenMeta = ref<ListenMeta | null>(null)
+const listenUnavailable = ref('')
+const listenRows = ref<ListenKeyRow[]>([])
+const retentionRows = ref<RetentionRow[]>([])
+const listenTrackIndex = ref(0)
+const listenLimit = ref(15)
+const loadingListen = ref(false)
+const loadingRetention = ref(false)
+
+const listenStart = computed(() => (listenMeta.value?.started_at ? moscowDateOf(listenMeta.value.started_at) : ''))
+// Тот же период, что у графика и топов, но не раньше начала сбора сессий.
+const listenPeriod = computed(() => (period.value && listenMeta.value ? clipToStart(period.value, listenMeta.value.started_at) : null))
+const listenTracks = computed(() => aggregateListen(listenRows.value, releases.value))
+const releaseListen = computed(() => {
+    const byIndex: (ReturnType<typeof aggregateListen>[number] | undefined)[] = []
+    for (const t of listenTracks.value) if (t.releaseId === releaseId.value) byIndex[t.trackIndex] = t
+    return byIndex
+})
+
+const listenNote = computed(() => {
+    if (listenUnavailable.value) return listenUnavailable.value
+    if (!listenMeta.value) return ''
+    const since = listenStart.value ? `Данные собираются с ${formatMediumDate(listenStart.value)} — с применения миграции.` : ''
+    if (!listenPeriod.value) return `${since} За выбранный период данных нет.`
+    const p = listenPeriod.value
+    const range = p.from === p.to ? formatMediumDate(p.from) : `${formatMediumDate(p.from)} — ${formatMediumDate(p.to)}`
+    const empty = listenTracks.value.length ? '' : ' Сессий пока нет.'
+    return `${since} Период: ${range}. Дослушали — конец трека или ≥ 95% прослушано; перемотка не считается.${empty}`
+})
+
+const retentionPoints = computed<BarPoint[]>(() =>
+    retentionPercents(retentionRows.value).map((r) => ({
+        key: String(r.second),
+        label: formatSeconds(r.second),
+        title: `На ${formatSeconds(r.second)}`,
+        value: r.percent
+    }))
+)
+const retentionNote = computed(() => {
+    const total = retentionRows.value[0]?.sessions ?? 0
+    if (!total) return 'По этому треку за период сессий нет.'
+    return `Сколько слушателей ещё слушают на каждой 5-й секунде (из ${formatNumber(total)} сессий).`
+})
+
+function openListenTrack(id: string, index: number) {
+    releaseId.value = id
+    listenTrackIndex.value = index
+    nextTick(() => releaseCard.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+
+async function loadListenMeta() {
+    try {
+        listenMeta.value = await fetchListenMeta()
+        listenUnavailable.value = ''
+    } catch (e) {
+        listenMeta.value = null
+        listenUnavailable.value =
+            e instanceof AdminApiError && e.code === 'missing'
+                ? 'Сбор ещё не запущен — примени миграцию 20261003120000_listen_sessions.sql (supabase db push).'
+                : message(e)
+    }
+}
+
+let listenToken = 0
+async function loadListen() {
+    const p = listenPeriod.value
+    if (!p) {
+        listenRows.value = []
+        return
+    }
+    const token = ++listenToken
+    loadingListen.value = true
+    try {
+        const rows = await fetchListenByKey(p.from, p.to)
+        if (token === listenToken) listenRows.value = rows
+    } catch (e) {
+        if (token === listenToken) listenUnavailable.value = message(e)
+    } finally {
+        if (token === listenToken) loadingListen.value = false
+    }
+}
+
+let retentionToken = 0
+async function loadRetention() {
+    const p = listenPeriod.value
+    if (!p || !release.value) {
+        retentionRows.value = []
+        return
+    }
+    const token = ++retentionToken
+    loadingRetention.value = true
+    try {
+        const rows = await fetchRetention(`${releaseId.value}-${listenTrackIndex.value}`, p.from, p.to)
+        if (token === retentionToken) retentionRows.value = rows
+    } catch {
+        if (token === retentionToken) retentionRows.value = []
+    } finally {
+        if (token === retentionToken) loadingRetention.value = false
+    }
+}
+
+watch(() => (listenPeriod.value ? `${listenPeriod.value.from}|${listenPeriod.value.to}` : ''), () => {
+    loadListen()
+    loadRetention()
+})
+watch([releaseId, listenTrackIndex], ([id], [prevId]) => {
+    if (id !== prevId && listenTrackIndex.value >= (release.value?.tracks.length ?? 0)) listenTrackIndex.value = 0
+    loadRetention()
+})
+
 async function loadBase() {
     loadingBase.value = true
     error.value = ''
+    // Сессии — отдельно: без миграции остальной дашборд работает как раньше.
+    loadListenMeta()
     try {
         const [o, all] = await Promise.all([fetchOverview(), fetchAllTime(), repo.load()])
         overview.value = o

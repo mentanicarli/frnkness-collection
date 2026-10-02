@@ -184,6 +184,48 @@ npm run dev
 
 ---
 
+## Обновление: админка v2
+
+Что добавилось и что нужно применить:
+
+| Что | Нужно |
+| --- | --- |
+| Срок токена на «Обзоре», правка релизов, анонс, история с откатом | новая версия функции `admin-content` |
+| «Дослушивают или пропускают» | миграция `20261003120000_listen_sessions.sql` |
+| Управление с экрана блокировки | ничего (только сайт) |
+
+Порядок — **сначала Supabase, потом сайт** (мерж в `main`): новая функция и
+миграция совместимы со старыми сайтом и админкой, а новые сайт и админка
+пользуются ими сразу после публикации.
+
+```bash
+npx supabase@latest link --project-ref momcakikuivtvxkmgjhx
+```
+
+```bash
+npx supabase@latest db push --dry-run
+```
+
+В списке должна быть одна миграция `20261003120000_listen_sessions.sql`.
+
+```bash
+npx supabase@latest db push
+```
+
+```bash
+npx supabase@latest functions deploy admin-content --no-verify-jwt --use-api
+```
+
+```bash
+npx supabase@latest unlink
+```
+
+Секреты менять не нужно.
+
+Проверка счётчика после миграции (данные не меняются) — `supabase/audit/verify_play_counter.sql`.
+
+---
+
 ## Что где лежит
 
 | Что | Где |

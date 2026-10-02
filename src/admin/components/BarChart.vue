@@ -61,15 +61,16 @@
                 :style="tipStyle"
             >
                 <div class="adm-chart-tip-title">{{ points[active].title }}</div>
-                <div><b>{{ points[active].value }}</b> {{ unit(points[active].value) }}</div>
+                <div v-if="format"><b>{{ format(points[active].value) }}</b></div>
+                <div v-else><b>{{ points[active].value }}</b> {{ unit(points[active].value) }}</div>
             </div>
         </div>
         <details class="adm-chart-table">
             <summary>Таблица</summary>
             <table class="adm-table">
-                <thead><tr><th>{{ columnLabel }}</th><th class="num">Прослушивания</th></tr></thead>
+                <thead><tr><th>{{ columnLabel }}</th><th class="num">{{ valueLabel }}</th></tr></thead>
                 <tbody>
-                    <tr v-for="p in points" :key="p.key"><td>{{ p.title }}</td><td class="num">{{ p.value }}</td></tr>
+                    <tr v-for="p in points" :key="p.key"><td>{{ p.title }}</td><td class="num">{{ format ? format(p.value) : p.value }}</td></tr>
                 </tbody>
             </table>
         </details>
@@ -96,9 +97,13 @@ const props = withDefaults(
         ariaLabel: string
         columnLabel?: string
         emptyText?: string
+        /** Подпись столбца значений в таблице. */
+        valueLabel?: string
+        /** Формат значения в подсказке и таблице (например, проценты). */
+        format?: (value: number) => string
         busy?: boolean
     }>(),
-    { columnLabel: 'День', emptyText: 'Нет прослушиваний за этот период', busy: false }
+    { columnLabel: 'День', emptyText: 'Нет прослушиваний за этот период', busy: false, valueLabel: 'Прослушивания', format: undefined }
 )
 
 const HEIGHT = 208

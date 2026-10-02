@@ -204,3 +204,36 @@ describe('releaseWindow — первые дни после релиза', () => 
         expect(releaseWindow('5 сентября 2026', 7, null, '2026-10-01').status).toBe('no-tracking')
     })
 })
+
+describe('дослушивают или пропускают', () => {
+    it('сводит ключи к трекам, оба формата, средняя доля — взвешенная', async () => {
+        const { aggregateListen } = await import('../stats')
+        const res = aggregateListen(
+            [
+                { track_key: 'faaa-0', sessions: 3, completed: 1, avg_share: 0.5 },
+                { track_key: 'faaa--1', sessions: 1, completed: 1, avg_share: 1 },
+                { track_key: 'boxik-0', sessions: 10, completed: 9, avg_share: 0.95 },
+                { track_key: 'nope-0', sessions: 5, completed: 0, avg_share: 0.1 }
+            ],
+            releases
+        )
+        expect(res.map((t) => [t.releaseId, t.sessions, t.completedShare, t.avgShare])).toEqual([
+            ['boxik', 10, 0.9, 0.95],
+            ['faaa', 4, 0.5, 0.625]
+        ])
+        expect(res[1].title).toBe('FAAA')
+    })
+
+    it('удержание в процентах, обрезка периода по началу сбора, форматы', async () => {
+        const { retentionPercents, clipToStart, percent, formatSeconds } = await import('../stats')
+        expect(retentionPercents([{ second: 0, listeners: 4, sessions: 4 }, { second: 5, listeners: 3, sessions: 4 }])).toEqual([
+            { second: 0, percent: 100 },
+            { second: 5, percent: 75 }
+        ])
+        expect(clipToStart({ from: '2026-09-01', to: '2026-10-02' }, '2026-10-01T09:00:00Z')).toEqual({ from: '2026-10-01', to: '2026-10-02' })
+        expect(clipToStart({ from: '2026-09-01', to: '2026-09-20' }, '2026-10-01T09:00:00Z')).toBeNull()
+        expect(clipToStart({ from: '2026-09-01', to: '2026-09-20' }, null)).toBeNull()
+        expect(percent(0.873)).toBe('87%')
+        expect(formatSeconds(125)).toBe('2:05')
+    })
+})

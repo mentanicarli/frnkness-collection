@@ -60,3 +60,38 @@ export async function fetchAllTime(): Promise<KeyPlays[]> {
     const rows = await rpc<KeyPlays[]>('admin_stats_all_time')
     return rows.map((r) => ({ track_key: r.track_key, plays: num(r.plays) }))
 }
+
+// ── Дослушивают или пропускают ───────────────────────────────────────
+
+export interface ListenMeta {
+    started_at: string | null
+    sessions: number
+}
+
+export interface ListenKeyRow {
+    track_key: string
+    sessions: number
+    completed: number
+    avg_share: number
+}
+
+export interface RetentionRow {
+    second: number
+    listeners: number
+    sessions: number
+}
+
+export async function fetchListenMeta(): Promise<ListenMeta> {
+    const m = await rpc<ListenMeta>('admin_listen_meta')
+    return { started_at: m.started_at, sessions: num(m.sessions) }
+}
+
+export async function fetchListenByKey(from: IsoDate, to: IsoDate): Promise<ListenKeyRow[]> {
+    const rows = await rpc<ListenKeyRow[]>('admin_listen_by_key', { p_from: from, p_to: to })
+    return rows.map((r) => ({ track_key: r.track_key, sessions: num(r.sessions), completed: num(r.completed), avg_share: num(r.avg_share) }))
+}
+
+export async function fetchRetention(trackKey: string, from: IsoDate, to: IsoDate): Promise<RetentionRow[]> {
+    const rows = await rpc<RetentionRow[]>('admin_listen_retention', { p_track_key: trackKey, p_from: from, p_to: to })
+    return rows.map((r) => ({ second: num(r.second), listeners: num(r.listeners), sessions: num(r.sessions) }))
+}

@@ -14,6 +14,7 @@ import { fetchTextFile } from './utils/textFiles'
 import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
 import { renderPromoCardHtml } from './utils/promoCard'
 import { setupMediaSession } from './runtime/mediaSession'
+import { createListenSender, setupListenTracker } from './runtime/listenTracker'
 import { isAnnounceActive, renderAnnounceCardHtml, startAnnounceCountdown } from './utils/announceCard'
 
 const app = createApp(App)
@@ -73,6 +74,8 @@ const legacyDeps = {
         isAnnounceActive,
         startAnnounceCountdown,
         setupMediaSession,
+        setupListenTracker,
+        sendListenSession: createListenSender(SUPABASE_URL, SUPABASE_ANON_KEY),
         throttle
     }
 }

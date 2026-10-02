@@ -251,7 +251,7 @@ body.adm-body::before { opacity: 0.6; }
 .adm-release-head { justify-content: space-between; margin-bottom: 0.5rem; }
 .adm-release-select { width: auto; min-width: 14rem; max-width: 100%; }
 .adm-release-tracks { margin: 0.75rem 0 1.25rem; }
-.adm-window-head { justify-content: space-between; margin-bottom: 0.375rem; }
+.adm-window-head { justify-content: space-between; margin: 1.5rem 0 0.375rem; }
 @media (max-width: 640px) { .adm-release-select { min-width: 0; width: 100%; } }
 
 /* ── Коммит ────────────────────────────────────────────────────────── */
@@ -261,6 +261,14 @@ body.adm-body::before { opacity: 0.6; }
 .adm-file-kind.changed { color: #ffd278; }
 .adm-file-kind.deleted { color: #ff8a80; }
 .adm-file-kind.restored { color: #9fc8ff; }
+
+/* ── Дослушивают или пропускают ────────────────────────────────────── */
+.adm-click-row { cursor: pointer; }
+.adm-click-row:hover td { background: var(--bg-2); }
+.adm-release-tracks tr.is-selected td { background: var(--bg-2); }
+.adm-release-tracks tr.is-selected td:first-child { box-shadow: inset 2px 0 0 var(--fg); }
+.adm-listen-table { transition: opacity var(--fast); }
+.adm-listen-table.is-busy { opacity: 0.5; }
 
 /* ── История ───────────────────────────────────────────────────────── */
 .adm-history { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }

@@ -193,3 +193,118 @@ describe('миграции админки', () => {
         })
     })
 })
+
+describe('сессии прослушивания (дослушивают или пропускают)', () => {
+    let db: PGlite
+    const S1 = '11111111-1111-4111-8111-111111111111'
+    const S2 = '22222222-2222-4222-8222-222222222222'
+    const S3 = '33333333-3333-4333-8333-333333333333'
+    const rec = (role: 'anon' | 'authenticated', claims: object, args: unknown[]) =>
+        as(db, role, claims, 'select public.record_listen_session($1, $2, $3, $4, $5, $6)', args)
+
+    beforeAll(async () => {
+        db = await createDb()
+        await applyMigrations(db)
+        await applyMigrations(db) // повторный прогон
+    }, 60_000)
+
+    it('таблица закрыта для всех ролей', async () => {
+        for (const [role, claims] of [['anon', ANON], ['authenticated', USER], ['authenticated', ADMIN]] as const) {
+            await expect(as(db, role, claims, 'select * from public.listen_sessions')).rejects.toThrow(/permission denied/)
+            await expect(
+                as(db, role, claims, "insert into public.listen_sessions (session_id, track_key, listened_seconds, max_position, duration) values (gen_random_uuid(), 'faaa-0', 10, 10, 100)")
+            ).rejects.toThrow(/permission denied/)
+        }
+    })
+
+    it('аноним пишет сессию через RPC; ключ нормализуется', async () => {
+        await rec('anon', ANON, [S1, 'faaa--1', 50.123, 60, 120, false])
+        const row = (await db.query<any>('select * from public.listen_sessions where session_id = $1', [S1])).rows[0]
+        expect(row.track_key).toBe('faaa-0')
+        expect(Number(row.listened_seconds)).toBe(50.12)
+        expect(row.completed).toBe(false)
+    })
+
+    it('повторная отправка той же сессии — одна строка, значения только растут', async () => {
+        await rec('anon', ANON, [S1, 'faaa-0', 30, 40, 120, false]) // старый снимок не уменьшает
+        await rec('anon', ANON, [S1, 'faaa-0', 118, 120, 120, true])
+        const rows = (await db.query<any>('select * from public.listen_sessions where session_id = $1', [S1])).rows
+        expect(rows).toHaveLength(1)
+        expect(Number(rows[0].listened_seconds)).toBe(118)
+        expect(Number(rows[0].max_position)).toBe(120)
+        expect(rows[0].completed).toBe(true)
+    })
+
+    it('сессия не переезжает на другой трек', async () => {
+        await rec('anon', ANON, [S1, 'boxik-0', 119, 120, 120, true])
+        const row = (await db.query<any>('select track_key from public.listen_sessions where session_id = $1', [S1])).rows[0]
+        expect(row.track_key).toBe('faaa-0')
+        expect(Number((await db.query<any>('select count(*) n from public.listen_sessions')).rows[0].n)).toBe(1)
+    })
+
+    it.each([
+        [['мусор', 10, 10, 100, false], /Invalid track_key/],
+        [['faaa-0', 10, 10, 0, false], /Длительность/],
+        [['faaa-0', 10, 10, 1801, false], /Длительность/],
+        [['faaa-0', 2.5, 10, 100, false], /Прослушанное время/],
+        [['faaa-0', 200, 10, 100, false], /Прослушанное время/],
+        [['faaa-0', 10, 150, 100, false], /Позиция/],
+        [['faaa-0', 10, -1, 100, false], /Позиция/]
+    ])('границы: %j', async (args, re) => {
+        await expect(rec('anon', ANON, [S2, ...(args as unknown[])])).rejects.toThrow(re)
+    })
+
+    it('счётчик прослушиваний не затронут', async () => {
+        const before = Number((await db.query<any>("select coalesce(sum(plays),0) n from public.play_counts")).rows[0].n)
+        await rec('anon', ANON, [S3, 'boxik-0', 20, 25, 200, false])
+        expect(Number((await db.query<any>("select coalesce(sum(plays),0) n from public.play_counts")).rows[0].n)).toBe(before)
+    })
+
+    it('admin RPC: anon — нет прав, не-админ — «Нет доступа»', async () => {
+        for (const sql of [
+            'select public.admin_listen_meta()',
+            "select * from public.admin_listen_by_key('2026-10-01', '2026-10-31')",
+            "select * from public.admin_listen_retention('faaa-0', '2026-10-01', '2026-10-31')"
+        ]) {
+            await expect(as(db, 'anon', ANON, sql)).rejects.toThrow(/permission denied/)
+            await expect(as(db, 'authenticated', USER, sql)).rejects.toThrow(/Нет доступа/)
+        }
+    })
+
+    it('агрегаты: доля дослушанных (ended или ≥ 95%), средняя доля, число сессий', async () => {
+        await db.exec(`
+            delete from public.listen_sessions;
+            insert into public.listen_sessions (session_id, track_key, listened_seconds, max_position, duration, completed, created_at) values
+                (gen_random_uuid(), 'faaa-0', 100, 100, 100, true,  '2026-10-02 10:00+00'),
+                (gen_random_uuid(), 'faaa-0', 96,  100, 100, false, '2026-10-02 10:00+00'),
+                (gen_random_uuid(), 'faaa-0', 20,  22,  100, false, '2026-10-02 10:00+00'),
+                (gen_random_uuid(), 'faaa-0', 4,   4,   100, false, '2026-10-02 10:00+00'),
+                (gen_random_uuid(), 'boxik-0', 50, 50,  100, false, '2026-10-02 10:00+00'),
+                (gen_random_uuid(), 'faaa-0', 100, 100, 100, true,  '2026-09-01 10:00+00');
+        `)
+        const rows = (await as(db, 'authenticated', ADMIN, "select * from public.admin_listen_by_key('2026-10-01', '2026-10-31')")).rows
+        expect(rows.map((r) => [r.track_key, Number(r.sessions), Number(r.completed), Number(r.avg_share)])).toEqual([
+            ['faaa-0', 4, 2, 0.55],
+            ['boxik-0', 1, 0, 0.5]
+        ])
+    })
+
+    it('удержание по 5-секундным шагам', async () => {
+        const rows = (await as(db, 'authenticated', ADMIN, "select * from public.admin_listen_retention('faaa-0', '2026-10-01', '2026-10-31')")).rows
+        const at = (s: number) => Number(rows.find((r) => r.second === s)!.listeners)
+        expect(rows[0]).toMatchObject({ second: 0 })
+        expect(Number(rows[0].sessions)).toBe(4)
+        expect(at(0)).toBe(4)
+        expect(at(5)).toBe(3) // сессия с 4 с ушла
+        expect(at(25)).toBe(2) // и сессия с 22 с
+        expect(at(100)).toBe(2)
+        expect(rows[rows.length - 1].second).toBe(100)
+        expect((await as(db, 'authenticated', ADMIN, "select * from public.admin_listen_retention('nope-0', '2026-10-01', '2026-10-31')")).rows).toEqual([])
+    })
+
+    it('дата начала сбора', async () => {
+        const meta = (await as(db, 'authenticated', ADMIN, 'select public.admin_listen_meta() as m')).rows[0].m
+        expect(meta.started_at).toBeTruthy()
+        expect(meta.sessions).toBe(6)
+    })
+})
