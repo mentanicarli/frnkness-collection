@@ -20,6 +20,53 @@ const files = Object.values(releases).flatMap((r) => [
     { path: r.cover },
     ...r.tracks.flatMap((t) => [{ path: r.audioPath + t.file }, { path: r.lyricsPath + t.lyricsFile }])
 ])
+const fixtureReleases: Releases = {
+    'album-space': {
+        type: 'album',
+        title: 'A',
+        year: '2024',
+        cover: 'images/album 3-cover.jpg',
+        audioPath: 'audio/album 3/',
+        lyricsPath: 'lyrics/album 3/',
+        tracks: [{ num: 1, title: 'A1', file: 'a1.mp3', lyricsFile: '01-a1.txt' }]
+    },
+    album3: {
+        type: 'album',
+        title: 'B',
+        year: '2025',
+        cover: 'images/album3-cover.jpg',
+        audioPath: 'audio/album3/',
+        lyricsPath: 'lyrics/album3/',
+        tracks: [{ num: 1, title: 'B1', file: 'b1.mp3', lyricsFile: '01-b1.txt' }]
+    },
+    album4: {
+        type: 'album',
+        title: 'C',
+        year: '2026',
+        cover: 'images/album4-cover.jpg',
+        audioPath: 'audio/album4/',
+        lyricsPath: 'lyrics/album4/',
+        tracks: [{ num: 1, title: 'C1', file: 'c1.mp3', lyricsFile: '01-c1.txt' }]
+    },
+    ...Object.fromEntries(
+        Array.from({ length: 6 }, (_, i) => [
+            `single-${i + 1}`,
+            {
+                type: 'single',
+                title: `S${i + 1}`,
+                year: '2026',
+                cover: `images/single${i + 1}-cover.jpg`,
+                audioPath: 'audio/singles/',
+                lyricsPath: 'lyrics/singles/',
+                tracks: [{ num: 1, title: `S${i + 1}`, file: `s${i + 1}.mp3`, lyricsFile: `s${i + 1}.txt` }]
+            }
+        ])
+    )
+} as Releases
+const fixtureFiles = Object.values(fixtureReleases).flatMap((r) => [
+    { path: r.cover },
+    ...r.tracks.flatMap((t) => [{ path: r.audioPath + t.file }, { path: r.lyricsPath + t.lyricsFile }])
+])
 
 describe('транслитерация и slug', () => {
     it('совпадает с существующими slug', () => {
@@ -52,9 +99,9 @@ describe('транслитерация и slug', () => {
 describe('соглашения о папках', () => {
     it('следующий номер альбома и сингла', () => {
         // album 3 (с пробелом), album3, album4 → 5; single1..6 → 7.
-        expect(nextNumber('album', releases, files)).toBe(5)
-        expect(nextNumber('single', releases, files)).toBe(7)
-        expect(nextNumber('album', releases, [...files, { path: 'audio/album9/x.mp3' }])).toBe(10)
+        expect(nextNumber('album', fixtureReleases, fixtureFiles)).toBe(5)
+        expect(nextNumber('single', fixtureReleases, fixtureFiles)).toBe(7)
+        expect(nextNumber('album', fixtureReleases, [...fixtureFiles, { path: 'audio/album9/x.mp3' }])).toBe(10)
     })
 
     it('ссылка YouTube в embed', () => {
@@ -93,7 +140,7 @@ const single = (): ReleaseDraft => ({
 
 describe('planRelease', () => {
     it('альбом: albumN, NN-slug.txt, дата в формате реестра', () => {
-        const plan = planRelease(album(), releases, files)
+        const plan = planRelease(album(), fixtureReleases, fixtureFiles)
         expect(plan.release).toEqual({
             type: 'album',
             title: 'Новый альбом',
@@ -109,14 +156,14 @@ describe('planRelease', () => {
             ]
         })
         // Порядок полей как у существующих записей.
-        expect(Object.keys(plan.release)).toEqual(Object.keys(releases['most-venture-poopsicks']))
+        expect(Object.keys(plan.release)).toEqual(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'lyricsBookPath', 'tracks'])
         expect(plan.paths.tracks[1]).toEqual({ audio: 'audio/album5/vtoroy.mp3', txt: 'lyrics/album5/02-vtoroy.txt' })
         // slug в URL трека — тот, что ввели.
         expect(plan.release.tracks.map((t) => getTrackSlug(t))).toEqual(['pervy-trek', 'vtoroy'])
     })
 
     it('сингл: общие папки singles, slug.txt без номера, embed-ссылка', () => {
-        const plan = planRelease(single(), releases, files)
+        const plan = planRelease(single(), fixtureReleases, fixtureFiles)
         expect(plan.release).toMatchObject({
             cover: 'images/single7-cover.jpg',
             audioPath: 'audio/singles/',
