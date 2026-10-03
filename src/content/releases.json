@@ -317,5 +317,22 @@
                 "lyricsFile": "07-gouty.txt"
             }
         ]
+    },
+    "byebye": {
+        "type": "album",
+        "title": "BYEBYE",
+        "year": "2026",
+        "releaseDate": "3 октября 2026",
+        "cover": "images/album5-cover.jpg",
+        "audioPath": "audio/album5/",
+        "lyricsPath": "lyrics/album5/",
+        "tracks": [
+            {
+                "num": 1,
+                "title": "BYEBYE",
+                "file": "byebye.mp3",
+                "lyricsFile": "01-byebye.txt"
+            }
+        ]
     }
 }
