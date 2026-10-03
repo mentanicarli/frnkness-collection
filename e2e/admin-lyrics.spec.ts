@@ -86,9 +86,13 @@ test('правка текста: висящий разбор, текст и ра
     // Строка повторяется в припеве — меняем все вхождения.
     await input.fill(value.replaceAll('Пупсики (смешное имя)', 'Пупсики (новое имя)'))
     await expect(page.getByTestId('dangling')).toContainText('«Пупсики (смешное имя),»')
+    // С висящим разбором не пройдёт проверка контента при деплое — сохранить нельзя.
+    await expect(page.getByRole('button', { name: 'Сохранить…' })).toBeDisabled()
+    await expect(page.getByText('сначала удали или перенеси разборы')).toBeVisible()
 
     await page.getByTestId('dangling').getByRole('button', { name: 'Удалить разбор' }).first().click()
     await expect(page.getByTestId('dangling')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Сохранить…' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Сохранить…' }).click()
     const dialog = page.getByRole('dialog')
@@ -120,7 +124,8 @@ test('пустой текст: «Текст будет позже», .notes.json
 })
 
 test('конфликт: ветка ушла вперёд — понятная ошибка, правки не теряются', async ({ page }) => {
-    await openEditor(page, '#/lyrics/singles/0'.replace('singles', 'faaa'), {
+    // Трек без разборов: текст заменяется целиком, висящих разборов не будет.
+    await openEditor(page, '#/lyrics/born-to-be-deluxe/2', {
         commit: () => ({ status: 409, body: { error: 'conflict', message: 'Данные на сайте изменились, пока ты редактировал. Обнови страницу и повтори правку.' } })
     })
     await lyricsInput(page).fill('Новый текст')
@@ -135,7 +140,7 @@ test('конфликт: ветка ушла вперёд — понятная о
 })
 
 test('ошибка сборки — ссылка на запуск в GitHub Actions', async ({ page }) => {
-    await openEditor(page, '#/lyrics/faaa/0', { deploy: 'failed' })
+    await openEditor(page, '#/lyrics/born-to-be-deluxe/2', { deploy: 'failed' })
     await lyricsInput(page).fill('Другой текст')
     await page.getByRole('button', { name: 'Сохранить…' }).click()
     await page.getByRole('dialog').getByRole('button', { name: 'Опубликовать' }).click()

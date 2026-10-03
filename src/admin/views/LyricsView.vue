@@ -200,7 +200,11 @@ const validation = computed(() => {
     } catch {
         return ['разборы не сериализуются в JSON']
     }
-    return validateTrackNotes(parsed)
+    const errors = validateTrackNotes(parsed)
+    // Висящий разбор не пропустит проверка контента при деплое
+    // (npm run check:content), поэтому сохранить с ним нельзя.
+    if (dangling.value.length) errors.push('сначала удали или перенеси разборы, которые не находят свою строку')
+    return errors
 })
 
 // Строки текста с разборами — как их увидит сайт.
@@ -339,7 +343,7 @@ async function save() {
         title: 'Сохранить текст',
         message: `${parts.join(', ')} «${track.value.title}» (${release.value.title})`,
         files: files.map(({ path, kind }) => ({ path, kind })),
-        notes: dangling.value.length ? [`${dangling.value.length} разбор(ов) не найдут строку в тексте и не покажутся на сайте.`] : [],
+        notes: [],
         prepare: async () => files.map(({ path, content }) => ({ path, content }))
     })
     if (!result) return

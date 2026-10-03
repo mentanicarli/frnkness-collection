@@ -1,24 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import { isNotesEmpty, noteFor, normalizeNewlines, parseNotes, removeNote, serializeNotes, setNote } from '../notesEdit'
 import { buildNoteMap, findDanglingAnnotations } from '@/utils/trackNotes'
+import { fixtureText, fixtureTree } from '../../../../tests/fixtures/catalog'
 
 describe('notesEdit', () => {
-    it('сериализация совпадает с существующими файлами байт в байт', () => {
-        const dir = path.resolve(__dirname, '../../../../lyrics')
-        const files: string[] = []
-        const walk = (d: string) => {
-            for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-                const full = path.join(d, e.name)
-                if (e.isDirectory()) walk(full)
-                else if (e.name.endsWith('.notes.json')) files.push(full)
-            }
-        }
-        walk(dir)
-        expect(files.length).toBeGreaterThan(10)
+    it('сериализация совпадает с файлами в формате репозитория байт в байт', () => {
+        const files = fixtureTree()
+            .map((f) => f.path)
+            .filter((p) => p.endsWith('.notes.json'))
+        expect(files.length).toBeGreaterThan(3)
         for (const f of files) {
-            const original = normalizeNewlines(fs.readFileSync(f, 'utf8'))
+            const original = normalizeNewlines(fixtureText(f)!)
             const { notes, error } = parseNotes(original)
             expect(error, f).toBeNull()
             expect(serializeNotes(notes), f).toBe(original)

@@ -1,10 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
-import { ADMIN_USER, installMocks, loginAs, type ContentCall } from './mocks'
+import { ADMIN_USER, FIXTURE_UPLOADS, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
 
-const ROOT = path.resolve(__dirname, '..')
-const COVER = { name: 'announce.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(ROOT, 'images/album3-cover.jpg')) }
+const COVER = { name: 'announce.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'square.jpg')) }
 // «Сейчас» в браузере — 2 октября 2026, 12:00 МСК.
 const NOW = new Date('2026-10-02T09:00:00Z')
 
@@ -26,7 +25,7 @@ async function openPromo(page: Page, announce?: object) {
                 const files: Record<string, string | null> = {}
                 for (const p of call.body.paths as string[]) files[p] = p === 'src/content/site.json' ? JSON.stringify(site, null, 4) + '\n' : null
                 if ((call.body.paths as string[]).includes('src/content/releases.json')) {
-                    files['src/content/releases.json'] = fs.readFileSync(path.join(ROOT, 'src/content/releases.json'), 'utf8')
+                    files['src/content/releases.json'] = repoFile('src/content/releases.json')
                 }
                 return { body: { files } }
             }

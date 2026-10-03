@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createHandler, type AuthUser, type HandlerDeps } from '../../../../supabase/functions/admin-content/handler.ts'
-import releasesJson from '@/content/releases.json'
+import { fixtureReleases } from '../../../../tests/fixtures/catalog'
+
+const releasesJson = fixtureReleases()
 
 // Фейковый GitHub в памяти: тесты никогда не ходят в сеть и не коммитят.
 const REPO = 'mentanicarli/frnkness-collection'

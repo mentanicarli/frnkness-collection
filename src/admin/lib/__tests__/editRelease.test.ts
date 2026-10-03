@@ -1,15 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import type { Releases } from '@/types'
-import releasesJson from '@/content/releases.json'
 import { formFromRelease, orderReleaseFields, planEdit, versionedPath } from '../editRelease'
 import { serializeReleases } from '../content'
+import { fixtureReleases, fixtureTree } from '../../../../tests/fixtures/catalog'
 
-const releases = releasesJson as unknown as Releases
-const files = Object.values(releases).flatMap((r) => [
-    { path: r.cover },
-    ...(r.lyricsBookPath ? [{ path: r.lyricsBookPath }] : []),
-    ...r.tracks.flatMap((t) => [{ path: r.audioPath + t.file }, { path: r.lyricsPath + t.lyricsFile }])
-])
+const releases = fixtureReleases()
+const files = fixtureTree()
 const TODAY = '2026-10-02'
 
 describe('versionedPath', () => {
@@ -68,11 +63,7 @@ describe('planEdit', () => {
         expect(remove.deletes).toEqual(['lyrics-books/disinvolto.pdf'])
         expect(remove.changes).toEqual(['PDF убран'])
 
-        // У всех релизов уже есть PDF — для «добавить» убираем его у FAAA.
-        const { lyricsBookPath: _, ...faaaNoPdf } = releases.faaa
-        const noPdf = { ...releases, faaa: faaaNoPdf }
-        const noPdfFiles = files.filter((f) => f.path !== 'lyrics-books/faaa.pdf')
-        const add = planEdit(noPdf, 'faaa', { ...formFromRelease(faaaNoPdf), pdf: 'replace' }, noPdfFiles, TODAY)
+        const add = planEdit(releases, 'faaa', { ...formFromRelease(releases.faaa), pdf: 'replace' }, files, TODAY)
         expect(add.uploads).toEqual([{ kind: 'pdf', path: 'lyrics-books/faaa.pdf' }])
         expect(add.deletes).toEqual([])
         expect(Object.keys(add.release)).toEqual(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'lyricsBookPath', 'tracks'])

@@ -31,11 +31,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # content — пуш меняет только контент (lyrics/, audio/, images/,
+      # lyrics-books/, src/content/*.json), как правки из админки: типы и
+      # юнит-тесты от контента не зависят, их не гоняем. full — всё остальное.
+      - name: Detect what changed
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          COMMITS: ${{ toJSON(github.event.commits) }}
+        run: npx vite-node scripts/ci-scope.ts
+
       - name: Typecheck
+        if: steps.scope.outputs.scope != 'content'
         run: npm run typecheck
 
       - name: Run tests
+        if: steps.scope.outputs.scope != 'content'
         run: npm run test:run
+
+      - name: Check content
+        run: npm run check:content
 
       - name: Build project
         env:

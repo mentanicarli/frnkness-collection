@@ -15,9 +15,9 @@ async function openCatalog(page: Page, extraFiles: { path: string; size: number 
     return mocks
 }
 
-test('таблица по трекам и релизам по настоящему репозиторию', async ({ page }) => {
-    // Пустых текстов в репозитории больше нет, поэтому пустоту одного трека
-    // подменяем в дереве: размер 0 — это и есть признак пустого текста.
+test('таблица по трекам и релизам по фикстурному каталогу', async ({ page }) => {
+    // Пустых текстов в фикстуре нет, поэтому пустоту одного трека подменяем
+    // в дереве: размер 0 — это и есть признак пустого текста.
     const mocks = await openCatalog(page, [{ path: 'lyrics/album3/03-come-n-team.txt', size: 0 }])
     const poopsicks = page.getByTestId('track-most-venture-poopsicks-0')
     await expect(poopsicks).toContainText('POOPSICKS')
@@ -35,7 +35,7 @@ test('таблица по трекам и релизам по настоящем
 
     // Релизы: обложка и PDF.
     await expect(page.getByTestId('release-most-venture-poopsicks')).toContainText('PDF есть')
-    await expect(page.getByTestId('release-faaa')).toContainText('PDF есть')
+    await expect(page.getByTestId('release-faaa')).toContainText('без PDF')
 
     // Разборы читаются пачками не больше 60 путей.
     const reads = mocks.calls.filter((c) => c.action === 'read' && (c.body.paths as string[]).some((p) => p.endsWith('.notes.json')))

@@ -1,16 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import type { Releases, SiteSettings } from '@/types'
 import { serializeReleases, serializeSite } from '../content'
-
-const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '../../../content', rel), 'utf8').replace(/\r\n?/g, '\n')
+import { fixtureText } from '../../../../tests/fixtures/catalog'
 
 describe('сериализация src/content', () => {
-    it('site.json и releases.json — байт в байт как в репозитории', () => {
-        const site = read('site.json')
+    it('site.json и releases.json в формате репозитория — байт в байт', () => {
+        const site = fixtureText('src/content/site.json')!
         expect(serializeSite(JSON.parse(site) as SiteSettings)).toBe(site)
-        const releases = read('releases.json')
+        const releases = fixtureText('src/content/releases.json')!
         expect(serializeReleases(JSON.parse(releases) as Releases)).toBe(releases)
     })
 

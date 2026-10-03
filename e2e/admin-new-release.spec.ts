@@ -1,11 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
-import { ADMIN_USER, HEAD_SHA, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
+import { ADMIN_USER, FIXTURE_UPLOADS, HEAD_SHA, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
 
-const ROOT = path.resolve(__dirname, '..')
-const SQUARE_COVER = { name: 'cover.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(ROOT, 'images/album4-cover.jpg')) }
-const TALL_COVER = { name: 'tall.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(ROOT, 'images/album2-cover.jpg')) }
+const SQUARE_COVER = { name: 'cover.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'square.jpg')) }
+const TALL_COVER = { name: 'tall.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'tall.jpg')) }
 // Браузеры иногда называют mp3 «audio/mp3» — админка всё равно отправит audio/mpeg.
 const mp3 = (name: string, size = 2048) => ({ name, mimeType: 'audio/mp3', buffer: Buffer.concat([Buffer.from('ID3'), Buffer.alloc(size)]) })
 const pdf = { name: 'book.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') }
@@ -68,7 +67,7 @@ test('альбом: форма → подтверждение → загрузк
         'lyrics/album5/01-vtoroy.txt',
         'lyrics/album5/02-pervy.txt'
     ])
-    await expect(dialog).toContainText('существующие 10 релизов не меняются')
+    await expect(dialog).toContainText('существующие 7 релизов не меняются')
     await dialog.getByRole('button', { name: 'Опубликовать' }).click()
     await expect(page.getByTestId('done')).toContainText('Релиз «Тестовый альбом» отправлен на публикацию')
 

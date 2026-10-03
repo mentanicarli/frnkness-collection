@@ -13,9 +13,9 @@ import {
     parseRuDate
 } from '../dates'
 import { aggregatePlays, fillDays, releaseDailySeries, releaseTrackPlays, releaseWindow, resolvePeriod } from '../stats'
-import releasesJson from '@/content/releases.json'
+import { fixtureReleases } from '../../../../tests/fixtures/catalog'
 
-const releases = releasesJson as unknown as Releases
+const releases: Releases = fixtureReleases()
 
 describe('даты', () => {
     it('сегодня по Москве', () => {
@@ -117,7 +117,8 @@ describe('aggregatePlays — ключи статистики', () => {
             releases,
             'six-senses-pupsiks'
         )
-        expect(plays).toEqual([0, 5, 0, 0, 0, 0])
+        // В фикстуре у six-senses-pupsiks два трека.
+        expect(plays).toEqual([0, 5])
     })
 })
 
