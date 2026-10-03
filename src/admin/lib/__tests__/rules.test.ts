@@ -13,6 +13,21 @@ import siteJson from '@/content/site.json'
 
 const current = releasesJson as unknown as Registry
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
+const nextNumber = (kind: 'album' | 'single'): number => {
+    const re = kind === 'album' ? /(?:^|\/)album\s?(\d+)(?:[/-]|$)/ : /(?:^|\/)single(\d+)-/
+    let max = 0
+    const scan = (p?: string) => {
+        if (!p) return
+        const m = p.match(re)
+        if (m) max = Math.max(max, Number(m[1]))
+    }
+    for (const r of Object.values(current)) {
+        scan(r.audioPath)
+        scan(r.lyricsPath)
+        scan(r.cover)
+    }
+    return max + 1
+}
 
 describe('checkPath — белый список', () => {
     it.each([
@@ -68,31 +83,37 @@ describe('checkPath — белый список', () => {
     })
 })
 
-const newAlbum = (): RegistryRelease => ({
-    type: 'album',
-    title: 'Новый альбом',
-    year: '2026',
-    releaseDate: '1 октября 2026',
-    cover: 'images/album5-cover.jpg',
-    audioPath: 'audio/album5/',
-    lyricsPath: 'lyrics/album5/',
-    tracks: [
-        { num: 1, title: 'Первый', file: 'pervyy.mp3', lyricsFile: '01-pervyy.txt' },
-        { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt' }
-    ]
-})
+const newAlbum = (): RegistryRelease => {
+    const n = nextNumber('album')
+    return {
+        type: 'album',
+        title: 'Новый альбом',
+        year: '2026',
+        releaseDate: '1 октября 2026',
+        cover: `images/album${n}-cover.jpg`,
+        audioPath: `audio/album${n}/`,
+        lyricsPath: `lyrics/album${n}/`,
+        tracks: [
+            { num: 1, title: 'Первый', file: 'pervyy.mp3', lyricsFile: '01-pervyy.txt' },
+            { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt' }
+        ]
+    }
+}
 
-const newSingle = (): RegistryRelease => ({
-    type: 'single',
-    title: 'Сингл',
-    year: '2026',
-    releaseDate: '2 октября 2026',
-    cover: 'images/single7-cover.jpg',
-    audioPath: 'audio/singles/',
-    lyricsPath: 'lyrics/singles/',
-    videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-    tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt' }]
-})
+const newSingle = (): RegistryRelease => {
+    const n = nextNumber('single')
+    return {
+        type: 'single',
+        title: 'Сингл',
+        year: '2026',
+        releaseDate: '2 октября 2026',
+        cover: `images/single${n}-cover.jpg`,
+        audioPath: 'audio/singles/',
+        lyricsPath: 'lyrics/singles/',
+        videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
+        tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt' }]
+    }
+}
 
 describe('checkRegistryChange — защита статистики', () => {
     it('пропускает реестр без изменений', () => {

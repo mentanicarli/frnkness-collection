@@ -1,12 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import path from 'node:path'
-import { execFileSync } from 'node:child_process'
 import type { Releases } from '@/types'
 import { computeCatalogReport, contentPathsNeeded } from '../catalog'
-import releasesJson from '@/content/releases.json'
-
-const ROOT = path.resolve(__dirname, '../../../..')
-const releases = releasesJson as unknown as Releases
 
 const mini: Releases = {
     one: {
@@ -106,20 +100,32 @@ describe('отчёт о каталоге', () => {
     })
 })
 
-describe('отчёт по настоящему репозиторию', () => {
+describe('отчёт на фиксированных данных', () => {
+    const releases: Releases = {
+        demo: {
+            type: 'album',
+            title: 'Демо',
+            year: '2026',
+            cover: 'images/demo-cover.jpg',
+            audioPath: 'audio/demo/',
+            lyricsPath: 'lyrics/demo/',
+            tracks: [{ num: 1, title: 'POOPSICKS', file: 'poopsicks.mp3', lyricsFile: '01-poopsicks.txt' }]
+        }
+    }
+    const tree = [
+        { path: 'images/demo-cover.jpg', size: 1000 },
+        { path: 'audio/demo/poopsicks.mp3', size: 123 },
+        { path: 'lyrics/demo/01-poopsicks.txt', size: 40 },
+        { path: 'lyrics/demo/01-poopsicks.lrc', size: 40 },
+        { path: 'lyrics/demo/01-poopsicks.notes.json', size: 40 }
+    ]
+    const contents = {
+        'lyrics/demo/01-poopsicks.txt': 'POOPSICKS\n',
+        'lyrics/demo/01-poopsicks.notes.json': JSON.stringify({ annotations: [{ line: 'POOPSICKS', note: 'ok' }] })
+    }
+
     it('считается без ошибок и находит известные пробелы', () => {
-        // Состояние репозитория (HEAD), а не рабочей копии с возможными черновиками.
-        const tree = execFileSync('git', ['ls-tree', '-r', '-l', '-z', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
-            .split('\0')
-            .filter(Boolean)
-            .map((line) => {
-                const [meta, p] = line.split('\t')
-                return { path: p, size: Number(meta.trim().split(/\s+/)[3]) }
-            })
         const needed = contentPathsNeeded(releases, tree)
-        const contents = Object.fromEntries(
-            needed.map((p) => [p, execFileSync('git', ['show', `HEAD:${p}`], { cwd: ROOT, encoding: 'utf8' })])
-        )
         const report = computeCatalogReport(releases, tree, contents)
 
         const all = report.releases.flatMap((r) => r.tracks)
@@ -127,13 +133,13 @@ describe('отчёт по настоящему репозиторию', () => {
         // Все mp3 и обложки на месте.
         expect(all.every((t) => t.audio)).toBe(true)
         expect(report.releases.every((r) => r.cover)).toBe(true)
-        // Пустых текстов в репозитории больше нет: тексты есть у всех треков.
+        // Пустых текстов нет: тексты есть у всех треков.
         const empty = all.filter((t) => t.txt === 'empty').map((t) => t.title)
         expect(empty).toEqual([])
         expect(all.every((t) => t.txt === 'ok')).toBe(true)
         // У POOPSICKS есть .lrc и разборы.
         expect(all[0]).toMatchObject({ title: 'POOPSICKS', lrc: true, notes: 'ok' })
         expect(all[0].annotations).toBeGreaterThan(0)
-        // Десятки вызовов git на Windows в параллельном прогоне не укладываются в 5 с.
-    }, 30_000)
+        expect(needed).toEqual(['lyrics/demo/01-poopsicks.notes.json', 'lyrics/demo/01-poopsicks.txt'])
+    })
 })
