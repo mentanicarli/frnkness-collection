@@ -319,19 +319,20 @@
         ]
     },
     "byebye": {
-        "type": "album",
+        "type": "single",
         "title": "BYEBYE",
         "year": "2026",
         "releaseDate": "3 октября 2026",
-        "cover": "images/album5-cover.jpg",
-        "audioPath": "audio/album5/",
-        "lyricsPath": "lyrics/album5/",
+        "cover": "images/single7-cover.jpg",
+        "audioPath": "audio/singles/",
+        "lyricsPath": "lyrics/singles/",
+        "lyricsBookPath": "lyrics-books/byebye.pdf",
         "tracks": [
             {
                 "num": 1,
                 "title": "BYEBYE",
                 "file": "byebye.mp3",
-                "lyricsFile": "01-byebye.txt"
+                "lyricsFile": "byebye.txt"
             }
         ]
     }
