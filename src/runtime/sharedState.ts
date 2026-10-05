@@ -1,3 +1,4 @@
+import { shallowReactive } from 'vue'
 import type { LyricLine, Release } from '@/types'
 
 export interface RuntimeState {
@@ -29,11 +30,10 @@ export interface RuntimeState {
     currentLyricsLrcRaw: string
 }
 
-// Общая модель состояния runtime.
-// Намеренно обычный объект: шаблоны Vue отсюда ничего не читают, поэтому
-// прокси Vue только добавлял бы накладные расходы на каждое чтение — в том
-// числе в обработчике timeupdate, который ходит сюда несколько раз в секунду.
-export const runtimeState: RuntimeState = {
+// Общая модель состояния runtime: её пишет legacy-код, а шаблоны Vue читают.
+// shallowReactive — отслеживаются только поля верхнего уровня: массивы строк
+// караоке и DOM-узлы внутри не оборачиваются в прокси.
+export const runtimeState: RuntimeState = shallowReactive<RuntimeState>({
     viewedReleaseId: null,
     currentRelease: null,
     currentReleaseId: null,
@@ -55,7 +55,7 @@ export const runtimeState: RuntimeState = {
     currentLyricsTrackIndex: null,
     currentLyricsPlainText: '',
     currentLyricsLrcRaw: ''
-}
+})
 
 // Кэши вынесены отдельно, чтобы избежать повторных сетевых/CPU-операций.
 export const runtimeCaches = {

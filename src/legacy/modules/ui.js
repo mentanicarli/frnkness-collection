@@ -1,84 +1,13 @@
 import { lyricsBookFilename } from '../../utils/lyricsBook'
 
 export function createUiModule(ctx) {
-    const { dom, state, releases, utils, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, ANNOUNCE } = ctx
-    const { throttle, escapeHtml, renderPromoCardHtml, renderAnnounceCardHtml, isAnnounceActive, startAnnounceCountdown } = utils
-    let stopAnnounceCountdown = null
+    const { dom, state, releases, utils } = ctx
+    const { escapeHtml } = utils
 
     function initStaggerAnimation() {
         document.querySelectorAll('.stagger-item').forEach((item, i) => {
             item.classList.remove('visible')
             setTimeout(() => item.classList.add('visible'), i * 150)
-        })
-    }
-
-    function moveCardGradient(e) {
-        const card = e.currentTarget
-        const rect = card.getBoundingClientRect()
-        card.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`)
-        card.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`)
-    }
-
-    function renderHome() {
-        if (!dom.albumsGrid || !dom.singlesGrid) return
-        let albumsHtml = '', singlesHtml = ''
-
-        // Промо-блок: анонс будущего релиза (если включён и время не вышло),
-        // под ним — релиз, на который указывает PROMO_RELEASE_ID.
-        if (stopAnnounceCountdown) {
-            stopAnnounceCountdown()
-            stopAnnounceCountdown = null
-        }
-        const promoRelease = SHOW_NEW_RELEASE_PROMO ? releases[PROMO_RELEASE_ID] : null
-        const showAnnounce = Boolean(isAnnounceActive && isAnnounceActive(ANNOUNCE))
-        if (dom.homePromo && (promoRelease || showAnnounce)) {
-            const announceHtml = showAnnounce ? renderAnnounceCardHtml(ANNOUNCE) : ''
-            const promoHtml = promoRelease ? renderPromoCardHtml(PROMO_RELEASE_ID, promoRelease) : ''
-            dom.homePromo.innerHTML = announceHtml + promoHtml
-            const promoCard = dom.homePromo.querySelector('.promo-release-card:not(.announce-card)')
-            if (promoCard) ctx.modules.colors.applyCardAccent(promoCard, promoRelease.cover)
-            const announceCard = dom.homePromo.querySelector('.announce-card')
-            if (announceCard) {
-                ctx.modules.colors.applyCardAccent(announceCard, ANNOUNCE.cover)
-                // Время вышло — карточка исчезает, а не висит с нулями.
-                stopAnnounceCountdown = startAnnounceCountdown(announceCard, () => announceCard.remove())
-            }
-        } else if (dom.homePromo) {
-            dom.homePromo.innerHTML = ''
-        }
-
-        Object.entries(releases).forEach(([id, r], index) => {
-            const isPriorityCard = index < 6
-            const meta = r.type === 'album' ? `${r.tracks.length} треков` : 'Сингл'
-            const safeId = escapeHtml(id)
-            const safeTitle = escapeHtml(r.title)
-            const card = `
-                <button class="release-card text-left transition-all group relative" data-id="${safeId}" onclick="App.openRelease('${safeId}')">
-                    <div class="aspect-square overflow-hidden mb-3 bg-[var(--bg)] relative">
-                        <img src="${r.cover}" alt="${safeTitle}" class="card-image w-full h-full object-cover" loading="${isPriorityCard ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${index < 4 ? 'high' : 'low'}" onerror="this.style.display='none'">
-                    </div>
-                    <h3 class="font-semibold text-[var(--fg)] transition-colors line-clamp-2 relative z-10">${safeTitle}</h3>
-                    <p class="text-xs text-[var(--fg-muted)] mt-1 relative z-10">${meta} • ${escapeHtml(r.year)}</p>
-                </button>
-            `
-            if (r.type === 'album') albumsHtml += card
-            else singlesHtml += card
-        })
-
-        dom.albumsGrid.innerHTML = albumsHtml
-        dom.singlesGrid.innerHTML = singlesHtml
-
-        const throttledMove = throttle(moveCardGradient, 16)
-        document.querySelectorAll('.release-card').forEach(card => {
-            card.addEventListener('mouseenter', async (e) => {
-                card.addEventListener('mousemove', throttledMove)
-                const img = card.querySelector('img')
-                if (img) await ctx.modules.colors.applyCardAccent(card, img.src)
-            })
-            card.addEventListener('mouseleave', () => {
-                card.removeEventListener('mousemove', throttledMove)
-                if (card.dataset.fixedAccent !== 'true') ctx.modules.colors.resetCardAccent(card)
-            })
         })
     }
 
@@ -179,5 +108,5 @@ export function createUiModule(ctx) {
         if (name !== 'home') ctx.modules.search.toggleSearchPanel(false)
     }
 
-    return { initStaggerAnimation, renderHome, renderRelease, renderTracklist, showPage }
+    return { initStaggerAnimation, renderRelease, renderTracklist, showPage }
 }

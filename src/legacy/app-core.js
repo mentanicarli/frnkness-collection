@@ -86,8 +86,6 @@ export function initLegacyApp(deps = {}) {
         dom.fsVolumeSlider = $('fs-volume-slider')
         dom.fsVolWave1 = $('fs-vol-wave-1')
         dom.fsVolWave2 = $('fs-vol-wave-2')
-        dom.albumsGrid = $('albums-grid')
-        dom.singlesGrid = $('singles-grid')
         dom.chartList = $('chart-list')
         dom.tracklist = $('tracklist')
         dom.playerTrack = $('player-track')
@@ -95,16 +93,11 @@ export function initLegacyApp(deps = {}) {
         dom.releaseTitle = $('release-title')
         dom.releaseMeta = $('release-meta')
         dom.releasePlays = $('release-plays')
-        dom.flowModeBtn = $('flow-mode-btn')
-        dom.flowModeLabel = $('flow-mode-label')
-        dom.homePromo = $('home-promo')
         dom.searchInput = $('global-search')
         dom.searchResults = $('search-results')
         dom.searchPanel = $('header-search-panel')
         dom.searchToggle = $('search-toggle-btn')
         dom.searchBackdrop = $('search-backdrop')
-        dom.albumsSection = dom.albumsGrid ? dom.albumsGrid.closest('section') : null
-        dom.singlesSection = dom.singlesGrid ? dom.singlesGrid.closest('section') : null
         dom.trackPage = $('page-track')
         dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch')
         dom.fsLyricsModeText = $('fs-lyrics-mode-text')
@@ -254,7 +247,6 @@ export function initLegacyApp(deps = {}) {
         state.karaokeHardStart = false
 
         cacheDomElements()
-        modules.ui.renderHome()
         modules.router.start()
         modules.search.initGlobalSearch()
         modules.player.updateFlowButtonState()

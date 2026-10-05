@@ -89,7 +89,9 @@
         <section class="adm-card">
             <h2 class="adm-h2">Превью главной</h2>
             <div class="adm-promo-preview">
-                <div v-if="announcePreview" ref="announceBox" data-testid="announce-preview" v-html="announceHtml"></div>
+                <div v-if="announcePreview" data-testid="announce-preview">
+                    <AnnounceCard v-if="!announceGone" :key="announceKey" :announce="announcePreview" @expire="announceGone = true" />
+                </div>
                 <p v-else-if="announce.exists && announce.enabled" class="adm-faint adm-small" data-testid="announce-hidden">
                     Анонс не показывается: {{ announceHiddenReason }}
                 </p>
@@ -99,8 +101,9 @@
                     data-testid="promo-preview"
                     role="img"
                     :aria-label="`Промо-карточка: ${releases[releaseId].title}`"
-                    v-html="previewHtml"
-                ></div>
+                >
+                    <PromoCard :release-id="releaseId" :release="releases[releaseId]" />
+                </div>
                 <p v-else data-testid="promo-hidden" class="adm-faint adm-small">Промо-блок скрыт — на главной сразу идёт список альбомов.</p>
             </div>
         </section>
@@ -119,15 +122,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Announce, Releases, SiteSettings } from '@/types'
 import CommitDialog from '../components/CommitDialog.vue'
 import { SITE_PATH, useRepo } from '../composables/useRepo'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useUnsaved } from '../composables/useUnsaved'
 import { uploadMedia, type CommitFile } from '../api/content'
-import { renderPromoCardHtml } from '@/utils/promoCard'
-import { isAnnounceActive, isAnnounceExpired, renderAnnounceCardHtml, startAnnounceCountdown } from '@/utils/announceCard'
+// Превью — те же компоненты, что на главной сайта: расходиться нечему.
+import PromoCard from '@/site/components/PromoCard.vue'
+import AnnounceCard from '@/site/components/AnnounceCard.vue'
+import { isAnnounceActive, isAnnounceExpired } from '@/utils/announceCard'
 import { validateSiteSettings } from '../../../supabase/functions/_shared/rules.ts'
 import { serializeSite } from '../lib/content'
 import { coverErrors, imageExt, readImage, type ImageInfo } from '../lib/imageFile'
@@ -206,7 +211,6 @@ const errors = computed(() => {
 })
 
 // ── Превью ───────────────────────────────────────────────────────────
-const previewHtml = computed(() => renderPromoCardHtml(releaseId.value, releases.value[releaseId.value]))
 const announcePreview = computed<Announce | null>(() => {
     const a = nextAnnounce.value
     if (!a || !coverSrc.value || !a.title.trim()) return null
@@ -217,24 +221,11 @@ const announceHiddenReason = computed(() => {
     if (!announce.title.trim() || !coverSrc.value) return 'заполни название и обложку'
     return 'время выхода прошло'
 })
-// Разметка не зависит от текущего времени — перерисовывается только при смене
-// данных, а цифры отсчёта обновляет startAnnounceCountdown (у анонса без
-// даты отсчёта нет).
-const announceHtml = computed(() => {
-    const a = announcePreview.value
-    if (!a) return ''
-    return a.releaseAt ? renderAnnounceCardHtml(a, Date.parse(a.releaseAt) - 1000) : renderAnnounceCardHtml(a)
-})
-const announceBox = ref<HTMLElement | null>(null)
-let stopCountdown: (() => void) | null = null
-watch(announceHtml, async () => {
-    stopCountdown?.()
-    stopCountdown = null
-    await nextTick()
-    const card = announceBox.value?.querySelector<HTMLElement>('.announce-card')
-    if (card) stopCountdown = startAnnounceCountdown(card, () => card.remove())
-}, { immediate: true })
-onBeforeUnmount(() => stopCountdown?.())
+// Карточка пересоздаётся только при смене данных анонса; цифры отсчёта
+// обновляет она сама. Время вышло — карточка пропадает, как на сайте.
+const announceKey = computed(() => JSON.stringify(announcePreview.value))
+const announceGone = ref(false)
+watch(announceKey, () => { announceGone.value = false })
 
 // ── Действия ─────────────────────────────────────────────────────────
 function resetCover() {
