@@ -13,19 +13,22 @@
                 "num": 1,
                 "title": "POOPSICKS",
                 "file": "poopsicks.mp3",
-                "lyricsFile": "01-poopsicks.txt"
+                "lyricsFile": "01-poopsicks.txt",
+                "id": "most-venture-poopsicks/poopsicks"
             },
             {
                 "num": 2,
                 "title": "BACK TO POOPSICKS 2",
                 "file": "back-to-poopsicks-2.mp3",
-                "lyricsFile": "02-back-to-poopsicks-2.txt"
+                "lyricsFile": "02-back-to-poopsicks-2.txt",
+                "id": "most-venture-poopsicks/back-to-poopsicks-2"
             },
             {
                 "num": 3,
                 "title": "Macan-Walker",
                 "file": "macan-walker.mp3",
-                "lyricsFile": "03-macan-walker.txt"
+                "lyricsFile": "03-macan-walker.txt",
+                "id": "most-venture-poopsicks/macan-walker"
             }
         ]
     },
@@ -44,7 +47,8 @@
                 "num": 1,
                 "title": "Disinvolto: Danilovsky",
                 "file": "disinvolto.mp3",
-                "lyricsFile": "disinvolto.txt"
+                "lyricsFile": "disinvolto.txt",
+                "id": "disinvolto/disinvolto"
             }
         ]
     },
@@ -61,13 +65,15 @@
                 "num": 1,
                 "title": "still ballin'",
                 "file": "still-ballin.mp3",
-                "lyricsFile": "01-still-ballin.txt"
+                "lyricsFile": "01-still-ballin.txt",
+                "id": "six-senses-pupsiks/still-ballin"
             },
             {
                 "num": 2,
                 "title": "Hulk's Reflections",
                 "file": "hulks-reflections.mp3",
-                "lyricsFile": "02-hulks-reflections.txt"
+                "lyricsFile": "02-hulks-reflections.txt",
+                "id": "six-senses-pupsiks/hulks-reflections"
             }
         ]
     },
@@ -84,7 +90,8 @@
                 "num": 1,
                 "title": "какой тебе боксик?",
                 "file": "boxik.mp3",
-                "lyricsFile": "boxik.txt"
+                "lyricsFile": "boxik.txt",
+                "id": "boxik/boxik"
             }
         ]
     },
@@ -101,7 +108,8 @@
                 "num": 1,
                 "title": "FAAA",
                 "file": "faaa.mp3",
-                "lyricsFile": "faaa.txt"
+                "lyricsFile": "faaa.txt",
+                "id": "faaa/faaa"
             }
         ]
     },
@@ -119,19 +127,22 @@
                 "num": 1,
                 "title": "ZAL",
                 "file": "ZAL.mp3",
-                "lyricsFile": "01-zal.txt"
+                "lyricsFile": "01-zal.txt",
+                "id": "born-to-be-deluxe/zal"
             },
             {
                 "num": 2,
                 "title": "Última Historia",
                 "file": "Última historia.mp3",
-                "lyricsFile": "02-ultima-historia.txt"
+                "lyricsFile": "02-ultima-historia.txt",
+                "id": "born-to-be-deluxe/ultima-historia"
             },
             {
                 "num": 3,
                 "title": "COMЁ N TEAM",
                 "file": "come n team.mp3",
-                "lyricsFile": "03-come-n-team.txt"
+                "lyricsFile": "03-come-n-team.txt",
+                "id": "born-to-be-deluxe/come-n-team"
             }
         ]
     },
@@ -149,43 +160,50 @@
                 "num": 1,
                 "title": "Маканочки",
                 "file": "Маканочки.mp3",
-                "lyricsFile": "01-makanochki.txt"
+                "lyricsFile": "01-makanochki.txt",
+                "id": "zlaya-nostalgia/makanochki"
             },
             {
                 "num": 2,
                 "title": "Общество Могнутых Аналитиков",
                 "file": "Общество Могнутых Аналитиков.mp3",
-                "lyricsFile": "02-obshchestvo-mognutyh-analitikov.txt"
+                "lyricsFile": "02-obshchestvo-mognutyh-analitikov.txt",
+                "id": "zlaya-nostalgia/obshchestvo-mognutyh-analitikov"
             },
             {
                 "num": 3,
                 "title": "ПУПСАСТИЯ",
                 "file": "Пупсастия.mp3",
-                "lyricsFile": "03-pupsastiya.txt"
+                "lyricsFile": "03-pupsastiya.txt",
+                "id": "zlaya-nostalgia/pupsastiya"
             },
             {
                 "num": 4,
                 "title": "Случайно взяли топ один",
                 "file": "Случайно взяли топ 1.mp3",
-                "lyricsFile": "04-sluchayno-vzyali-top-odin.txt"
+                "lyricsFile": "04-sluchayno-vzyali-top-odin.txt",
+                "id": "zlaya-nostalgia/sluchayno-vzyali-top-odin"
             },
             {
                 "num": 5,
                 "title": "Где же наш первый курс",
                 "file": "Где же наш первый курс.mp3",
-                "lyricsFile": "05-gde-zhe-nash-perviy-kurs.txt"
+                "lyricsFile": "05-gde-zhe-nash-perviy-kurs.txt",
+                "id": "zlaya-nostalgia/gde-zhe-nash-perviy-kurs"
             },
             {
                 "num": 6,
                 "title": "Бильярд",
                 "file": "Бильярд.mp3",
-                "lyricsFile": "06-bilyard.txt"
+                "lyricsFile": "06-bilyard.txt",
+                "id": "zlaya-nostalgia/bilyard"
             },
             {
                 "num": 7,
                 "title": "ГОУТЫ",
                 "file": "ГОУТЫ.mp3",
-                "lyricsFile": "07-gouty.txt"
+                "lyricsFile": "07-gouty.txt",
+                "id": "zlaya-nostalgia/gouty"
             }
         ]
     }

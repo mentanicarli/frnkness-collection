@@ -8,7 +8,7 @@ import type { Releases, Track, TrackRef } from '@/types'
  * трека отбрасываем — он дублирует порядок внутри релиза и сместился бы
  * при любой перестановке.
  */
-export function getTrackSlug(track: Track): string {
+export function getTrackSlug(track: Pick<Track, 'num' | 'lyricsFile'>): string {
     const base = (track?.lyricsFile || '').replace(/\.[^/.]+$/, '')
     const slug = base.replace(/^\d+-/, '')
     return slug || String(track?.num ?? '')

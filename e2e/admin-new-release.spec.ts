@@ -99,8 +99,8 @@ test('альбом: форма → подтверждение → загрузк
         lyricsPath: 'lyrics/album5/',
         lyricsBookPath: 'lyrics-books/testovy-albom.pdf',
         tracks: [
-            { num: 1, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '01-vtoroy.txt' },
-            { num: 2, title: 'Первый', file: 'pervy.mp3', lyricsFile: '02-pervy.txt' }
+            { num: 1, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '01-vtoroy.txt', id: 'testovy-albom/vtoroy' },
+            { num: 2, title: 'Первый', file: 'pervy.mp3', lyricsFile: '02-pervy.txt', id: 'testovy-albom/pervy' }
         ]
     })
     // Формат файла реестра — как у текущего (4 пробела, перевод строки в конце).
@@ -132,7 +132,7 @@ test('сингл: общие папки, slug.txt, ссылка YouTube в embed
         audioPath: 'audio/singles/',
         lyricsPath: 'lyrics/singles/',
         videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-        tracks: [{ num: 1, title: 'Новый сингл', file: 'novy-singl.mp3', lyricsFile: 'novy-singl.txt' }]
+        tracks: [{ num: 1, title: 'Новый сингл', file: 'novy-singl.mp3', lyricsFile: 'novy-singl.txt', id: 'novy-singl/novy-singl' }]
     })
     expect(files.map((f) => f.path)).not.toContain('src/content/site.json')
 })

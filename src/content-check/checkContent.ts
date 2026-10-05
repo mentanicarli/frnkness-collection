@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { validateSiteSettings, validateTrackNotes } from '../../supabase/functions/_shared/rules.ts'
+import { checkTrackIds, validateSiteSettings, validateTrackNotes } from '../../supabase/functions/_shared/rules.ts'
 import { findDanglingAnnotations, type TrackNotes } from '@/utils/trackNotes'
 import { getTrackSlug } from '@/utils/slug'
 import type { Track } from '@/types'
@@ -22,7 +22,7 @@ export interface ContentReport {
 
 const RELEASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const RELEASE_KEYS = new Set(['type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath', 'lyricsBookPath', 'videoUrl', 'upcoming', 'tracks'])
-const TRACK_KEYS = new Set(['num', 'title', 'file', 'lyricsFile'])
+const TRACK_KEYS = new Set(['num', 'title', 'file', 'lyricsFile', 'id'])
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря']
 const RELEASE_DATE_RE = new RegExp(`^([1-9]|[12]\\d|3[01]) (${MONTHS.join('|')}) (\\d{4})$`)
 const YOUTUBE_EMBED_RE = /^https:\/\/www\.youtube\.com\/embed\/[\w-]{6,20}$/
@@ -131,6 +131,8 @@ function checkRegistry(registry: unknown, errors: string[]): Obj {
             slugs.add(slug)
         })
     }
+    // Постоянный id есть у каждого трека, формат верный, повторов нет.
+    for (const e of checkTrackIds(registry, true)) errors.push(`${p}: ${e}`)
     return registry
 }
 

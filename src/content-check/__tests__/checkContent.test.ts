@@ -37,7 +37,7 @@ describe('checkContent: корректный каталог', () => {
     it('у анонсированного релиза файлов треков может не быть', () => {
         const c = catalog()
         const reg = c.json('src/content/releases.json')
-        reg.soon = { ...reg.faaa, title: 'Скоро', upcoming: true, tracks: [{ num: 1, title: 'Скоро', file: 'soon.mp3', lyricsFile: 'soon.txt' }] }
+        reg.soon = { ...reg.faaa, title: 'Скоро', upcoming: true, tracks: [{ num: 1, title: 'Скоро', file: 'soon.mp3', lyricsFile: 'soon.txt', id: 'soon/soon' }] }
         c.write('src/content/releases.json', reg)
         expect(c.check()).toEqual([])
     })
@@ -67,6 +67,20 @@ describe('checkContent: ошибки', () => {
         expect(errors).toContain('src/content/releases.json: релиз «boxik»: год в releaseDate не совпадает с year')
         expect(errors).toContain('src/content/releases.json: релиз «six-senses-pupsiks», трек 2: num должен быть 2')
         expect(errors).toContain('src/content/releases.json: релиз «six-senses-pupsiks», трек 2: адрес трека «still-ballin» уже занят в этом релизе')
+    })
+
+    it('постоянные id треков: есть у всех, верный формат, без повторов', () => {
+        const c = catalog()
+        const reg = c.json('src/content/releases.json')
+        delete reg.faaa.tracks[0].id
+        reg.boxik.tracks[0].id = 'boxik'
+        reg['zlaya-nostalgia'].tracks[1].id = reg['zlaya-nostalgia'].tracks[0].id
+        c.write('src/content/releases.json', reg)
+        expect(c.check()).toEqual([
+            'src/content/releases.json: релиз «boxik», трек 1: id должен быть вида <id релиза>/<slug> латиницей',
+            'src/content/releases.json: релиз «faaa», трек 1: нет id',
+            'src/content/releases.json: релиз «zlaya-nostalgia», трек 2: id «zlaya-nostalgia/makanochki» уже занят (релиз «zlaya-nostalgia», трек 1)'
+        ])
     })
 
     it('нет mp3, обложки, PDF; регистр в имени файла важен', () => {

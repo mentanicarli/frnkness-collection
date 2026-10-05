@@ -5,6 +5,8 @@ import {
     validateNewRelease,
     validateSiteSettings,
     checkDeletions,
+    checkTrackIds,
+    registryHasTrackIds,
     type Registry,
     type RegistryRelease
 } from '../../../../supabase/functions/_shared/rules.ts'
@@ -83,7 +85,7 @@ describe('checkPath — белый список', () => {
     })
 })
 
-const newAlbum = (): RegistryRelease => {
+const newAlbum = (releaseId = 'novyy-albom'): RegistryRelease => {
     const n = nextNumber('album')
     return {
         type: 'album',
@@ -94,13 +96,20 @@ const newAlbum = (): RegistryRelease => {
         audioPath: `audio/album${n}/`,
         lyricsPath: `lyrics/album${n}/`,
         tracks: [
-            { num: 1, title: 'Первый', file: 'pervyy.mp3', lyricsFile: '01-pervyy.txt' },
-            { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt' }
+            { num: 1, title: 'Первый', file: 'pervyy.mp3', lyricsFile: '01-pervyy.txt', id: `${releaseId}/pervyy` },
+            { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt', id: `${releaseId}/vtoroy` }
         ]
     }
 }
 
-const newSingle = (): RegistryRelease => {
+// Реестр как до перехода на постоянные id треков.
+const withoutIds = (registry: Registry): Registry => {
+    const out = clone(registry)
+    for (const r of Object.values(out)) for (const t of r.tracks) delete t.id
+    return out
+}
+
+const newSingle = (releaseId = 'singl'): RegistryRelease => {
     const n = nextNumber('single')
     return {
         type: 'single',
@@ -111,7 +120,7 @@ const newSingle = (): RegistryRelease => {
         audioPath: 'audio/singles/',
         lyricsPath: 'lyrics/singles/',
         videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-        tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt' }]
+        tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt', id: `${releaseId}/singl` }]
     }
 }
 
@@ -245,12 +254,12 @@ describe('checkRegistryChange — защита статистики', () => {
 
     it('не даёт новому релизу занять чужие файлы и папки', () => {
         const single = newSingle()
-        single.tracks[0] = { num: 1, title: 'x', file: 'boxik.mp3', lyricsFile: 'boxik.txt' }
+        single.tracks[0] = { num: 1, title: 'x', file: 'boxik.mp3', lyricsFile: 'boxik.txt', id: 'x/boxik' }
         const errors = checkRegistryChange(current, { ...clone(current), x: single })
         expect(errors).toContain('файл audio/singles/boxik.mp3 уже занят релизом «boxik»')
         expect(errors).toContain('файл lyrics/singles/boxik.txt уже занят релизом «boxik»')
 
-        const album = { ...newAlbum(), lyricsPath: 'lyrics/album4/', cover: 'images/album4-cover.jpg' }
+        const album = { ...newAlbum('y'), lyricsPath: 'lyrics/album4/', cover: 'images/album4-cover.jpg' }
         const albumErrors = checkRegistryChange(current, { ...clone(current), y: album })
         expect(albumErrors).toContain('папка lyrics/album4/ уже занята релизом «zlaya-nostalgia»')
         expect(albumErrors).toContain('файл images/album4-cover.jpg уже занят релизом «zlaya-nostalgia»')
@@ -263,6 +272,94 @@ describe('checkRegistryChange — защита статистики', () => {
 
     it('отклоняет мусор вместо объекта', () => {
         expect(checkRegistryChange(current, [])).toEqual(['releases.json должен быть объектом'])
+    })
+})
+
+describe('checkRegistryChange — постоянные id треков', () => {
+    it('id существующего трека нельзя изменить или убрать', () => {
+        const changed = clone(current)
+        changed.faaa.tracks[0].id = 'faaa/faaa-2'
+        expect(checkRegistryChange(current, changed)).toEqual(['релиз «faaa»: трек 1 нельзя менять или переставлять'])
+
+        const removed = clone(current)
+        delete removed.faaa.tracks[0].id
+        expect(checkRegistryChange(current, removed)).toEqual(['релиз «faaa»: трек 1 нельзя менять или переставлять'])
+    })
+
+    it('после перехода новый релиз без id не принимается', () => {
+        const single = newSingle()
+        delete single.tracks[0].id
+        expect(checkRegistryChange(current, { ...clone(current), singl: single })).toEqual([
+            'релиз «singl», трек 1: нет id — обнови страницу админки'
+        ])
+    })
+
+    it('id нового трека — «<id релиза>/<slug>» и не занят', () => {
+        const wrong = newAlbum()
+        wrong.tracks[1].id = 'novyy-albom/drugoy'
+        expect(checkRegistryChange(current, { ...clone(current), 'novyy-albom': wrong })).toContain(
+            'релиз «novyy-albom», трек 2: id должен быть «novyy-albom/vtoroy»'
+        )
+
+        const foreign = newSingle()
+        foreign.tracks[0].id = 'faaa/faaa'
+        expect(checkRegistryChange(current, { ...clone(current), singl: foreign }).join()).toContain('id должен быть «singl/singl»')
+    })
+
+    describe('переходный период: в текущем реестре id ещё нет', () => {
+        const before = withoutIds(current)
+
+        it('правка названия, обложки и PDF проходит', () => {
+            const next = clone(before)
+            Object.assign(next['zlaya-nostalgia'], {
+                title: 'Злая Ностальгия (Deluxe)',
+                cover: 'images/album4-cover-20261002.jpg',
+                lyricsBookPath: 'lyrics-books/zlaya-nostalgia-20261002.pdf'
+            })
+            expect(checkRegistryChange(before, next)).toEqual([])
+        })
+
+        it('новый релиз можно добавить и без id, и с id', () => {
+            const plain = newSingle()
+            delete plain.tracks[0].id
+            expect(checkRegistryChange(before, { ...clone(before), singl: plain })).toEqual([])
+            expect(checkRegistryChange(before, { ...clone(before), 'novyy-albom': newAlbum() })).toEqual([])
+        })
+
+        it('неверный id нового трека всё равно отклоняется', () => {
+            const bad = newSingle()
+            bad.tracks[0].id = 'Сингл'
+            expect(checkRegistryChange(before, { ...clone(before), singl: bad }).join()).toContain('id должен быть «singl/singl»')
+        })
+    })
+
+    it('после перехода правка названия, обложки и PDF проходит', () => {
+        const next = clone(current)
+        Object.assign(next.disinvolto, { title: 'Disinvolto!', cover: 'images/single1-cover-20261005.jpg' })
+        delete next.disinvolto.lyricsBookPath
+        expect(checkRegistryChange(current, next)).toEqual([])
+    })
+})
+
+describe('checkTrackIds и registryHasTrackIds', () => {
+    it('реестр фикстуры — с id у всех треков, без ошибок', () => {
+        expect(registryHasTrackIds(current)).toBe(true)
+        expect(checkTrackIds(current, true)).toEqual([])
+        expect(registryHasTrackIds(withoutIds(current))).toBe(false)
+    })
+
+    it('ловит отсутствие, неверный формат, чужой префикс и повтор', () => {
+        const reg = clone(current)
+        delete reg.faaa.tracks[0].id
+        reg.boxik.tracks[0].id = 'boxik/Боксик'
+        reg['zlaya-nostalgia'].tracks[0].id = 'faaa/makanochki'
+        reg['zlaya-nostalgia'].tracks[1].id = reg['zlaya-nostalgia'].tracks[2].id
+        expect(checkTrackIds(reg, false)).toEqual([
+            'релиз «boxik», трек 1: id должен быть вида <id релиза>/<slug> латиницей',
+            'релиз «zlaya-nostalgia», трек 1: id «faaa/makanochki» должен начинаться с «zlaya-nostalgia/»',
+            'релиз «zlaya-nostalgia», трек 3: id «zlaya-nostalgia/pupsastiya» уже занят (релиз «zlaya-nostalgia», трек 2)'
+        ])
+        expect(checkTrackIds(reg, true)).toContain('релиз «faaa», трек 1: нет id')
     })
 })
 

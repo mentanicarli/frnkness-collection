@@ -3,6 +3,8 @@
  */
 
 export interface Track {
+    /** Постоянный id «<releaseId>/<slug>»; не меняется никогда. */
+    id: string
     num: number
     title: string
     file: string

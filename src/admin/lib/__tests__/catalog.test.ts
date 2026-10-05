@@ -12,10 +12,10 @@ const mini: Releases = {
         lyricsPath: 'lyrics/one/',
         lyricsBookPath: 'lyrics-books/one.pdf',
         tracks: [
-            { num: 1, title: 'Полный', file: 'full.mp3', lyricsFile: '01-full.txt' },
-            { num: 2, title: 'Пустой', file: 'empty.mp3', lyricsFile: '02-empty.txt' },
-            { num: 3, title: 'Без файлов', file: 'none.mp3', lyricsFile: '03-none.txt' },
-            { num: 4, title: 'Битые разборы', file: 'broken.mp3', lyricsFile: '04-broken.txt' }
+            { num: 1, title: 'Полный', file: 'full.mp3', lyricsFile: '01-full.txt', id: 'one/full' },
+            { num: 2, title: 'Пустой', file: 'empty.mp3', lyricsFile: '02-empty.txt', id: 'one/empty' },
+            { num: 3, title: 'Без файлов', file: 'none.mp3', lyricsFile: '03-none.txt', id: 'one/none' },
+            { num: 4, title: 'Битые разборы', file: 'broken.mp3', lyricsFile: '04-broken.txt', id: 'one/broken' }
         ]
     }
 }
@@ -109,7 +109,7 @@ describe('отчёт на фиксированных данных', () => {
             cover: 'images/demo-cover.jpg',
             audioPath: 'audio/demo/',
             lyricsPath: 'lyrics/demo/',
-            tracks: [{ num: 1, title: 'POOPSICKS', file: 'poopsicks.mp3', lyricsFile: '01-poopsicks.txt' }]
+            tracks: [{ num: 1, title: 'POOPSICKS', file: 'poopsicks.mp3', lyricsFile: '01-poopsicks.txt', id: 'demo/poopsicks' }]
         }
     }
     const tree = [

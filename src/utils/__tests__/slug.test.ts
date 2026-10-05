@@ -3,6 +3,7 @@ import { getTrackSlug, findTrackRefBySlug, buildTrackHash } from '../slug'
 import type { Releases, Track } from '@/types'
 
 const track = (num: number, title: string, lyricsFile: string): Track => ({
+    id: `test/${num}`,
     num,
     title,
     file: `${lyricsFile.replace(/\.txt$/, '')}.mp3`,
@@ -47,7 +48,7 @@ describe('getTrackSlug', () => {
     })
 
     it('falls back to the track number when there is no lyrics file', () => {
-        expect(getTrackSlug({ num: 3, title: 'x', file: 'x.mp3', lyricsFile: '' })).toBe('3')
+        expect(getTrackSlug(track(3, 'x', ''))).toBe('3')
     })
 })
 

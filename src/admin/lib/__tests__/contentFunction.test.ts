@@ -287,7 +287,7 @@ describe('admin-content: commit', () => {
                 cover: 'images/single7-cover.jpg',
                 audioPath: 'audio/singles/',
                 lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: 'Новый', file: 'novyy.mp3', lyricsFile: 'novyy.txt' }]
+                tracks: [{ num: 1, title: 'Новый', file: 'novyy.mp3', lyricsFile: 'novyy.txt', id: 'novyy-singl/novyy' }]
             }
         }
         const res = await call({

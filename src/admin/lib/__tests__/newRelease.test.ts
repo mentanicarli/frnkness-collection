@@ -27,7 +27,7 @@ const fixtureReleases: Releases = {
         cover: 'images/album 3-cover.jpg',
         audioPath: 'audio/album 3/',
         lyricsPath: 'lyrics/album 3/',
-        tracks: [{ num: 1, title: 'A1', file: 'a1.mp3', lyricsFile: '01-a1.txt' }]
+        tracks: [{ num: 1, title: 'A1', file: 'a1.mp3', lyricsFile: '01-a1.txt', id: 'album-space/a1' }]
     },
     album3: {
         type: 'album',
@@ -36,7 +36,7 @@ const fixtureReleases: Releases = {
         cover: 'images/album3-cover.jpg',
         audioPath: 'audio/album3/',
         lyricsPath: 'lyrics/album3/',
-        tracks: [{ num: 1, title: 'B1', file: 'b1.mp3', lyricsFile: '01-b1.txt' }]
+        tracks: [{ num: 1, title: 'B1', file: 'b1.mp3', lyricsFile: '01-b1.txt', id: 'album3/b1' }]
     },
     album4: {
         type: 'album',
@@ -45,7 +45,7 @@ const fixtureReleases: Releases = {
         cover: 'images/album4-cover.jpg',
         audioPath: 'audio/album4/',
         lyricsPath: 'lyrics/album4/',
-        tracks: [{ num: 1, title: 'C1', file: 'c1.mp3', lyricsFile: '01-c1.txt' }]
+        tracks: [{ num: 1, title: 'C1', file: 'c1.mp3', lyricsFile: '01-c1.txt', id: 'album4/c1' }]
     },
     ...Object.fromEntries(
         Array.from({ length: 6 }, (_, i) => [
@@ -57,7 +57,7 @@ const fixtureReleases: Releases = {
                 cover: `images/single${i + 1}-cover.jpg`,
                 audioPath: 'audio/singles/',
                 lyricsPath: 'lyrics/singles/',
-                tracks: [{ num: 1, title: `S${i + 1}`, file: `s${i + 1}.mp3`, lyricsFile: `s${i + 1}.txt` }]
+                tracks: [{ num: 1, title: `S${i + 1}`, file: `s${i + 1}.mp3`, lyricsFile: `s${i + 1}.txt`, id: `single-${i + 1}/s${i + 1}` }]
             }
         ])
     )
@@ -150,8 +150,8 @@ describe('planRelease', () => {
             lyricsPath: 'lyrics/album5/',
             lyricsBookPath: 'lyrics-books/novyy-albom.pdf',
             tracks: [
-                { num: 1, title: 'Первый трек', file: 'pervy-trek.mp3', lyricsFile: '01-pervy-trek.txt' },
-                { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt' }
+                { num: 1, title: 'Первый трек', file: 'pervy-trek.mp3', lyricsFile: '01-pervy-trek.txt', id: 'novyy-albom/pervy-trek' },
+                { num: 2, title: 'Второй', file: 'vtoroy.mp3', lyricsFile: '02-vtoroy.txt', id: 'novyy-albom/vtoroy' }
             ]
         })
         // Порядок полей как у существующих записей.
@@ -168,7 +168,7 @@ describe('planRelease', () => {
             audioPath: 'audio/singles/',
             lyricsPath: 'lyrics/singles/',
             videoUrl: 'https://www.youtube.com/embed/vI_8FLsAn50',
-            tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt' }]
+            tracks: [{ num: 1, title: 'Сингл', file: 'singl.mp3', lyricsFile: 'singl.txt', id: `${single().id}/singl` }]
         })
         expect(plan.release.lyricsBookPath).toBeUndefined()
     })

@@ -3,6 +3,7 @@ import {
     RELEASE_ID_RE,
     SLUG_RE,
     checkRegistryChange,
+    makeTrackId,
     type Registry,
     type RegistryRelease
 } from '../../../supabase/functions/_shared/rules.ts'
@@ -115,7 +116,9 @@ export function planRelease(draft: ReleaseDraft, releases: Releases, files: { pa
         num: i + 1,
         title: t.title.trim(),
         file: `${t.slug}.mp3`,
-        lyricsFile: isAlbum ? `${String(i + 1).padStart(2, '0')}-${t.slug}.txt` : `${t.slug}.txt`
+        lyricsFile: isAlbum ? `${String(i + 1).padStart(2, '0')}-${t.slug}.txt` : `${t.slug}.txt`,
+        // Постоянный id: дальше его никто не меняет (см. checkRegistryChange).
+        id: makeTrackId(draft.id, t.slug)
     }))
     const release: RegistryRelease = {
         type: draft.type,

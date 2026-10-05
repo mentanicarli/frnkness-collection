@@ -54,8 +54,8 @@ describe('getAllTrackRefs', () => {
             type: 'album', title: 'Album 1', year: '2025',
             cover: '', audioPath: '', lyricsPath: '',
             tracks: [
-                { num: 1, title: 'Track A', file: 'a.mp3', lyricsFile: 'a.txt' },
-                { num: 2, title: 'Track B', file: 'b.mp3', lyricsFile: 'b.txt' }
+                { id: 'album-1/a', num: 1, title: 'Track A', file: 'a.mp3', lyricsFile: 'a.txt' },
+                { id: 'album-1/b', num: 2, title: 'Track B', file: 'b.mp3', lyricsFile: 'b.txt' }
             ]
         }
     }
@@ -89,7 +89,7 @@ describe('pickRandomTrackRef', () => {
         'r1': {
             type: 'single', title: 'Single', year: '2025',
             cover: '', audioPath: '', lyricsPath: '',
-            tracks: [{ num: 1, title: 'T', file: 't.mp3', lyricsFile: 't.txt' }]
+            tracks: [{ id: 'r1/t', num: 1, title: 'T', file: 't.mp3', lyricsFile: 't.txt' }]
         }
     }
 

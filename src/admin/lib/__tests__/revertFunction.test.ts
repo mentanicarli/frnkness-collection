@@ -205,7 +205,7 @@ describe('откат', () => {
 
     it('новый релиз: откат только при 0 прослушиваний', async () => {
         const reg = JSON.parse(REG)
-        reg['novyy-singl'] = { ...reg.faaa, title: 'Новый', cover: 'images/single7-cover.jpg', tracks: [{ num: 1, title: 'Новый', file: 'novyy-singl.mp3', lyricsFile: 'novyy-singl.txt' }] }
+        reg['novyy-singl'] = { ...reg.faaa, title: 'Новый', cover: 'images/single7-cover.jpg', tracks: [{ num: 1, title: 'Новый', file: 'novyy-singl.mp3', lyricsFile: 'novyy-singl.txt', id: 'novyy-singl/novyy-singl' }] }
         const add = addCommit('admin: новый сингл «Новый»', (f) => {
             f['src/content/releases.json'] = JSON.stringify(reg, null, 4)
             f['images/single7-cover.jpg'] = 'JPEG'

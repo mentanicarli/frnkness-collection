@@ -112,6 +112,12 @@ export interface RegistryTrack {
     title: string
     file: string
     lyricsFile: string
+    /**
+     * Постоянный id трека «<releaseId>/<slug>». Необязателен только на
+     * переходный период: реестр, где у всех треков уже есть id, требует его
+     * и у треков нового релиза.
+     */
+    id?: string
 }
 
 export interface RegistryRelease {
@@ -144,7 +150,57 @@ const RELEASE_KEYS = new Set([
     'type', 'title', 'year', 'releaseDate', 'cover', 'audioPath', 'lyricsPath',
     'lyricsBookPath', 'videoUrl', 'upcoming', 'tracks'
 ])
-const TRACK_KEYS = new Set(['num', 'title', 'file', 'lyricsFile'])
+const TRACK_KEYS = new Set(['num', 'title', 'file', 'lyricsFile', 'id'])
+
+// ── Постоянные id треков ───────────────────────────────────────────────
+//
+// id — «<releaseId>/<slug>» на момент создания трека; дальше он не меняется,
+// даже если поменять название. На него ссылаются избранное, плейлисты и
+// комнаты. Статистика пока считается по старому ключу «<releaseId>-<индекс>».
+
+export const TRACK_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+export function makeTrackId(releaseId: string, slug: string): string {
+    return `${releaseId}/${slug}`
+}
+
+/** У всех треков реестра есть id — переход на постоянные id завершён. */
+export function registryHasTrackIds(registry: unknown): boolean {
+    if (!isPlainObject(registry)) return false
+    const releases = Object.values(registry)
+    return releases.length > 0 && releases.every((r) =>
+        isPlainObject(r) && Array.isArray(r.tracks) && r.tracks.every((t) => isPlainObject(t) && typeof t.id === 'string'))
+}
+
+/**
+ * id треков во всём реестре: формат, префикс — id своего релиза, без
+ * повторов. Трек без id — ошибка, только если requireIds.
+ */
+export function checkTrackIds(registry: unknown, requireIds: boolean): string[] {
+    if (!isPlainObject(registry)) return []
+    const errors: string[] = []
+    const seen = new Map<string, string>()
+    for (const [releaseId, release] of Object.entries(registry)) {
+        if (!isPlainObject(release) || !Array.isArray(release.tracks)) continue
+        release.tracks.forEach((t, i) => {
+            if (!isPlainObject(t)) return
+            const tp = `релиз «${releaseId}», трек ${i + 1}`
+            if (t.id === undefined) {
+                if (requireIds) errors.push(`${tp}: нет id`)
+                return
+            }
+            if (typeof t.id !== 'string' || !TRACK_ID_RE.test(t.id)) {
+                errors.push(`${tp}: id должен быть вида <id релиза>/<slug> латиницей`)
+                return
+            }
+            if (!t.id.startsWith(releaseId + '/')) errors.push(`${tp}: id «${t.id}» должен начинаться с «${releaseId}/»`)
+            const prev = seen.get(t.id)
+            if (prev) errors.push(`${tp}: id «${t.id}» уже занят (${prev})`)
+            else seen.set(t.id, tp)
+        })
+    }
+    return errors
+}
 
 function stableStringify(value: unknown): string {
     if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
@@ -235,6 +291,7 @@ export function validateNewRelease(id: string, value: unknown): string[] {
         if (!SLUG_RE.test(slug)) errors.push(`${tp}: slug может содержать только a-z, 0-9 и дефисы`)
         if (slugs.has(slug)) errors.push(`${tp}: slug «${slug}» уже есть в релизе`)
         slugs.add(slug)
+        if (t.id !== undefined && t.id !== makeTrackId(id, slug)) errors.push(`${tp}: id должен быть «${makeTrackId(id, slug)}»`)
     })
     return errors
 }
@@ -388,6 +445,18 @@ export function checkRegistryChange(before: unknown, after: unknown): string[] {
 
     const newIds = Object.keys(after).filter((id) => !(id in before))
     for (const id of newIds) errors.push(...validateNewRelease(id, after[id]))
+
+    // Постоянные id треков. Пока в реестре их нет (переходный период), новый
+    // релиз можно добавить и без них; после перехода id обязателен. id
+    // существующих треков менять нельзя — это уже запрещает проверка выше.
+    if (newIds.length) {
+        const requireIds = registryHasTrackIds(before)
+        const newOnly = Object.fromEntries(newIds.map((id) => [id, after[id]]))
+        errors.push(...checkTrackIds(newOnly, requireIds).map((e) => requireIds && e.endsWith(': нет id')
+            ? `${e} — обнови страницу админки`
+            : e))
+        if (errors.length === 0) errors.push(...checkTrackIds(after, false))
+    }
 
     // Файлы нового релиза не должны совпадать с файлами других релизов
     // (синглы делят общие папки).
