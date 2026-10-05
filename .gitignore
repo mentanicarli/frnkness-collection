@@ -21,3 +21,6 @@ deno.lock
 
 # Локальное состояние Supabase CLI (link, адрес пулера)
 supabase/.temp/
+
+# План обновления — только локально
+docs/frnkness-accounts-update.md
