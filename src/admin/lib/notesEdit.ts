@@ -72,3 +72,19 @@ export function setNote(list: TrackAnnotation[], line: string, note: string): Tr
 export function removeNote(list: TrackAnnotation[], line: string): TrackAnnotation[] {
     return setNote(list, line, '')
 }
+
+/**
+ * Привязать разбор строки from к строке to на том же месте в списке (порядок
+ * в .notes.json не прыгает). Прежний разбор строки to, если был, заменяется.
+ */
+export function moveNote(list: TrackAnnotation[], from: string, to: string): TrackAnnotation[] {
+    const fromKey = normalizeLine(from)
+    const toKey = normalizeLine(to)
+    if (fromKey === toKey) return list
+    return list.flatMap((a) => {
+        const key = normalizeLine(a.line)
+        if (key === fromKey) return [{ ...a, line: to.trim() }]
+        if (key === toKey) return []
+        return [a]
+    })
+}

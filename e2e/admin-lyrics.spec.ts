@@ -79,30 +79,33 @@ test('добавить разбор и сохранить: подтвержде�
     await expect(page.getByText('Изменений нет')).toBeVisible()
 })
 
-test('правка текста: висящий разбор, текст и разборы — одним коммитом', async ({ page }) => {
+test('правка текста: висящий разбор — подтверждение со списком, удаление, текст и разборы одним коммитом', async ({ page }) => {
     const mocks = await openEditor(page, '#/lyrics/most-venture-poopsicks/0')
     const input = lyricsInput(page)
     const value = await input.inputValue()
-    // Строка повторяется в припеве — меняем все вхождения.
-    await input.fill(value.replaceAll('Пупсики (смешное имя)', 'Пупсики (новое имя)'))
+    // Строку переписали целиком (во всех вхождениях припева) — разбор не угадываем.
+    await input.fill(value.replaceAll('Пупсики (смешное имя)', 'Совсем другая строка про утро'))
     await expect(page.getByTestId('dangling')).toContainText('«Пупсики (смешное имя),»')
-    // С висящим разбором не пройдёт проверка контента при деплое — сохранить нельзя.
-    await expect(page.getByRole('button', { name: 'Сохранить…' })).toBeDisabled()
-    await expect(page.getByText('сначала удали или перенеси разборы')).toBeVisible()
+    await expect(page.getByTestId('relink-notice')).toHaveCount(0)
+    // .lrc этого трека и раньше не совпадал с текстом построчно — только предупреждение.
+    await expect(page.getByTestId('lrc-follow')).toContainText('и раньше не совпадало с текстом')
 
-    await page.getByTestId('dangling').getByRole('button', { name: 'Удалить разбор' }).first().click()
-    await expect(page.getByTestId('dangling')).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'Сохранить…' })).toBeEnabled()
-
+    // Сохранить можно, но только через явное подтверждение со списком.
     await page.getByRole('button', { name: 'Сохранить…' }).click()
+    const confirm = page.getByTestId('dangling-confirm')
+    await expect(confirm).toContainText('«Пупсики (смешное имя),»')
+    await confirm.getByRole('button', { name: 'Удалить его и сохранить' }).click()
+    await expect(page.getByTestId('dangling')).toHaveCount(0)
+
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByTestId('commit-files').locator('li')).toHaveCount(2)
     await dialog.getByRole('button', { name: 'Опубликовать' }).click()
     await expect(dialog).toHaveCount(0)
     const commits = mocks.calls.filter((c) => c.action === 'commit')
     expect(commits).toHaveLength(1)
-    const paths = (commits[0].body.files as { path: string }[]).map((f) => f.path)
-    expect(paths).toEqual(['lyrics/album1/01-poopsicks.txt', 'lyrics/album1/01-poopsicks.notes.json'])
+    const files = commits[0].body.files as { path: string; content: string }[]
+    expect(files.map((f) => f.path)).toEqual(['lyrics/album1/01-poopsicks.txt', 'lyrics/album1/01-poopsicks.notes.json'])
+    expect(JSON.parse(files[1].content).annotations.some((a: { line: string }) => a.line.startsWith('Пупсики (смешное'))).toBe(false)
     expect(commits[0].body.message).toBe('текст, описание и разборы «POOPSICKS» (Most Venture Poopsicks / Last Over V)')
 })
 

@@ -58,7 +58,16 @@
                 <section v-show="wide || tab === 'text'" class="adm-editor-col">
                     <label class="adm-field">
                         <span class="adm-label">Текст песни</span>
-                        <textarea v-model="text" class="adm-textarea adm-mono adm-lyrics-input" spellcheck="false" rows="22" aria-label="Текст песни"></textarea>
+                        <textarea
+                            ref="textInput"
+                            v-model="text"
+                            class="adm-textarea adm-mono adm-lyrics-input"
+                            :class="{ 'is-binding': bindingFor !== null }"
+                            spellcheck="false"
+                            rows="22"
+                            aria-label="Текст песни"
+                            @click="onTextClick"
+                        ></textarea>
                     </label>
                     <details class="adm-hint adm-format-hint">
                         <summary>Как оформлять текст</summary>
@@ -66,7 +75,7 @@
                             <li>Метки секций — отдельной строкой в квадратных скобках: <span class="adm-mono">[Припев]</span>, <span class="adm-mono">[Куплет 1]</span>, <span class="adm-mono">[Бридж]</span>. Они не подсвечиваются и не принимают разборы.</li>
                             <li>Между блоками — одна пустая строка.</li>
                             <li>Пустой файл — на сайте будет «Текст будет позже...».</li>
-                            <li>Если строку разбора изменить, разбор «повиснет» — он появится в предупреждении справа.</li>
+                            <li>Небольшая правка строки с разбором (опечатка, знак, слово) — разбор переезжает сам. Если строку удалить или переписать целиком, разбор «повиснет»: привяжи его к другой строке или удали.</li>
                         </ul>
                     </details>
                     <label class="adm-field" style="margin-top: 1rem">
@@ -82,12 +91,25 @@
                         <div v-if="dangling.length" class="adm-alert adm-alert-warn" data-testid="dangling">
                             {{ dangling.length === 1 ? 'Разбор не найдёт свою строку' : `${dangling.length} разбора(ов) не найдут свои строки` }}
                             в тексте и не покажется на сайте:
-                            <ul>
-                                <li v-for="a in dangling" :key="a.line">
-                                    «{{ a.line }}»
-                                    <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click="dropAnnotation(a.line)">Удалить разбор</button>
+                            <ul class="adm-dangling">
+                                <li v-for="a in dangling" :key="a.line" :class="{ 'is-binding': bindingFor === a.line }">
+                                    <div>«{{ a.line }}»</div>
+                                    <div class="adm-small adm-faint adm-dangling-note">{{ a.note }}</div>
+                                    <div class="adm-row" style="gap: 0.375rem; margin-top: 0.25rem">
+                                        <button
+                                            class="adm-btn adm-btn-sm"
+                                            type="button"
+                                            :aria-pressed="bindingFor === a.line"
+                                            @click="bindingFor = bindingFor === a.line ? null : a.line"
+                                        >{{ bindingFor === a.line ? 'Отменить привязку' : 'Привязать к строке' }}</button>
+                                        <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click="dropAnnotation(a.line)">Удалить разбор</button>
+                                    </div>
                                 </li>
                             </ul>
+                        </div>
+                        <div v-if="bindingFor !== null" class="adm-alert adm-alert-ok adm-binding" role="status" data-testid="binding">
+                            Кликни строку — в тексте слева или в списке ниже, — к которой привязать разбор «{{ bindingFor }}».
+                            <span v-if="bindError" style="display: block; color: #ffc4be">{{ bindError }}</span>
                         </div>
                         <p class="adm-hint" style="margin: 0 0 0.5rem">Нажми на строку, чтобы добавить или изменить разбор.</p>
                         <div ref="linesBox" class="adm-lines" data-testid="lines">
@@ -98,8 +120,8 @@
                                     <button
                                         type="button"
                                         class="adm-line"
-                                        :class="{ 'has-note': row.note, 'is-repeat': row.repeat, active: editing === i, 'is-playing': row.lineNo === playingLine }"
-                                        @click="openEditor(i, row.text)"
+                                        :class="{ 'has-note': row.note, 'is-repeat': row.repeat, active: editing === i, 'is-playing': row.lineNo === playingLine, 'is-bind-target': bindingFor !== null }"
+                                        @click="bindingFor !== null ? bindTo(row.text) : openEditor(i, row.text)"
                                     >
                                         <span>{{ row.text }}</span>
                                         <span v-if="row.note" class="adm-line-note">{{ row.note }}</span>
@@ -135,8 +157,33 @@
                 </section>
             </div>
 
+            <!-- Караоке вслед за текстом: .lrc совпадает с .txt построчно. -->
+            <div v-if="lrcFollow.kind === 'update'" class="adm-alert adm-alert-ok adm-lrc-follow" data-testid="lrc-follow">
+                <label class="adm-check">
+                    <input v-model="updateLrc" type="checkbox" />
+                    Обновить {{ lrcFollow.changes.length === 1 ? 'эту строку' : `эти строки (${lrcFollow.changes.length})` }} и в караоке — таймкоды сохранятся
+                </label>
+                <ul class="adm-small">
+                    <li v-for="c in lrcFollow.changes" :key="c.index"><s>{{ c.from }}</s> → {{ c.to }}</li>
+                </ul>
+                <span class="adm-small adm-faint">{{ paths.lrc }} сохранится тем же коммитом.</span>
+            </div>
+            <div v-else-if="lrcFollow.kind === 'structure'" class="adm-alert adm-alert-warn" data-testid="lrc-follow">
+                В тексте теперь {{ lrcFollow.after }} строк(и) вместо {{ lrcFollow.before }} — караоке ({{ paths.lrc }}) автоматически не обновляется.
+                После сохранения поправь разметку в синхронизаторе:
+                <a :href="`#/lrc/${encodeURIComponent(releaseId)}/${trackIndex}`">открыть «Караоке» для этого трека</a>.
+            </div>
+            <div v-else-if="lrcFollow.kind === 'mismatch'" class="adm-alert adm-alert-warn" data-testid="lrc-follow">
+                Караоке ({{ paths.lrc }}) и раньше не совпадало с текстом построчно — обновить его автоматически нельзя.
+                <a :href="`#/lrc/${encodeURIComponent(releaseId)}/${trackIndex}`">Открыть «Караоке»</a>.
+            </div>
+
             <div class="adm-savebar">
-                <span v-if="validation.length" class="adm-small" style="color: #ffc4be">{{ validation.join('; ') }}</span>
+                <span v-if="relinkNotice" class="adm-small adm-relink-notice" role="status" data-testid="relink-notice">{{ relinkNotice }}</span>
+                <span v-else-if="validation.length" class="adm-small" style="color: #ffc4be">{{ validation.join('; ') }}</span>
+                <span v-else-if="dangling.length" class="adm-small" style="color: #ffe2a8">
+                    {{ dangling.length === 1 ? 'Есть висящий разбор' : `Висящих разборов: ${dangling.length}` }} — при сохранении спросим, что с ними делать
+                </span>
                 <span v-else-if="dirty" class="adm-small adm-muted">Есть несохранённые изменения</span>
                 <span v-else class="adm-small adm-faint">Изменений нет</span>
                 <span class="adm-spacer"></span>
@@ -145,6 +192,24 @@
             </div>
         </template>
     </template>
+
+    <!-- Сохранение с висящими разборами — только явно. -->
+    <div v-if="danglingConfirm" class="adm-modal-backdrop" @click.self="danglingConfirm = false">
+        <div class="adm-modal" role="dialog" aria-modal="true" aria-labelledby="adm-dangling-title" data-testid="dangling-confirm" @keydown.esc="danglingConfirm = false">
+            <h2 id="adm-dangling-title">Разборы без строки</h2>
+            <p class="adm-small adm-muted">
+                {{ dangling.length === 1 ? 'Этот разбор не находит' : 'Эти разборы не находят' }} свою строку в тексте. На сайте такие разборы не
+                показываются, а проверка при публикации не пропустит их, поэтому при сохранении они будут удалены:
+            </p>
+            <ul class="adm-small adm-dangling-list">
+                <li v-for="a in dangling" :key="a.line"><b>«{{ a.line }}»</b> — {{ a.note }}</li>
+            </ul>
+            <div class="adm-row" style="margin-top: 1.25rem; justify-content: flex-end">
+                <button class="adm-btn adm-btn-ghost" type="button" @click="danglingConfirm = false">Вернуться и привязать</button>
+                <button class="adm-btn adm-btn-danger" type="button" @click="saveWithoutDangling">Удалить {{ dangling.length === 1 ? 'его' : 'их' }} и сохранить</button>
+            </div>
+        </div>
+    </div>
 
     <CommitDialog :flow="flow" />
 </template>
@@ -159,9 +224,21 @@ import { useRoute, navigate } from '../composables/useRoute'
 import { useCommitFlow } from '../composables/useCommitFlow'
 import { useUnsaved } from '../composables/useUnsaved'
 import { AdminApiError, readFiles } from '../api/content'
-import { buildNoteMap, findDanglingAnnotations, layoutLyrics, renderAboutHtml, renderLyricsHtml, validateTrackNotes, type TrackAnnotation } from '@/utils/trackNotes'
+import {
+    buildNoteMap,
+    findDanglingAnnotations,
+    isSectionLabel,
+    layoutLyrics,
+    normalizeLine,
+    renderAboutHtml,
+    renderLyricsHtml,
+    validateTrackNotes,
+    type TrackAnnotation
+} from '@/utils/trackNotes'
+import { relinkAnnotations } from '../lib/lineMatch'
+import { followLrc } from '../lib/lrcFollow'
 import { getTrackSlug } from '@/utils/slug'
-import { isNotesEmpty, noteFor, normalizeNewlines, parseNotes, removeNote, serializeNotes, setNote } from '../lib/notesEdit'
+import { isNotesEmpty, moveNote, noteFor, normalizeNewlines, parseNotes, removeNote, serializeNotes, setNote } from '../lib/notesEdit'
 import { audioPath, lrcPath, notesPath, siteUrl, txtPath } from '../lib/paths'
 import AudioPlayer from '../components/AudioPlayer.vue'
 import DraftBanner from '../components/DraftBanner.vue'
@@ -249,8 +326,110 @@ const draft = useDraft<{ text: string; about: string; annotations: TrackAnnotati
         about.value = String(d.about ?? '')
         annotations.value = Array.isArray(d.annotations) ? d.annotations : []
         editing.value = -1
+        settle()
     }
 })
+
+// ── Разборы вслед за правкой строк ───────────────────────────────────
+// Текст «устоявшийся» — после паузы в наборе. Сравнение идёт с ним, а не
+// на каждое нажатие клавиши: так «та же строка» узнаётся по целой правке.
+let settledText = ''
+let relinkTimer: ReturnType<typeof setTimeout> | undefined
+/** Исходный текст строки разбора (до переносов) — по нормализованной строке. */
+const origins = new Map<string, string>()
+const originOf = (line: string) => origins.get(normalizeLine(line)) ?? line
+const relinkNotice = ref('')
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
+
+function notify(message: string) {
+    relinkNotice.value = message
+    clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => (relinkNotice.value = ''), 5000)
+}
+
+/** Сбросить точку сравнения (загрузка, отмена, черновик, сохранение). */
+function settle() {
+    clearTimeout(relinkTimer)
+    settledText = normalizeNewlines(text.value)
+}
+
+function relinkNow() {
+    clearTimeout(relinkTimer)
+    const next = normalizeNewlines(text.value)
+    if (next === settledText) return
+    const r = relinkAnnotations(songLines(settledText), songLines(next), annotations.value, originOf)
+    settledText = next
+    if (!r.moved.length) return
+    for (const m of r.moved) {
+        origins.set(normalizeLine(m.to), originOf(m.from))
+        origins.delete(normalizeLine(m.from))
+    }
+    annotations.value = r.annotations
+    notify(r.moved.length === 1 ? `Разбор перенесён на изменённую строку «${r.moved[0].to}»` : `Разборы перенесены на изменённые строки: ${r.moved.length}`)
+}
+
+watch(text, () => {
+    if (!loaded.value) return
+    clearTimeout(relinkTimer)
+    relinkTimer = setTimeout(relinkNow, 700)
+})
+onBeforeUnmount(() => {
+    clearTimeout(relinkTimer)
+    clearTimeout(noticeTimer)
+})
+
+// ── Ручная привязка висящего разбора ─────────────────────────────────
+const bindingFor = ref<string | null>(null)
+const bindError = ref('')
+const textInput = ref<HTMLTextAreaElement | null>(null)
+watch(bindingFor, () => (bindError.value = ''))
+
+function bindTo(target: string) {
+    const from = bindingFor.value
+    if (from === null) return
+    const ann = annotations.value.find((a) => a.line === from)
+    if (!ann) {
+        bindingFor.value = null
+        return
+    }
+    const existing = noteFor(annotations.value, target)
+    if (existing && normalizeLine(target) !== normalizeLine(from) && !window.confirm(`У строки «${target}» уже есть разбор. Заменить его?`)) return
+    annotations.value = moveNote(annotations.value, from, target)
+    origins.delete(normalizeLine(from))
+    origins.delete(normalizeLine(target))
+    bindingFor.value = null
+    editing.value = -1
+    notify(`Разбор привязан к строке «${target}»`)
+}
+
+// Клик в поле текста в режиме привязки — строка под курсором.
+function onTextClick() {
+    if (bindingFor.value === null) return
+    const el = textInput.value
+    if (!el) return
+    const raw = el.value.slice(0, el.selectionStart).split('\n').length - 1
+    const line = (el.value.split('\n')[raw] ?? '').trim()
+    if (!line || isSectionLabel(line)) {
+        bindError.value = 'Это не строка песни — кликни по строке с текстом'
+        return
+    }
+    bindTo(line)
+}
+
+// ── Караоке вслед за текстом ─────────────────────────────────────────
+const lrcFollow = computed(() => (loaded.value ? followLrc(original.value.text, normalizeNewlines(text.value), lrcRaw.value) : ({ kind: 'none' } as const)))
+const updateLrc = ref(true)
+
+// ── Сохранение с висящими разборами ──────────────────────────────────
+const danglingConfirm = ref(false)
+
+function saveWithoutDangling() {
+    const drop = new Set(dangling.value.map((a) => a.line))
+    annotations.value = annotations.value.filter((a) => !drop.has(a.line))
+    danglingConfirm.value = false
+    bindingFor.value = null
+    save()
+}
 
 const validation = computed(() => {
     let parsed: unknown
@@ -259,11 +438,9 @@ const validation = computed(() => {
     } catch {
         return ['разборы не сериализуются в JSON']
     }
-    const errors = validateTrackNotes(parsed)
-    // Висящий разбор не пропустит проверка контента при деплое
-    // (npm run check:content), поэтому сохранить с ним нельзя.
-    if (dangling.value.length) errors.push('сначала удали или перенеси разборы, которые не находят свою строку')
-    return errors
+    // Висящие разборы не блокируют кнопку: при сохранении их список
+    // показывается отдельно и они удаляются только после подтверждения.
+    return validateTrackNotes(parsed)
 })
 
 // Строки текста с разборами — как их увидит сайт.
@@ -413,6 +590,10 @@ async function loadTrack() {
         text.value = t
         about.value = parsed.notes.about ?? ''
         annotations.value = [...(parsed.notes.annotations ?? [])]
+        origins.clear()
+        bindingFor.value = null
+        updateLrc.value = true
+        settle()
         loaded.value = true
     } catch (e) {
         if (token === loadToken) loadError.value = e instanceof AdminApiError ? e.message : `Не удалось загрузить: ${(e as Error).message}`
@@ -427,6 +608,9 @@ function reset() {
     about.value = parsed.notes.about ?? ''
     annotations.value = [...(parsed.notes.annotations ?? [])]
     editing.value = -1
+    origins.clear()
+    bindingFor.value = null
+    settle()
 }
 
 function select(id: string, index: number) {
@@ -449,6 +633,8 @@ async function openEditor(i: number, line: string) {
 
 function saveNote(line: string) {
     annotations.value = setNote(annotations.value, line, draftNote.value)
+    // Разбор написан для строки в её нынешнем виде — она и есть исходная.
+    origins.delete(normalizeLine(line))
     editing.value = -1
 }
 
@@ -477,7 +663,13 @@ function previewKey(e: KeyboardEvent) {
 
 // ── Сохранение ───────────────────────────────────────────────────────
 async function save() {
+    // Правка, набранная перед самым нажатием, — сначала перенести разборы.
+    relinkNow()
     if (!release.value || !track.value || !dirty.value || validation.value.length) return
+    if (dangling.value.length) {
+        danglingConfirm.value = true
+        return
+    }
     const files: { path: string; content: string; kind: 'new' | 'changed' }[] = []
     const fileExists = (p: string) => repo.state.files.some((f) => f.path === p)
     if (textChanged.value) {
@@ -486,12 +678,20 @@ async function save() {
     if (notesChanged.value) {
         files.push({ path: paths.value.notes, content: notesSerialized.value, kind: original.value.notesRaw === null ? 'new' : 'changed' })
     }
-    const parts = [textChanged.value && 'текст', notesChanged.value && 'описание и разборы'].filter(Boolean)
+    // Те же строки в караоке — с прежними таймкодами, тем же коммитом.
+    const follow = lrcFollow.value
+    const lrcContent = follow.kind === 'update' && updateLrc.value ? follow.content : null
+    if (lrcContent !== null) files.push({ path: paths.value.lrc, content: lrcContent, kind: 'changed' })
+    const parts = [textChanged.value && 'текст', notesChanged.value && 'описание и разборы', lrcContent !== null && 'караоке'].filter(Boolean)
+    const notes: string[] = []
+    if (follow.kind === 'update' && lrcContent !== null) notes.push(`В караоке обновятся строки: ${follow.changes.length}, таймкоды не меняются.`)
+    if (follow.kind === 'update' && lrcContent === null) notes.push('Караоке не обновляется — его строки разойдутся с текстом.')
+    if (follow.kind === 'structure') notes.push('Число строк изменилось — караоке нужно поправить в синхронизаторе.')
     const result = await flow.request({
         title: 'Сохранить текст',
         message: `${parts.join(', ')} «${track.value.title}» (${release.value.title})`,
         files: files.map(({ path, kind }) => ({ path, kind })),
-        notes: [],
+        notes,
         prepare: async () => files.map(({ path, content }) => ({ path, content })),
         baseSha: loadedSha.value,
         draft: true
@@ -499,6 +699,9 @@ async function save() {
     if (!result) return
     loadedSha.value = result.sha
     draft.clear()
+    if (lrcContent !== null) lrcRaw.value = lrcContent
+    origins.clear()
+    settle()
     original.value = {
         text: normalizeNewlines(text.value),
         notesRaw: notesChanged.value || original.value.notesRaw !== null ? notesSerialized.value : null,

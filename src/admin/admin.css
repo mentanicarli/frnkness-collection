@@ -146,6 +146,30 @@ body.adm-body::before { opacity: 0.6; }
 }
 .adm-modal h2 { font-family: 'Unbounded'; font-size: 1.0625rem; margin: 0 0 0.75rem; letter-spacing: -0.02em; }
 .adm-draft { margin-bottom: 0.75rem; }
+
+/* «Тексты»: разборы вслед за строками, привязка висящих, караоке вслед за текстом. */
+.adm-dangling { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
+.adm-dangling li { padding: 0.375rem 0.5rem; border-radius: var(--r-sm); border: 1px solid transparent; }
+.adm-dangling li.is-binding { border-color: rgba(140, 230, 160, 0.5); background: rgba(140, 230, 160, 0.06); }
+.adm-dangling-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.adm-binding { margin-bottom: 0.5rem; }
+.adm-line.is-bind-target { cursor: crosshair; }
+.adm-line.is-bind-target:hover { border-color: rgba(140, 230, 160, 0.6); background: rgba(140, 230, 160, 0.08); }
+.adm-lyrics-input.is-binding { cursor: crosshair; border-color: rgba(140, 230, 160, 0.6); box-shadow: 0 0 0 1px rgba(140, 230, 160, 0.35); }
+.adm-lrc-follow { margin-top: 1rem; }
+.adm-lrc-follow ul { margin: 0.375rem 0; }
+.adm-lrc-follow s { color: var(--fg-faint); }
+.adm-dangling-list { margin: 0.5rem 0 0; padding-left: 1.125rem; display: grid; gap: 0.25rem; color: var(--fg-muted); }
+.adm-dangling-list b { color: var(--fg); font-weight: 600; }
+/* Уведомление о переносе разбора — в закреплённой панели сохранения, всегда на виду. */
+.adm-relink-notice {
+  min-width: 0; flex: 1 1 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #c6f3d0; padding: 0.25rem 0.625rem; border-radius: var(--r-sm);
+  background: rgba(140, 230, 160, 0.08); border: 1px solid rgba(140, 230, 160, 0.35);
+  animation: adm-relink-in 0.25s ease-out;
+}
+@keyframes adm-relink-in { from { opacity: 0; transform: translateY(0.25rem); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .adm-relink-notice { animation: none; } }
 .adm-conflict { margin-top: 0.75rem; padding: 0.75rem; border: 1px solid rgba(255, 210, 120, 0.4); background: rgba(255, 210, 120, 0.06); border-radius: var(--r-md); color: var(--fg); }
 .adm-conflict-file + .adm-conflict-file { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
 .adm-conflict-file b { word-break: break-all; }
