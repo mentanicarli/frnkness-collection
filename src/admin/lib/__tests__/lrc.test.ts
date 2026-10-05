@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import { parseLRC } from '@/utils/lyrics'
+import { fixtureText, fixtureTree } from '../../../../tests/fixtures/catalog'
 import {
     activeIndex,
     buildLrc,
@@ -17,8 +16,7 @@ import {
     type LrcLine
 } from '../lrc'
 
-const LYRICS = path.resolve(__dirname, '../../../../lyrics')
-const read = (rel: string) => fs.readFileSync(path.join(LYRICS, rel), 'utf8').replace(/\r\n?/g, '\n')
+const read = (rel: string) => fixtureText(`lyrics/${rel}`)!
 
 describe('строки для LRC из .txt', () => {
     it('переносит текст дословно, ничего не срезая с конца', () => {
@@ -48,7 +46,7 @@ describe('строки для LRC из .txt', () => {
     })
 
     it('каждая строка готового .lrc дословно есть в .txt', () => {
-        for (const slug of ['album1/02-back-to-poopsicks-2', 'singles/p-team', 'singles/boxik']) {
+        for (const slug of ['album1/02-back-to-poopsicks-2', 'singles/faaa', 'singles/boxik']) {
             const fromTxt = linesFromTxt(read(`${slug}.txt`))
             const fromLrc = linesFromLrc(read(`${slug}.lrc`)).map((l) => l.text)
             for (const line of fromLrc) expect(fromTxt).toContain(line)
@@ -81,12 +79,12 @@ describe('формат времени и сборка файла', () => {
         expect(parsed[2].time).toBeCloseTo(75.5)
     })
 
-    it('все существующие .lrc проходят круг «разобрать → собрать» без изменений', () => {
-        const files: string[] = []
-        for (const dir of fs.readdirSync(LYRICS)) {
-            for (const f of fs.readdirSync(path.join(LYRICS, dir))) if (f.endsWith('.lrc')) files.push(`${dir}/${f}`)
-        }
-        expect(files.length).toBeGreaterThan(10)
+    it('.lrc в формате репозитория проходят круг «разобрать → собрать» без изменений', () => {
+        const files = fixtureTree()
+            .map((f) => f.path)
+            .filter((p) => p.endsWith('.lrc'))
+            .map((p) => p.replace(/^lyrics\//, ''))
+        expect(files.length).toBeGreaterThan(3)
         for (const f of files) {
             const original = read(f)
             const rebuilt = buildLrc(linesFromLrc(original))

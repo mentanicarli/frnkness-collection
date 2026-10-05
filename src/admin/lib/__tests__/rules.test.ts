@@ -8,10 +8,10 @@ import {
     type Registry,
     type RegistryRelease
 } from '../../../../supabase/functions/_shared/rules.ts'
-import releasesJson from '@/content/releases.json'
-import siteJson from '@/content/site.json'
+import { fixtureReleases, fixtureSite } from '../../../../tests/fixtures/catalog'
 
-const current = releasesJson as unknown as Registry
+const siteJson = fixtureSite()
+const current = fixtureReleases() as unknown as Registry
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
 const nextNumber = (kind: 'album' | 'single'): number => {
     const re = kind === 'album' ? /(?:^|\/)album\s?(\d+)(?:[/-]|$)/ : /(?:^|\/)single(\d+)-/

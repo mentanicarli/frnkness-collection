@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createHandler } from '../../../../supabase/functions/admin-content/handler.ts'
-import releasesJson from '@/content/releases.json'
+import { fixtureReleases } from '../../../../tests/fixtures/catalog'
+
+const releasesJson = fixtureReleases()
 
 /**
  * Мини-модель git в памяти: коммиты со снимками файлов и те эндпоинты

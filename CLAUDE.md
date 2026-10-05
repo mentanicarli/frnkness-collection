@@ -42,8 +42,26 @@ PDF с текстами — `lyrics-books/<releaseId>.pdf` (при замене 
 `<releaseId>-ГГГГММДД.pdf`, чтобы не мешал кэш). При скачивании файл получает имя
 «frnk ness — <Название релиза> (тексты).pdf».
 
+## Тесты и контент
+
+**Тесты никогда не проверяют конкретное содержимое каталога** — ни юнит, ни e2e.
+Они не читают `src/content/*.json`, `lyrics/`, `audio/`, `images/`,
+`lyrics-books/` и дерево git, а работают на фикстуре `tests/fixtures/catalog`
+(хелперы — `tests/fixtures/catalog.ts`). Каталог меняется из админки, и тест,
+завязанный на него, роняет деплой после обычной правки. Нарушение ловит
+`src/__tests__/noLiveCatalog.test.ts`.
+
+Корректность настоящего контента проверяет `npm run check:content`
+(`src/content-check/checkContent.ts`): схема реестра и site.json, все файлы,
+на которые они ссылаются, разборы без висящих строк, .lrc с метками времени.
+Проверка не знает, какие релизы есть, и проходит на любом корректном каталоге.
+
+Деплой: пуш только с контентом (`lyrics/`, `audio/`, `images/`, `lyrics-books/`,
+`src/content/*.json`) — `check:content` и сборка; любой другой — ещё typecheck и
+юнит-тесты (`src/content-check/ciScope.ts`).
+
 ## Проверки перед коммитом
 
-`npm run typecheck`, `npm run test:run`, `npm run build` (сборка заодно проверяет,
-что код админки не попал в бандл сайта и в precache service worker).
-Для админки — `npm run test:e2e` (Supabase и GitHub замоканы).
+`npm run typecheck`, `npm run test:run`, `npm run check:content`, `npm run build`
+(сборка заодно проверяет, что код админки не попал в бандл сайта и в precache
+service worker). Для админки — `npm run test:e2e` (Supabase и GitHub замоканы).

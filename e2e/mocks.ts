@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test'
+import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { FIXTURE_ROOT, FIXTURE_UPLOADS, fixtureText, fixtureTree } from '../tests/fixtures/catalog'
 
 // Моки Supabase Auth, PostgREST и функции admin-content. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
@@ -59,51 +60,86 @@ export interface MockOptions {
     rpc?: (name: string, body: unknown) => { status?: number; body: unknown } | undefined
 }
 
-// Содержимое репозитория для мока read — из HEAD, а не из рабочей копии:
-// мок изображает GitHub, а в рабочей копии могут лежать черновики.
-const ROOT = path.resolve(__dirname, '..')
-let textFiles: Map<string, string> | null = null
-
-// Все текстовые файлы HEAD одним вызовом git cat-file --batch: по git show на
-// файл в параллельных тестах на Windows выходило слишком медленно.
-function loadTextFiles(): Map<string, string> {
-    const paths = repoTree()
-        .map((f) => f.path)
-        .filter((p) => /\.(txt|lrc|json)$/i.test(p))
-    const out = execFileSync('git', ['cat-file', '--batch'], { cwd: ROOT, input: paths.map((p) => `HEAD:${p}`).join('\n') + '\n', maxBuffer: 64 * 1024 * 1024 })
-    const files = new Map<string, string>()
-    let pos = 0
-    for (const p of paths) {
-        const nl = out.indexOf(10, pos)
-        const header = out.subarray(pos, nl).toString('utf8').split(' ')
-        pos = nl + 1
-        if (header[1] !== 'blob') continue
-        const size = Number(header[2])
-        files.set(p, out.subarray(pos, pos + size).toString('utf8'))
-        pos += size + 1
-    }
-    return files
+// «Репозиторий» в тестах — фикстура tests/fixtures/catalog, а не настоящий
+// каталог: тот меняется из админки, и тесты не должны от него зависеть.
+// Сайт и админка в браузере тоже видят фикстуру: реестр, тексты, mp3 и
+// обложки подменяются в installMocks.
+let treeCache: { path: string; size: number }[] | null = null
+export function repoTree(): { path: string; size: number }[] {
+    if (!treeCache) treeCache = fixtureTree()
+    return treeCache
 }
 
 export function repoFile(rel: string): string | null {
-    if (!textFiles) textFiles = loadTextFiles()
-    return textFiles.get(rel) ?? null
+    return /\.(txt|lrc|json)$/i.test(rel) ? fixtureText(rel) : null
 }
 
-// Дерево репозитория для мока head: файлы из git с реальными размерами.
-let treeCache: { path: string; size: number }[] | null = null
-export function repoTree(): { path: string; size: number }[] {
-    if (!treeCache) {
-        // Дерево HEAD с размерами blob — как его отдаёт GitHub.
-        treeCache = execFileSync('git', ['ls-tree', '-r', '-l', '-z', 'HEAD'], { cwd: ROOT, encoding: 'utf8' })
-            .split('\0')
-            .filter(Boolean)
-            .map((line) => {
-                const [meta, p] = line.split('\t')
-                return { path: p, size: Number(meta.trim().split(/\s+/)[3]) }
-            })
+export { FIXTURE_UPLOADS }
+
+// Как lyricsIndexPlugin в vite.config.ts, только по фикстуре: .lrc, а для
+// треков без караоке — .txt; и все .notes.json одним файлом.
+function fixtureLyricsIndex(): string {
+    const paths = repoTree().map((f) => f.path)
+    const index: Record<string, string> = {}
+    for (const p of paths) {
+        if (!p.startsWith('lyrics/')) continue
+        const isLrc = p.toLowerCase().endsWith('.lrc')
+        const isTxtWithoutLrc = p.toLowerCase().endsWith('.txt') && !paths.includes(p.replace(/\.txt$/i, '.lrc'))
+        if (isLrc || isTxtWithoutLrc) index[p] = fixtureText(p)!
     }
-    return treeCache
+    return JSON.stringify(index)
+}
+
+function fixtureTrackNotes(): string {
+    const notes: Record<string, unknown> = {}
+    for (const { path: p } of repoTree()) if (p.startsWith('lyrics/') && p.endsWith('.notes.json')) notes[p] = JSON.parse(fixtureText(p)!)
+    return JSON.stringify(notes)
+}
+
+const CONTENT_TYPES: Record<string, string> = {
+    '.mp3': 'audio/mpeg',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain; charset=utf-8',
+    '.lrc': 'text/plain; charset=utf-8',
+    '.json': 'application/json; charset=utf-8'
+}
+
+/** Сайт и админка в браузере видят фикстурный каталог вместо настоящего. */
+async function routeFixtureCatalog(page: Page) {
+    // Dev-сервер отдаёт src/content/*.json как JS-модули (их импортирует src/config.ts).
+    await page.route(/\/src\/content\/(releases|site)\.json(\?|$)/, (route) => {
+        const name = new URL(route.request().url()).pathname.endsWith('site.json') ? 'site' : 'releases'
+        return route.fulfill({ contentType: 'application/javascript', body: `export default ${fixtureText(`src/content/${name}.json`)}` })
+    })
+    await page.route(/\/(lyrics-index|track-notes)\.json(\?|$)/, (route) =>
+        route.fulfill({
+            contentType: 'application/json; charset=utf-8',
+            body: route.request().url().includes('lyrics-index') ? fixtureLyricsIndex() : fixtureTrackNotes()
+        })
+    )
+    await page.route(/^https?:\/\/localhost:\d+\/(audio|images|lyrics|lyrics-books)\//, (route) => {
+        const rel = decodeURIComponent(new URL(route.request().url()).pathname.slice(1))
+        const full = path.join(FIXTURE_ROOT, rel)
+        if (!fs.existsSync(full)) return route.fulfill({ status: 404, body: 'not in fixture: ' + rel })
+        const type = CONTENT_TYPES[path.extname(rel).toLowerCase()] ?? 'application/octet-stream'
+        const body = fs.readFileSync(full)
+        // Без ответов на Range браузер не даёт перематывать <audio>.
+        const range = route.request().headers()['range']?.match(/^bytes=(\d+)-(\d*)$/)
+        if (range) {
+            const start = Number(range[1])
+            const end = range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1
+            return route.fulfill({
+                status: 206,
+                contentType: type,
+                headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${body.length}` },
+                body: body.subarray(start, end + 1)
+            })
+        }
+        return route.fulfill({ contentType: type, headers: { 'Accept-Ranges': 'bytes' }, body })
+    })
 }
 
 export const defaultContent: ContentResponder = ({ action, body }) => {
@@ -131,6 +167,8 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
             headers: { 'Access-Control-Allow-Origin': '*' },
             body: body === null ? '' : JSON.stringify(body)
         })
+
+    await routeFixtureCatalog(page)
 
     // Настоящий Supabase недоступен в тестах ни при каких условиях.
     await page.route(/https:\/\/[^/]*supabase\.co\//, (route) => {

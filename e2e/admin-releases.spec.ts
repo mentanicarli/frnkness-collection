@@ -1,11 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
-import { ADMIN_USER, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
+import { ADMIN_USER, FIXTURE_UPLOADS, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
 
-const ROOT = path.resolve(__dirname, '..')
-const SQUARE = { name: 'new.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(ROOT, 'images/album3-cover.jpg')) }
-const TALL = { name: 'tall.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(ROOT, 'images/album2-cover.jpg')) }
+const SQUARE = { name: 'new.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'square.jpg')) }
+const TALL = { name: 'tall.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'tall.jpg')) }
 
 async function openRelease(page: Page, id: string) {
     await page.clock.setFixedTime(new Date('2026-10-02T09:00:00Z'))

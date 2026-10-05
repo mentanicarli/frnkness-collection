@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Releases } from '@/types'
-import releasesJson from '@/content/releases.json'
 import { getTrackSlug } from '@/utils/slug'
+import { fixtureReleases as catalogReleases, fixtureTree } from '../../../../tests/fixtures/catalog'
 import {
     appendRelease,
     nextNumber,
@@ -15,11 +15,10 @@ import {
 } from '../newRelease'
 import { checkRegistryChange, type Registry } from '../../../../supabase/functions/_shared/rules.ts'
 
-const releases = releasesJson as unknown as Releases
-const files = Object.values(releases).flatMap((r) => [
-    { path: r.cover },
-    ...r.tracks.flatMap((t) => [{ path: r.audioPath + t.file }, { path: r.lyricsPath + t.lyricsFile }])
-])
+// Фикстурный каталог (tests/fixtures/catalog) и отдельный минимальный
+// реестр для нумерации папок.
+const releases = catalogReleases()
+const files = fixtureTree()
 const fixtureReleases: Releases = {
     'album-space': {
         type: 'album',

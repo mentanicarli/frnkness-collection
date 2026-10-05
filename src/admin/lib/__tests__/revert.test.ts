@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import releasesJson from '@/content/releases.json'
+import { fixtureReleases } from '../../../../tests/fixtures/catalog'
 import {
     planRevert,
     playsForRelease,
@@ -11,7 +11,7 @@ import {
 
 const sha = (n: number) => n.toString(16).padStart(40, '0')
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
-const registry = releasesJson as Record<string, unknown>
+const registry = fixtureReleases() as unknown as Record<string, unknown>
 
 function input(over: Partial<RevertInput> = {}): RevertInput {
     return {

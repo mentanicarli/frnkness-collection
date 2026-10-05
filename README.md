@@ -154,6 +154,7 @@ npm install
 npm run dev
 npm run typecheck
 npm run test:run
+npm run check:content   # проверка контента: реестр, файлы, разборы, .lrc
 npm run build
 npm run preview
 npm run test:e2e        # Playwright-тесты админки (Supabase и GitHub замоканы)
@@ -164,6 +165,8 @@ npm run check:function  # проверка типов Edge Function через D
 админки не попал в бандл сайта и в precache service worker.
 
 `npm test` запускает Vitest в watch-режиме, `npm run test:run` — однократный прогон (используется в CI).
+Тесты (юнит и e2e) работают на фикстуре `tests/fixtures/catalog` и не зависят от настоящего
+каталога; его корректность проверяет `npm run check:content` (`src/content-check/checkContent.ts`).
 
 Сборка создается в папке `dist`.
 
@@ -251,7 +254,9 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
 ## Деплой
 
 Проект рассчитан на GitHub Pages и деплоится через GitHub Actions workflow `.github/workflows/deploy-pages.yml`.
-Перед сборкой workflow прогоняет `npm run typecheck` и `npm run test:run`.
+Перед сборкой workflow прогоняет `npm run check:content`, а если пуш меняет не только
+контент (`lyrics/`, `audio/`, `images/`, `lyrics-books/`, `src/content/*.json`) — ещё
+`npm run typecheck` и `npm run test:run`.
 
 Сборка Vite настроена с `base: './'`, поэтому в `dist/index.html` используются относительные пути к ассетам.
 
