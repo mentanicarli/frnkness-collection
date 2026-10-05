@@ -429,6 +429,27 @@ describe('admin-content: анонс в site.json', () => {
         expect(res.status).toBe(200)
     })
 
+    it('анонс без даты выхода — ок, с испорченной датой — отказ', async () => {
+        const { releaseAt: _r, ...noDate } = announce
+        const commit = async (a: object) => {
+            staging.set(uuidName('jpg'), { bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), created_at: new Date(now).toISOString() })
+            const blob = await (await call({ action: 'stage-blob', stagingPath: uuidName('jpg'), path: announce.cover })).json()
+            return call({
+                action: 'commit',
+                baseSha: BASE,
+                message: 'анонс',
+                files: [
+                    { path: 'src/content/site.json', content: JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' }, announce: a }) },
+                    { path: announce.cover, blob: { sha: blob.sha, size: blob.size, token: blob.token } }
+                ]
+            })
+        }
+        expect((await commit(noDate)).status).toBe(200)
+        const bad = await commit({ ...noDate, releaseAt: '2026-11-01' })
+        expect(bad.status).toBe(422)
+        expect((await bad.json()).details.join()).toContain('announce.releaseAt')
+    })
+
     it('ссылка на несуществующую обложку — отказ', async () => {
         const res = await call({
             action: 'commit',

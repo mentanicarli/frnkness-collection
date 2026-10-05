@@ -84,6 +84,21 @@
                     Пробел/Enter — отметить текущую строку и перейти к следующей; Backspace — отменить последнюю отметку;
                     ←/→ — перемотка на 3 с. Клик по строке — перемотка к её времени.
                 </p>
+                <div class="adm-row adm-lrc-shift" data-testid="lrc-shift">
+                    <button
+                        class="adm-btn adm-btn-sm adm-lrc-press"
+                        type="button"
+                        :disabled="stampedCount === 0 || atZero"
+                        :title="atZero ? 'Самая ранняя строка уже на 00:00.00 — раньше некуда' : ''"
+                        @click="doShiftAll(-0.1)"
+                    >Все −0.1</button>
+                    <button class="adm-btn adm-btn-sm adm-lrc-press" type="button" :disabled="stampedCount === 0" @click="doShiftAll(0.1)">Все +0.1</button>
+                    <span class="adm-mono adm-small adm-lrc-shift-total" :class="{ 'is-zero': shiftTotalCs === 0 }" data-testid="shift-total">
+                        Сдвиг: {{ formatShift(shiftTotalCs / 100) }}
+                    </span>
+                    <button class="adm-btn adm-btn-ghost adm-btn-sm adm-lrc-press" type="button" :disabled="shiftTotalCs === 0" @click="resetShift">Сбросить сдвиг</button>
+                    <span v-if="shiftHint" class="adm-small adm-faint" role="status" data-testid="shift-hint">{{ shiftHint }}</span>
+                </div>
                 <ol class="adm-lrc-lines" data-testid="lrc-lines">
                     <li
                         v-for="(l, i) in lines"
@@ -91,12 +106,24 @@
                         :class="{ next: i === cursor, playing: l.time !== null && i === active, bad: badSet.has(i) }"
                     >
                         <button class="adm-lrc-line" type="button" :disabled="l.time === null" @click="l.time !== null && seekTo(l.time)">
-                            <span class="adm-mono adm-lrc-stamp">{{ l.time === null ? '—' : formatLrcTime(l.time) }}</span>
+                            <span
+                                :key="flashes[i]?.n ?? 0"
+                                class="adm-mono adm-lrc-stamp"
+                                :class="flashes[i] ? (flashes[i].d > 0 ? 'flash-later' : 'flash-earlier') : ''"
+                            >{{ l.time === null ? '—' : formatLrcTime(l.time) }}</span>
                             <span class="adm-lrc-text">{{ l.text }}</span>
                         </button>
                         <span v-if="l.time !== null" class="adm-lrc-nudge">
-                            <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" :aria-label="`Строка ${i + 1}: раньше на 0.1 с`" @click="doNudge(i, -0.1)">−0.1</button>
-                            <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" :aria-label="`Строка ${i + 1}: позже на 0.1 с`" @click="doNudge(i, 0.1)">+0.1</button>
+                            <!-- Место под «±0.1 с» занято всегда, чтобы кнопки не прыгали. -->
+                            <span
+                                :key="flashes[i]?.n ?? 0"
+                                class="adm-mono adm-lrc-delta"
+                                :class="flashes[i] ? (flashes[i].d > 0 ? 'flash-later' : 'flash-earlier') : ''"
+                                aria-hidden="true"
+                                data-testid="nudge-delta"
+                            >{{ flashes[i] ? formatShift(flashes[i].d) : '' }}</span>
+                            <button class="adm-btn adm-btn-ghost adm-btn-sm adm-lrc-press" type="button" :aria-label="`Строка ${i + 1}: раньше на 0.1 с`" :disabled="l.time <= 0" @click="doNudge(i, -0.1)">−0.1</button>
+                            <button class="adm-btn adm-btn-ghost adm-btn-sm adm-lrc-press" type="button" :aria-label="`Строка ${i + 1}: позже на 0.1 с`" @click="doNudge(i, 0.1)">+0.1</button>
                         </span>
                     </li>
                 </ol>
@@ -152,12 +179,15 @@ import {
     activeIndex,
     buildLrc,
     clearTimes,
+    earliestTime,
     formatLrcTime,
+    formatShift,
     linesFromLrc,
     linesFromTxt,
     nextUnstamped,
     nudge,
     outOfOrder,
+    shiftAll,
     stamp,
     undoStamp,
     type LrcLine
@@ -270,6 +300,7 @@ async function loadTrack() {
         const initial = fromLrc ?? textLines.map((text) => ({ text, time: null }))
         original.value = { lrc, lines: initial.map((l) => ({ ...l })), textLines }
         lines.value = initial.map((l) => ({ ...l }))
+        resetShiftState()
         mode.value = 'sync'
         loaded.value = true
     } catch (e) {
@@ -290,10 +321,18 @@ function select(id: string, index: number) {
 
 function resetAll() {
     lines.value = original.value.lines.map((l) => ({ ...l }))
+    resetShiftState()
 }
 
 function takeFromText() {
     lines.value = original.value.textLines.map((text) => ({ text, time: null }))
+    resetShiftState()
+}
+
+function resetShiftState() {
+    shiftTotalCs.value = 0
+    shiftNote.value = ''
+    flashes.value = {}
 }
 
 // ── Аудио ────────────────────────────────────────────────────────────
@@ -337,10 +376,66 @@ function doUndo() {
     lines.value = undoStamp(lines.value)
 }
 function doNudge(i: number, d: number) {
+    const before = lines.value[i]?.time ?? null
     lines.value = nudge(lines.value, i, d)
+    const after = lines.value[i]?.time ?? null
+    shiftNote.value = ''
+    if (before !== null && after !== null && after !== before) flash([i], after - before)
 }
 function clearAll() {
-    if (window.confirm('Сбросить все отметки времени?')) lines.value = clearTimes(lines.value)
+    if (!window.confirm('Сбросить все отметки времени?')) return
+    lines.value = clearTimes(lines.value)
+    shiftTotalCs.value = 0
+    shiftNote.value = ''
+}
+
+// ── Сдвиг всех строк ─────────────────────────────────────────────────
+// Накопленный сдвиг — в сотых долях целым числом, чтобы подпись не
+// показывала 0.30000000000000004.
+const shiftTotalCs = ref(0)
+const shiftNote = ref('')
+const atZero = computed(() => earliestTime(lines.value) === 0)
+const shiftHint = computed(() => shiftNote.value || (atZero.value ? 'Самая ранняя строка на 00:00.00 — раньше сдвинуть нельзя' : ''))
+
+function applyShift(delta: number) {
+    const r = shiftAll(lines.value, delta)
+    if (r.applied === 0) return 0
+    lines.value = r.lines
+    shiftTotalCs.value += Math.round(r.applied * 100)
+    flash(
+        lines.value.flatMap((l, i) => (l.time === null ? [] : [i])),
+        r.applied
+    )
+    return r.applied
+}
+
+function doShiftAll(delta: number) {
+    const applied = applyShift(delta)
+    shiftNote.value =
+        applied !== 0 && Math.round(applied * 100) !== Math.round(delta * 100)
+            ? `Сдвинуто на ${formatShift(applied)}: самая ранняя строка упёрлась в 00:00.00`
+            : ''
+}
+
+function resetShift() {
+    const want = -shiftTotalCs.value / 100
+    const applied = applyShift(want)
+    // Если строку после сдвига вручную увели к нулю, вернуть всё целиком нельзя.
+    shiftNote.value = Math.round(applied * 100) !== Math.round(want * 100) ? 'Сдвиг сброшен не полностью: самая ранняя строка упёрлась в 00:00.00' : ''
+    shiftTotalCs.value = 0
+}
+
+// ── Отклик на нажатие: вспышка таймкода и «±0.1» у строки ────────────
+const flashes = ref<Record<number, { d: number; n: number }>>({})
+let flashN = 0
+let flashTimer: ReturnType<typeof setTimeout> | undefined
+function flash(indices: number[], d: number) {
+    const n = ++flashN
+    const next = { ...flashes.value }
+    for (const i of indices) next[i] = { d, n }
+    flashes.value = next
+    clearTimeout(flashTimer)
+    flashTimer = setTimeout(() => (flashes.value = {}), 1200)
 }
 
 function openLineEditor() {
@@ -359,6 +454,8 @@ function onKey(e: KeyboardEvent) {
     const el = e.target as HTMLElement
     if (el.closest('input, textarea, select, [contenteditable]')) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
+    // Фокус на кнопке сдвига: Пробел/Enter нажимают её, а не отмечают строку.
+    if ((e.key === ' ' || e.key === 'Enter') && el.closest('.adm-lrc-nudge, .adm-lrc-shift')) return
     if (mode.value === 'sync' && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault()
         doStamp()
@@ -416,6 +513,7 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKey)
+    clearTimeout(flashTimer)
     audio.value?.pause()
 })
 </script>

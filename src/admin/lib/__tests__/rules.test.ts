@@ -386,6 +386,15 @@ describe('site.json: анонс', () => {
         ])
     })
 
+    it('дата выхода необязательна, но если есть — проверяется', () => {
+        const { releaseAt: _r, ...noDate } = announce
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: noDate }, current)).toEqual([])
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: { ...noDate, releaseAt: '' } }, current)).toEqual([
+            'site.json: announce.releaseAt — дата и время по Москве вида 2026-11-01T18:00:00+03:00'
+        ])
+        expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: { ...noDate, releaseAt: null } }, current)).toHaveLength(1)
+    })
+
     it('время только по Москве (+03:00)', () => {
         const utc = { ...announce, releaseAt: '2026-11-01T15:00:00Z' }
         expect(validateSiteSettings({ promo: { enabled: true, releaseId: 'faaa' }, announce: utc }, current)).toHaveLength(1)

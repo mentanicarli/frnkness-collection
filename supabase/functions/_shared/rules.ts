@@ -460,7 +460,8 @@ export function validateAnnounce(value: unknown): string[] {
     if (typeof value.cover !== 'string' || !/^images\/[a-z0-9-]+\.(jpg|jpeg|png)$/.test(value.cover)) {
         errors.push(`${p}.cover должна лежать в images/ и называться латиницей`)
     }
-    if (typeof value.releaseAt !== 'string' || !ANNOUNCE_TIME_RE.test(value.releaseAt) || !Number.isFinite(Date.parse(value.releaseAt))) {
+    // Дата необязательна: без неё на сайте «Скоро» без таймера, анонс висит, пока его не выключат.
+    if (value.releaseAt !== undefined && (typeof value.releaseAt !== 'string' || !ANNOUNCE_TIME_RE.test(value.releaseAt) || !Number.isFinite(Date.parse(value.releaseAt)))) {
         errors.push(`${p}.releaseAt — дата и время по Москве вида 2026-11-01T18:00:00+03:00`)
     }
     if (value.text !== undefined && (typeof value.text !== 'string' || value.text.length > 400)) errors.push(`${p}.text — до 400 символов`)

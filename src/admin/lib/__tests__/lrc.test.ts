@@ -5,12 +5,15 @@ import {
     activeIndex,
     buildLrc,
     cleanLrcText,
+    earliestTime,
     formatLrcTime,
+    formatShift,
     linesFromLrc,
     linesFromTxt,
     nextUnstamped,
     nudge,
     outOfOrder,
+    shiftAll,
     stamp,
     undoStamp,
     type LrcLine
@@ -117,6 +120,62 @@ describe('синхронизация', () => {
         lines = nudge(lines, 0, -5)
         expect(lines[0].time).toBe(0)
         expect(nudge(lines, 1, 0.1)[1].time).toBeNull()
+    })
+
+    it('сдвиг всех строк вперёд и назад', () => {
+        const lines: LrcLine[] = [{ text: 'a', time: 1 }, { text: 'b', time: null }, { text: 'c', time: 2.5 }]
+        const fwd = shiftAll(lines, 0.1)
+        expect(fwd.applied).toBe(0.1)
+        expect(fwd.lines.map((l) => l.time)).toEqual([1.1, null, 2.6])
+        const back = shiftAll(fwd.lines, -0.1)
+        expect(back.applied).toBe(-0.1)
+        expect(back.lines.map((l) => l.time)).toEqual([1, null, 2.5])
+        // Исходный массив не меняется, текст и порядок сохраняются.
+        expect(lines.map((l) => l.time)).toEqual([1, null, 2.5])
+        expect(back.lines.map((l) => l.text)).toEqual(['a', 'b', 'c'])
+    })
+
+    it('сдвиг назад упирается в 0.00 одинаково для всех строк', () => {
+        const lines: LrcLine[] = [{ text: 'a', time: 0.05 }, { text: 'b', time: 1 }, { text: 'c', time: 3 }]
+        const r = shiftAll(lines, -0.1)
+        expect(r.applied).toBe(-0.05)
+        expect(r.lines.map((l) => l.time)).toEqual([0, 0.95, 2.95])
+        const stuck = shiftAll(r.lines, -0.1)
+        expect(stuck.applied).toBe(0)
+        expect(stuck.lines).toBe(r.lines)
+        expect(earliestTime(r.lines)).toBe(0)
+        // Вперёд от нуля — можно.
+        expect(shiftAll(r.lines, 0.1).lines.map((l) => l.time)).toEqual([0.1, 1.05, 3.05])
+    })
+
+    it('сдвиг округляет до сотых без накопления ошибки', () => {
+        let lines: LrcLine[] = [{ text: 'a', time: 0.7 }, { text: 'b', time: 12.34 }]
+        for (let i = 0; i < 30; i++) lines = shiftAll(lines, 0.1).lines
+        expect(lines.map((l) => l.time)).toEqual([3.7, 15.34])
+        for (let i = 0; i < 30; i++) lines = shiftAll(lines, -0.1).lines
+        expect(lines.map((l) => l.time)).toEqual([0.7, 12.34])
+        expect(buildLrc(lines)).toBe('[00:00.70]a\n[00:12.34]b\n')
+    })
+
+    it('сдвиг сохраняет порядок строк, даже неотсортированных', () => {
+        const lines: LrcLine[] = [{ text: 'a', time: 5 }, { text: 'b', time: 3 }, { text: 'c', time: 6 }]
+        const r = shiftAll(lines, -3.5)
+        expect(r.applied).toBe(-3)
+        expect(r.lines.map((l) => [l.text, l.time])).toEqual([['a', 2], ['b', 0], ['c', 3]])
+    })
+
+    it('сдвиг без отмеченных строк ничего не делает', () => {
+        const lines: LrcLine[] = [{ text: 'a', time: null }]
+        expect(shiftAll(lines, 0.1)).toEqual({ lines, applied: 0 })
+        expect(earliestTime(lines)).toBeNull()
+    })
+
+    it('подпись накопленного сдвига', () => {
+        expect(formatShift(0)).toBe('0.0 с')
+        expect(formatShift(0.30000000000000004)).toBe('+0.3 с')
+        expect(formatShift(-0.1)).toBe('−0.1 с')
+        expect(formatShift(-0.05)).toBe('−0.05 с')
+        expect(formatShift(1.25)).toBe('+1.25 с')
     })
 
     it('строки не по порядку', () => {

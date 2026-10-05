@@ -72,8 +72,11 @@ export interface Announce {
     title: string
     /** Путь к обложке в images/. */
     cover: string
-    /** ISO с +03:00, например 2026-11-01T18:00:00+03:00. */
-    releaseAt: string
+    /**
+     * ISO с +03:00, например 2026-11-01T18:00:00+03:00. Нет поля — дата не
+     * объявлена: на главной «Скоро» без таймера, анонс сам не исчезает.
+     */
+    releaseAt?: string
     text?: string
     url?: string
 }

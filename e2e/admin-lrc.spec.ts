@@ -108,6 +108,40 @@ test('готовый .lrc: загрузка для правки, подстро�
     expect(saved[0].endsWith(`]${first[4]}`)).toBe(true)
 })
 
+test('сдвиг всех строк: ±0.1, накопленный сдвиг, сброс, упор в 0', async ({ page }) => {
+    await openLrc(page, '#/lrc/faaa/0')
+    const stamps = () => page.getByTestId('lrc-lines').locator('.adm-lrc-stamp').allTextContents()
+    const before = await stamps()
+    const total = page.getByTestId('shift-total')
+    await expect(total).toHaveText('Сдвиг: 0.0 с')
+
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Все +0.1' }).click()
+    await expect(total).toHaveText('Сдвиг: +0.3 с')
+    await expect(page.getByTestId('lrc-lines').locator('.adm-lrc-stamp.flash-later').first()).toBeVisible()
+    const toCs = (s: string) => {
+        const m = s.match(/^(\d{2}):(\d{2})\.(\d{2})$/)!
+        return (Number(m[1]) * 60 + Number(m[2])) * 100 + Number(m[3])
+    }
+    const after = await stamps()
+    expect(after.map(toCs)).toEqual(before.map((s) => toCs(s) + 30))
+    await expect(page.getByText('Есть несохранённые изменения')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Сбросить сдвиг' }).click()
+    await expect(total).toHaveText('Сдвиг: 0.0 с')
+    expect(await stamps()).toEqual(before)
+    await expect(page.getByText('Изменений нет')).toBeVisible()
+
+    // Тянем назад, пока самая ранняя строка не встанет на 00:00.00.
+    const back = page.getByRole('button', { name: 'Все −0.1' })
+    const firstCs = Math.min(...before.map(toCs))
+    for (let i = 0; i < Math.ceil(firstCs / 10); i++) await back.click()
+    await expect(back).toBeDisabled()
+    await expect(page.getByTestId('shift-hint')).toContainText('00:00.00')
+    const atZero = (await stamps()).map(toCs)
+    expect(Math.min(...atZero)).toBe(0)
+    expect(atZero).toEqual(before.map((s) => toCs(s) - firstCs))
+})
+
 test('перемотка ←/→, скорость 0.75×, правка строк сохраняет отметки', async ({ page }) => {
     await openLrc(page, '#/lrc/faaa/0')
     await setTime(page, 10)

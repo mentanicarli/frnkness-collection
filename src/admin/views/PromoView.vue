@@ -32,9 +32,13 @@
                         <input v-model="announce.title" class="adm-input" type="text" maxlength="120" aria-label="Название анонса" />
                     </label>
                     <label class="adm-field">
-                        <span class="adm-label">Дата и время выхода (по Москве)</span>
-                        <input v-model="announce.localTime" class="adm-input" type="datetime-local" aria-label="Время выхода" style="color-scheme: dark" />
-                        <span class="adm-hint">В site.json: {{ releaseAtValue || '—' }}</span>
+                        <span class="adm-label">Дата и время выхода (по Москве, необязательно)</span>
+                        <span class="adm-row" style="gap: 0.5rem; flex-wrap: nowrap">
+                            <input v-model="announce.localTime" class="adm-input" type="datetime-local" aria-label="Время выхода" style="color-scheme: dark" />
+                            <button v-if="announce.localTime" class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click.prevent="announce.localTime = ''">Без даты</button>
+                        </span>
+                        <span v-if="announce.localTime" class="adm-hint">В site.json: {{ releaseAtValue }}. С таймером; после этого времени анонс исчезнет сам.</span>
+                        <span v-else class="adm-hint" data-testid="announce-no-date">Без даты: на главной «Скоро» без таймера. Анонс висит, пока его не выключишь.</span>
                     </label>
                     <label class="adm-field">
                         <span class="adm-label">Текст (необязательно)</span>
@@ -174,7 +178,7 @@ const nextAnnounce = computed<Announce | undefined>(() =>
               enabled: announce.enabled,
               title: announce.title,
               cover: newCoverPath.value ?? announce.cover,
-              releaseAt: releaseAtValue.value,
+              ...(releaseAtValue.value ? { releaseAt: releaseAtValue.value } : {}),
               text: announce.text,
               url: announce.url
           }
@@ -194,8 +198,7 @@ const errors = computed(() => {
     if (announce.exists) {
         if (!announce.title.trim()) list.push('Укажи название анонса')
         if (!announce.cover && !coverFile.value) list.push('Добавь обложку анонса')
-        if (!announce.localTime) list.push('Укажи время выхода')
-        else if (announce.enabled && Date.parse(releaseAtValue.value) <= now.value) list.push('Время выхода уже прошло — выключи анонс или поменяй время')
+        if (announce.localTime && announce.enabled && Date.parse(releaseAtValue.value) <= now.value) list.push('Время выхода уже прошло — выключи анонс или поменяй время')
     }
     if (list.length) return list
     // Та же проверка site.json, что в функции.
@@ -206,19 +209,21 @@ const errors = computed(() => {
 const previewHtml = computed(() => renderPromoCardHtml(releaseId.value, releases.value[releaseId.value]))
 const announcePreview = computed<Announce | null>(() => {
     const a = nextAnnounce.value
-    if (!a || !coverSrc.value || !a.title.trim() || !a.releaseAt) return null
+    if (!a || !coverSrc.value || !a.title.trim()) return null
     const shown = { ...a, cover: coverSrc.value }
     return isAnnounceActive(shown, now.value) ? shown : null
 })
 const announceHiddenReason = computed(() => {
-    if (!announce.title.trim() || !coverSrc.value || !announce.localTime) return 'заполни название, обложку и время'
+    if (!announce.title.trim() || !coverSrc.value) return 'заполни название и обложку'
     return 'время выхода прошло'
 })
 // Разметка не зависит от текущего времени — перерисовывается только при смене
-// данных, а цифры отсчёта обновляет startAnnounceCountdown.
+// данных, а цифры отсчёта обновляет startAnnounceCountdown (у анонса без
+// даты отсчёта нет).
 const announceHtml = computed(() => {
     const a = announcePreview.value
-    return a ? renderAnnounceCardHtml(a, Date.parse(a.releaseAt) - 1000) : ''
+    if (!a) return ''
+    return a.releaseAt ? renderAnnounceCardHtml(a, Date.parse(a.releaseAt) - 1000) : renderAnnounceCardHtml(a)
 })
 const announceBox = ref<HTMLElement | null>(null)
 let stopCountdown: (() => void) | null = null
@@ -246,7 +251,7 @@ function reset() {
     releaseId.value = s && releases.value[s.promo.releaseId] ? s.promo.releaseId : releaseIds.value[0] || ''
     const a = s?.announce
     Object.assign(announce, a
-        ? { exists: true, enabled: a.enabled, title: a.title, localTime: a.releaseAt.slice(0, 16), text: a.text ?? '', url: a.url ?? '', cover: a.cover }
+        ? { exists: true, enabled: a.enabled, title: a.title, localTime: a.releaseAt?.slice(0, 16) ?? '', text: a.text ?? '', url: a.url ?? '', cover: a.cover }
         : { exists: false, enabled: true, title: '', localTime: '', text: '', url: '', cover: '' })
 }
 

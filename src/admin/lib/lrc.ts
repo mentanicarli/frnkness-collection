@@ -78,6 +78,41 @@ export function nudge(lines: LrcLine[], index: number, delta: number): LrcLine[]
     return lines.map((l, j) => (j === index && l.time !== null ? { ...l, time: Math.max(0, round2(l.time + delta)) } : l))
 }
 
+/**
+ * Сдвиг всех отмеченных строк на одно и то же время. Назад сдвиг
+ * ограничивается так, чтобы самая ранняя строка встала ровно на 0.00:
+ * все строки сдвигаются на одинаковую величину, промежутки между ними не
+ * ломаются, и обратный сдвиг возвращает всё как было. `applied` — сколько
+ * сдвинули на самом деле (0, если самая ранняя строка уже на 0.00).
+ * Считаем в сотых долях целыми числами, чтобы не копить ошибку округления.
+ */
+export function shiftAll(lines: LrcLine[], delta: number): { lines: LrcLine[]; applied: number } {
+    const times = lines.flatMap((l) => (l.time === null ? [] : [Math.round(l.time * 100)]))
+    if (!times.length) return { lines, applied: 0 }
+    const want = Math.round(delta * 100)
+    const cs = Math.max(want, -Math.min(...times))
+    if (cs === 0) return { lines, applied: 0 }
+    return {
+        lines: lines.map((l) => (l.time === null ? l : { ...l, time: (Math.round(l.time * 100) + cs) / 100 })),
+        applied: cs / 100
+    }
+}
+
+/** Самое раннее время среди отмеченных строк (null — отмеченных нет). */
+export function earliestTime(lines: LrcLine[]): number | null {
+    const times = lines.flatMap((l) => (l.time === null ? [] : [l.time]))
+    return times.length ? Math.min(...times) : null
+}
+
+/** «+0.3 с», «−0.1 с», «0.0 с» — для подписи накопленного сдвига. */
+export function formatShift(seconds: number): string {
+    const cs = Math.round(seconds * 100)
+    if (cs === 0) return '0.0 с'
+    const abs = Math.abs(cs) / 100
+    const s = cs % 10 === 0 ? abs.toFixed(1) : abs.toFixed(2)
+    return `${cs > 0 ? '+' : '−'}${s} с`
+}
+
 export function clearTimes(lines: LrcLine[]): LrcLine[] {
     return lines.map((l) => ({ ...l, time: null }))
 }

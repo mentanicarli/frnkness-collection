@@ -82,6 +82,47 @@ test('создать анонс: превью с живым отсчётом, с
     })
 })
 
+test('анонс без даты: превью «Скоро» без таймера, в site.json нет releaseAt', async ({ page }) => {
+    const mocks = await openPromo(page)
+    await page.goto('/admin.html#/promo')
+    await page.getByRole('button', { name: 'Создать анонс' }).click()
+    await page.getByRole('textbox', { name: 'Название анонса' }).fill('Новый альбом')
+    await page.getByLabel('Обложка анонса').setInputFiles(COVER)
+    await expect(page.getByTestId('announce-no-date')).toBeVisible()
+    const preview = page.getByTestId('announce-preview')
+    await expect(preview.locator('.announce-countdown')).toHaveText('Скоро')
+    await expect(preview.locator('[role="timer"]')).toHaveCount(0)
+    await expect(preview.locator('.announce-when')).toHaveCount(0)
+    await expect(page.getByTestId('promo-errors')).toHaveCount(0)
+
+    // Дату можно поставить и снова убрать.
+    await page.getByLabel('Время выхода').fill('2026-10-03T18:00')
+    await expect(preview.locator('[role="timer"]')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Без даты' }).click()
+    await expect(preview.locator('.announce-countdown')).toHaveText('Скоро')
+
+    await page.getByRole('button', { name: 'Сохранить…' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Опубликовать' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    const files = mocks.calls.find((c) => c.action === 'commit')!.body.files as { path: string; content?: string }[]
+    expect(JSON.parse(files[0].content!).announce).toEqual({
+        enabled: true,
+        title: 'Новый альбом',
+        cover: 'images/announce-novy-albom-20261002.jpg'
+    })
+})
+
+test('анонс без даты не истекает — подсказки нет', async ({ page }) => {
+    const { releaseAt: _r, ...noDate } = EXISTING
+    await openPromo(page, noDate)
+    await page.goto('/admin.html#/promo')
+    await expect(page.getByRole('textbox', { name: 'Название анонса' })).toHaveValue('Тестовый анонс')
+    await expect(page.getByLabel('Время выхода')).toHaveValue('')
+    await expect(page.getByTestId('announce-preview').locator('.announce-countdown')).toHaveText('Скоро')
+    await expect(page.getByTestId('announce-expired')).toHaveCount(0)
+    await expect(page.getByText('Изменений нет')).toBeVisible()
+})
+
 test('время выхода в прошлом — сохранить нельзя', async ({ page }) => {
     await openPromo(page)
     await page.goto('/admin.html#/promo')
@@ -169,6 +210,18 @@ test('главная: истёкший анонс не показывается 
     await openSiteWithAnnounce(page, { ...EXISTING, releaseAt: '2026-10-01T12:00:00+03:00' })
     await expect(page.locator('#home-promo .promo-release-card')).toHaveCount(1)
     await expect(page.locator('#home-promo .announce-card')).toHaveCount(0)
+})
+
+test('главная: анонс без даты — «Скоро» без таймера и не исчезает', async ({ page }) => {
+    const { releaseAt: _r, ...noDate } = EXISTING
+    await openSiteWithAnnounce(page, noDate)
+    const announce = page.locator('#home-promo .announce-card')
+    await expect(announce.locator('.announce-countdown')).toHaveText('Скоро')
+    await expect(announce.locator('[role="timer"]')).toHaveCount(0)
+    await expect(announce.locator('.promo-title')).toHaveText('Тестовый анонс')
+    await page.clock.runFor(60_000)
+    await expect(announce).toHaveCount(1)
+    await expect(page.locator('#home-promo .promo-release-card')).toHaveCount(2)
 })
 
 test('главная: только анонс, если последний релиз выключен', async ({ page }) => {

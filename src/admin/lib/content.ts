@@ -12,7 +12,7 @@ export function serializeSite(settings: SiteSettings): string {
             enabled: a.enabled,
             title: a.title.trim(),
             cover: a.cover,
-            releaseAt: a.releaseAt,
+            ...(a.releaseAt ? { releaseAt: a.releaseAt } : {}),
             ...(a.text && a.text.trim() ? { text: a.text.trim() } : {}),
             ...(a.url && a.url.trim() ? { url: a.url.trim() } : {})
         }

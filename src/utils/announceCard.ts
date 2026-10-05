@@ -7,22 +7,32 @@ import { escapeHtml } from './helpers'
  *
  * Время выхода хранится в ISO с +03:00 (по Москве), отсчёт считается в
  * браузере. Когда время вышло, карточка убирается — сайт не висит с нулями.
+ *
+ * Дата необязательна: без неё карточка показывает «Скоро» без таймера и
+ * висит, пока анонс не выключат в админке.
  */
 
-export function releaseTime(announce: Pick<Announce, 'releaseAt'>): number {
-    return Date.parse(announce.releaseAt)
+/** Есть ли у анонса дата выхода (поле releaseAt заполнено). */
+export function hasReleaseDate(announce: Pick<Announce, 'releaseAt'>): boolean {
+    return typeof announce.releaseAt === 'string' && announce.releaseAt !== ''
 }
 
-/** Показывать ли анонс сейчас: включён, заполнен и время ещё не наступило. */
+/** Момент выхода в мс; NaN — даты нет или она испорчена. */
+export function releaseTime(announce: Pick<Announce, 'releaseAt'>): number {
+    return hasReleaseDate(announce) ? Date.parse(announce.releaseAt!) : NaN
+}
+
+/** Показывать ли анонс сейчас: включён, заполнен и время ещё не наступило (или даты нет). */
 export function isAnnounceActive(announce: Announce | null | undefined, now: number = Date.now()): announce is Announce {
     if (!announce || !announce.enabled || !announce.title || !announce.cover) return false
+    if (!hasReleaseDate(announce)) return true
     const at = releaseTime(announce)
     return Number.isFinite(at) && at > now
 }
 
-/** Анонс включён, но время уже вышло — пора добавить релиз и выключить анонс. */
+/** Анонс включён, но время уже вышло — пора добавить релиз и выключить анонс. Без даты не истекает. */
 export function isAnnounceExpired(announce: Announce | null | undefined, now: number = Date.now()): boolean {
-    if (!announce || !announce.enabled) return false
+    if (!announce || !announce.enabled || !hasReleaseDate(announce)) return false
     const at = releaseTime(announce)
     return Number.isFinite(at) && at <= now
 }
@@ -53,7 +63,13 @@ function safeUrl(url: string | undefined): string | null {
 
 export function renderAnnounceCardHtml(announce: Announce, now: number = Date.now()): string {
     const title = escapeHtml(announce.title)
+    const dated = hasReleaseDate(announce)
     const at = releaseTime(announce)
+    // Без даты: вместо отсчёта — «Скоро», бейдж «анонс», чтобы «скоро» не повторялось дважды.
+    const when = dated
+        ? `<div class="announce-countdown" aria-live="off" role="timer">${formatCountdown(at - now)}</div>
+                            <p class="announce-when">Выйдет ${escapeHtml(formatReleaseMoment(announce.releaseAt!))}</p>`
+        : `<div class="announce-countdown announce-soon">Скоро</div>`
     const link = safeUrl(announce.url)
     const text = announce.text ? `<p class="announce-text">${escapeHtml(announce.text)}</p>` : ''
     const cta = link
@@ -63,16 +79,15 @@ export function renderAnnounceCardHtml(announce: Announce, now: number = Date.no
                                 </a>`
         : ''
     return `
-                <div class="release-card promo-release-card announce-card text-left relative w-full" data-release-at="${at}" style="padding: clamp(1rem,2vw,1.625rem);">
+                <div class="release-card promo-release-card announce-card text-left relative w-full"${dated ? ` data-release-at="${at}"` : ''} style="padding: clamp(1rem,2vw,1.625rem);">
                     <div class="flex flex-col sm:flex-row items-start sm:items-center" style="gap: clamp(1.125rem,3vw,2.5rem);">
                         <div class="promo-cover-wrap aspect-square overflow-hidden bg-[var(--bg)] flex-shrink-0" style="border-radius: 0.5rem;">
                             <img src="${escapeHtml(announce.cover)}" alt="${title}" class="card-image w-full h-full object-cover" loading="eager" decoding="async" onerror="this.style.display='none'">
                         </div>
                         <div class="flex-1 min-w-0 flex flex-col" style="gap: 1rem;">
-                            <div class="promo-badge">скоро</div>
+                            <div class="promo-badge">${dated ? 'скоро' : 'анонс'}</div>
                             <h3 class="promo-title line-clamp-2 relative z-10" style="font-size: clamp(1.5rem,4vw,3.125rem); line-height: 1;">${title}</h3>
-                            <div class="announce-countdown" aria-live="off" role="timer">${formatCountdown(at - now)}</div>
-                            <p class="announce-when">Выйдет ${escapeHtml(formatReleaseMoment(announce.releaseAt))}</p>
+                            ${when}
                             ${text}
                             ${cta}
                         </div>
@@ -83,9 +98,11 @@ export function renderAnnounceCardHtml(announce: Announce, now: number = Date.no
 
 /**
  * Живой отсчёт в отрисованной карточке. Когда время вышло — onExpire
- * (сайт убирает карточку). Возвращает функцию остановки.
+ * (сайт убирает карточку). Карточка без даты (нет data-release-at) не
+ * отсчитывает и не истекает. Возвращает функцию остановки.
  */
 export function startAnnounceCountdown(card: HTMLElement, onExpire: () => void, now: () => number = Date.now): () => void {
+    if (card.dataset.releaseAt === undefined) return () => {}
     const at = Number(card.dataset.releaseAt)
     const el = card.querySelector<HTMLElement>('.announce-countdown')
     let timer: ReturnType<typeof setInterval> | null = null

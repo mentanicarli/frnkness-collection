@@ -4,6 +4,7 @@ import {
     formatCountdown,
     formatReleaseMoment,
     isAnnounceActive,
+    isAnnounceExpired,
     renderAnnounceCardHtml,
     startAnnounceCountdown
 } from '../announceCard'
@@ -68,5 +69,42 @@ describe('карточка анонса', () => {
         now += 5000
         vi.advanceTimersByTime(5000)
         expect(expired).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('анонс без даты', () => {
+    const { releaseAt: _r, ...noDate } = base
+
+    it('активен всегда, пока включён, и не истекает', () => {
+        expect(isAnnounceActive(noDate, 0)).toBe(true)
+        expect(isAnnounceActive(noDate, Date.parse('2099-01-01T00:00:00Z'))).toBe(true)
+        expect(isAnnounceActive({ ...noDate, enabled: false })).toBe(false)
+        expect(isAnnounceExpired(noDate, Date.parse('2099-01-01T00:00:00Z'))).toBe(false)
+        // Старый формат с датой — как раньше.
+        expect(isAnnounceExpired(base, AT)).toBe(true)
+        expect(isAnnounceExpired(base, AT - 1)).toBe(false)
+    })
+
+    it('карточка: «Скоро» без таймера и без «Выйдет…»', () => {
+        const html = renderAnnounceCardHtml(noDate, 0)
+        expect(html).toContain('announce-soon')
+        expect(html).toContain('>Скоро<')
+        expect(html).not.toContain('role="timer"')
+        expect(html).not.toContain('announce-when')
+        expect(html).not.toContain('data-release-at')
+        expect(html).toContain('Новый &lt;альбом&gt;')
+        expect(html).toContain('href="https://example.com/presave"')
+    })
+
+    it('отсчёт не запускается и карточку не снимает', () => {
+        vi.useFakeTimers()
+        document.body.innerHTML = renderAnnounceCardHtml(noDate)
+        const card = document.querySelector<HTMLElement>('.announce-card')!
+        const expired = vi.fn()
+        const stop = startAnnounceCountdown(card, expired, () => Date.parse('2099-01-01T00:00:00Z'))
+        vi.advanceTimersByTime(10_000)
+        expect(expired).not.toHaveBeenCalled()
+        expect(card.querySelector('.announce-countdown')!.textContent).toBe('Скоро')
+        stop()
     })
 })

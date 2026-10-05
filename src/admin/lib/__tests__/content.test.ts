@@ -29,4 +29,12 @@ describe('site.json с анонсом', () => {
         })
         expect(Object.keys(JSON.parse(out))).toEqual(['promo', 'announce'])
     })
+
+    it('анонс без даты — поля releaseAt нет', () => {
+        const out = serializeSite({
+            promo: { enabled: true, releaseId: 'faaa' },
+            announce: { enabled: true, title: 'Скоро', cover: 'images/a.jpg', releaseAt: '' }
+        })
+        expect(JSON.parse(out).announce).toEqual({ enabled: true, title: 'Скоро', cover: 'images/a.jpg' })
+    })
 })
