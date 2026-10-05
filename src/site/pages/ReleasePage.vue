@@ -1,5 +1,5 @@
 <template>
-  <div id="page-release" class="page">
+  <div id="page-release" class="page active">
     <div class="shell px-6" style="padding-top: 1.5rem; padding-bottom: 0.5rem;">
       <BackButton />
       <div class="flex flex-col lg:flex-row gap-8 lg:gap-16" style="padding-bottom: 8.125rem;">
@@ -108,8 +108,7 @@ import BackButton from '../components/BackButton.vue'
 
 const route = useRoute()
 
-// Страница остаётся смонтированной и после ухода с неё: показывает
-// последний открытый релиз.
+// При переходе с релиза на релиз компонент тот же — содержимое меняет show().
 const releaseId = ref<string | null>(null)
 const release = computed(() => (releaseId.value ? releases[releaseId.value] ?? null : null))
 const coverBroken = ref(false)

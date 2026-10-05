@@ -1,5 +1,5 @@
 <template>
-  <div id="page-chart" class="page">
+  <div id="page-chart" class="page active">
     <div class="shell shell-narrow px-6" style="padding-top: 1.5rem; padding-bottom: 8.125rem;">
       <BackButton />
       <div class="mb-8">

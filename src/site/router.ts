@@ -1,6 +1,10 @@
 import { createRouter, createWebHashHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
 import { releases } from '@/config'
 import { findTrackRefBySlug, getTrackSlug } from '@/utils/slug'
+import HomePage from './pages/HomePage.vue'
+import ChartPage from './pages/ChartPage.vue'
+import ReleasePage from './pages/ReleasePage.vue'
+import TrackPage from './pages/TrackPage.vue'
 
 /**
  * Адреса сайта (hash-режим, как и раньше):
@@ -26,15 +30,15 @@ declare module 'vue-router' {
 const param = (value: unknown): string => (Array.isArray(value) ? String(value[0] ?? '') : String(value ?? ''))
 
 const routes: RouteRecordRaw[] = [
-    { path: '/', name: 'home', component: { render: () => null } },
-    { path: '/chart', name: 'chart', component: { render: () => null } },
+    { path: '/', name: 'home', component: HomePage },
+    { path: '/chart', name: 'chart', component: ChartPage },
     { path: '/chart/:rest(.*)+', redirect: { name: 'chart' } },
-    { path: '/release/:releaseId', name: 'release', component: { render: () => null } },
+    { path: '/release/:releaseId', name: 'release', component: ReleasePage },
     {
         path: '/release/:releaseId/:rest(.*)+',
         redirect: (to) => ({ name: 'release', params: { releaseId: to.params.releaseId } })
     },
-    { path: '/track/:releaseId/:slug', name: 'track', component: { render: () => null } },
+    { path: '/track/:releaseId/:slug', name: 'track', component: TrackPage },
     {
         path: '/track/:releaseId/:slug/:rest(.*)+',
         redirect: (to) => ({ name: 'track', params: { releaseId: to.params.releaseId, slug: to.params.slug } })

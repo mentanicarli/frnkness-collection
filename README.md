@@ -28,37 +28,36 @@ https://frnkness.ru/
 - Vite
 - Supabase (`@supabase/supabase-js`)
 - Tailwind CSS 4 через плагин `@tailwindcss/vite` (импорт в `src/assets/app.css`)
-- Color Thief через npm-пакет `colorthief` (инициализируется в `src/main.ts`)
+- Vue Router (hash-режим)
+- Color Thief через npm-пакет `colorthief` (цвет обложек, `src/site/services/colors.ts`)
 - Vitest для юнит-тестов
 
 ## Архитектура
 
-Проект организован в два связанных слоя.
+Сайт и админка — приложения на Vue 3 с общими компонентами и утилитами.
+Весь текст выводится через шаблоны с автоэкранированием; `v-html` на сайте не используется.
 
-### Vue-слой
-
-Отвечает за разметку экранов и тонкие обработчики. Данные в шаблонах не рендерятся —
-компоненты задают DOM-каркас с `id`-атрибутами, за который цепляется runtime.
-
-- Компоненты интерфейса: `src/components/*`
-- Корневая композиция: `src/App.vue`, `src/main.ts`
-- Реактивное состояние: `src/runtime/sharedState.ts`
+- Корень сайта: `src/main.ts`, `src/App.vue` (шапка, `RouterView`, плеер)
+- Адреса: `src/site/router.ts` — Vue Router в hash-режиме; `meta.public` — задел под вход
+- Страницы: `src/site/pages/*` (главная, чарт, релиз, трек)
+- Компоненты: `src/site/components/*`; карточки промо и анонса, текст с разборами и
+  «О треке» — общие с предпросмотром в админке
+- Плеер: `src/site/player/*` — состояние, движок (воспроизведение, Поток, засчёт
+  прослушиваний, экран блокировки, сессии) и караоке
+- Состояние экрана и поиска: `src/site/stores/*`; «кто вошёл» — `src/site/session.ts` (пока пусто)
+- Сервисы без отрисовки: `src/site/services/*` — цвета обложек, статистика и чарт,
+  файлы текстов и разборов, индекс поиска
+- Экран блокировки и сессии прослушивания: `src/runtime/mediaSession.ts`, `src/runtime/listenTracker.ts`
 - Контент: `src/content/releases.json` (реестр релизов) и `src/content/site.json` (промо-блок)
 - Конфиг: `src/config.ts` — импортирует JSON и отдаёт `releases`, настройки промо и адрес Supabase
 - Утилиты и типы: `src/utils/*`, `src/types/index.ts`
 
-### Runtime-слой
+### Постоянные id треков
 
-Здесь живёт вся логика приложения: рендер карточек и треклистов, воспроизведение,
-тексты, поиск, чарт и цветовые акценты.
-
-- Оркестратор: `src/legacy/app-core.js` — принимает зависимости, собирает модули и `window.App`
-- Модули: `src/legacy/modules/*.js` (`player`, `lyrics`, `fullscreen`, `colors`, `chart`, `search`, `ui`, `track`, `router`)
-- Единая точка вызова runtime из Vue: `src/runtime/legacyBridge.ts`
-
-Конфиг, утилиты и общее состояние передаются в runtime явно через `initLegacyApp(deps)`
-в `src/main.ts` — модули ничего не импортируют из Vue-слоя напрямую.
-Bridge задаёт единый контракт вызовов (`window.App`) и отделяет шаблоны Vue от прямых обращений к runtime-API.
+У каждого трека в `releases.json` есть поле `id` вида `<releaseId>/<slug>` — оно
+задаётся при создании трека (админка генерирует его сама) и больше не меняется.
+На него будут ссылаться избранное, плейлисты и комнаты. Статистика пока хранится
+по старому ключу `<releaseId>-<индекс трека>`; соответствие — `src/utils/trackIds.ts`.
 
 ## Структура каталогов
 
@@ -74,39 +73,22 @@ src/
 		site.json
 	admin/            админка (см. раздел «Админка»)
 	sw.js
-	components/
-		AppHeader.vue
-		MainPages.vue
-		LyricsAndPlayers.vue
-	runtime/
-		sharedState.ts
-		legacyBridge.ts
-	utils/
-		helpers.ts
-		lyrics.ts
-		slug.ts
-		trackNotes.ts
-		promoCard.ts
+	site/
+		router.ts
+		session.ts
+		pages/            HomePage, ChartPage, ReleasePage, TrackPage
+		components/       шапка, плееры, карточки, текст с разборами
+		player/           state, engine, karaoke
+		stores/           search, view
+		services/         colors, stats, lyricsFiles, searchIndex, lyricFocus
+		composables/
 		__tests__/
-			helpers.test.ts
-			lyrics.test.ts
-			slug.test.ts
-			trackNotes.test.ts
+	runtime/
+		mediaSession.ts
+		listenTracker.ts
+	utils/            helpers, lyrics, slug, trackIds, trackNotes, search, …
 	types/
 		index.ts
-	legacy/
-		app-core.js
-		app-core.d.ts
-		modules/
-			chart.js
-			colors.js
-			fullscreen.js
-			lyrics.js
-			player.js
-			router.js
-			search.js
-			track.js
-			ui.js
 	assets/
 		app.css
 
@@ -172,10 +154,10 @@ npm run check:function  # проверка типов Edge Function через D
 
 ## Адреса страниц
 
-Навигация построена на hash-роутинге (`src/legacy/modules/router.js`).
-Единственный источник правды — `location.hash`: переходы только меняют адрес,
-а отрисовкой занимается обработчик `hashchange`. Поэтому «назад» и «вперёд»
-в браузере работают штатно, а прямая ссылка открывает нужный экран.
+Навигация — Vue Router в hash-режиме (`src/site/router.ts`). Адрес — единственный
+источник правды: «назад» и «вперёд» в браузере работают штатно, прямая ссылка
+открывает нужный экран, битые адреса приводятся к рабочим без записи в истории
+(неизвестный трек — на страницу его релиза, неизвестный релиз — на главную).
 
 ```text
 #/                                 главная
@@ -318,13 +300,12 @@ lyrics/album1/01-poopsicks.notes.json   описание и разборы
 
 ## Ограничения
 
-- Основная логика приложения находится в runtime-слое `src/legacy/`, а не в компонентах Vue
-- Интеграция между слоями идет через `window.App` и bridge
-- TypeScript покрывает Vue-слой и утилиты; модули в `src/legacy/modules/` типами не проверяются
+- `npm run typecheck` проверяет `.ts`-файлы; шаблоны `.vue` проверяются сборкой и тестами
 - Роутинг построен на hash-адресах, поэтому страницы треков не индексируются поисковиками,
   а превью ссылки в мессенджерах одинаковое для всего сайта. Чтобы это изменить,
   понадобится генерация отдельного HTML на трек при сборке
-- Юнит-тестами покрыты утилиты и логика админки; e2e-тесты есть только у админки
+- Юнит-тестами покрыты утилиты, плеер, роутер, компоненты сайта и логика админки;
+  e2e-тесты сайта — экран блокировки и сессии прослушивания
 - Правки из админки появляются на сайте через 1–2 минуты — после сборки в GitHub Actions
 
 ## Автор

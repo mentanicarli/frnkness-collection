@@ -2,17 +2,10 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './assets/app.css'
 
-import { initLegacyApp } from './legacy/app-core'
 import { normalizeInitialHash, router } from './site/router'
 
 normalizeInitialHash()
-const app = createApp(App)
-app.use(router)
-app.mount('#app')
-
-// Сразу после монтирования: страницы рисует Vue, и кнопки на них должны
-// работать с первого клика.
-initLegacyApp()
+createApp(App).use(router).mount('#app')
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

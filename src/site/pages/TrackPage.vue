@@ -1,6 +1,6 @@
 <template>
   <!-- Страница трека: обложка, метаданные, описание, текст с разборами, соседние треки. -->
-  <div id="page-track" ref="pageEl" class="page">
+  <div id="page-track" ref="pageEl" class="page active">
     <div v-if="view" class="shell shell-narrow px-6 track-page-inner">
       <RouterLink class="track-back" :to="releaseRoute(view.releaseId)">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
@@ -87,8 +87,7 @@ interface View {
   track: Track
 }
 
-// Страница остаётся смонтированной и после ухода с неё: показывает
-// последний открытый трек.
+// При переходе с трека на трек компонент тот же — содержимое меняет show().
 const view = shallowRef<View | null>(null)
 const content = shallowRef<{ about: string | null; text: string; noteMap: Map<string, string> } | null>(null)
 const plays = ref(0)
