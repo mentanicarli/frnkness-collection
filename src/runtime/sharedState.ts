@@ -1,11 +1,4 @@
-import type { ColorSet, LyricLine, Release } from '@/types'
-
-// Базовый акцент, который используется до вычисления цвета из обложки.
-export const DEFAULT_COLOR: ColorSet = {
-    hex: 'rgb(103, 114, 131)',
-    glow: 'rgba(103, 114, 131, 0.32)',
-    soft: 'rgba(103, 114, 131, 0.18)'
-}
+import type { LyricLine, Release } from '@/types'
 
 export interface RuntimeState {
     // Релиз, страница которого открыта на экране (страница релиза или трека).
@@ -34,12 +27,6 @@ export interface RuntimeState {
     currentLyricsTrackIndex: number | null
     currentLyricsPlainText: string
     currentLyricsLrcRaw: string
-    lyricsIndex: Array<Record<string, any>>
-    lyricsIndexReady: boolean
-    lyricsIndexPromise: Promise<void> | null
-    // Временные any: зависимости приходят из legacy/CDN и будут типизированы позже.
-    colorThief: any
-    db: any
 }
 
 // Общая модель состояния runtime.
@@ -67,17 +54,10 @@ export const runtimeState: RuntimeState = {
     preferredLyricsMode: 'karaoke',
     currentLyricsTrackIndex: null,
     currentLyricsPlainText: '',
-    currentLyricsLrcRaw: '',
-    lyricsIndex: [],
-    lyricsIndexReady: false,
-    lyricsIndexPromise: null,
-    colorThief: null,
-    db: null
+    currentLyricsLrcRaw: ''
 }
 
 // Кэши вынесены отдельно, чтобы избежать повторных сетевых/CPU-операций.
 export const runtimeCaches = {
-    colorCache: {} as Record<string, [number, number, number]>,
-    colorPromiseCache: {} as Record<string, Promise<[number, number, number]>>,
     releasePlayCountCache: {} as Record<string, number>
 }

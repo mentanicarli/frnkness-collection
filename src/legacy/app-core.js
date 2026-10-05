@@ -4,7 +4,8 @@
  * Импортирует модули из src/legacy/modules/ и собирает window.App.
  * Вся бизнес-логика живёт в модулях; здесь только инициализация и склейка.
  */
-import { createColorsModule } from './modules/colors'
+import * as colors from '../site/services/colors'
+import { getDb } from '../site/services/stats'
 import { createFullscreenModule } from './modules/fullscreen'
 import { createLyricsModule } from './modules/lyrics'
 import { createPlayerModule } from './modules/player'
@@ -25,26 +26,18 @@ export function initLegacyApp(deps = {}) {
     } = deps
 
     const {
-        SUPABASE_URL = '',
-        SUPABASE_ANON_KEY = '',
-        createSupabaseClient = null,
         PROMO_RELEASE_ID = '',
         SHOW_NEW_RELEASE_PROMO = true,
         ANNOUNCE = null,
-        LYRICS_INDEX_URL = '',
-        TRACK_NOTES_URL = '',
         releases = {}
     } = config
 
     const {
-        DEFAULT_COLOR = { hex: 'rgb(103, 114, 131)', glow: 'rgba(103, 114, 131, 0.32)', soft: 'rgba(103, 114, 131, 0.18)' },
         runtimeState = {},
         runtimeCaches = {}
     } = shared
 
     const state = runtimeState
-    const colorCache = runtimeCaches.colorCache || {}
-    const colorPromiseCache = runtimeCaches.colorPromiseCache || {}
     const releasePlayCountCache = runtimeCaches.releasePlayCountCache || {}
 
     // ── DOM cache ──────────────────────────────────────────────────────
@@ -53,7 +46,6 @@ export function initLegacyApp(deps = {}) {
     const perf = {
         lastProgressPercent: -1,
         lastSecond: -1,
-        searchCache: new Map(),
         preloadedAudio: new Set(),
         pendingTrackClickGuard: null,
         fsLyricsToggleGuardUntil: 0
@@ -142,57 +134,23 @@ export function initLegacyApp(deps = {}) {
 
     // ── Build context & modules ─────────────────────────────────────────
 
-    // Клиент БД создаётся при первом обращении, а не на старте.
-    // Промис кэшируется, чтобы параллельные вызовы не создали два клиента;
-    // после неудачи повторные попытки не делаются — иначе таймер плеера
-    // дёргал бы загрузку чанка на каждом тике.
-    let dbPromise = null
-    let dbUnavailable = false
-
-    function getDb() {
-        if (state.db) return Promise.resolve(state.db)
-        if (dbUnavailable) return Promise.resolve(null)
-        if (!SUPABASE_URL || !SUPABASE_ANON_KEY || typeof createSupabaseClient !== 'function') {
-            return Promise.resolve(null)
-        }
-        if (!dbPromise) {
-            dbPromise = Promise.resolve()
-                .then(() => createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY))
-                .then(client => {
-                    state.db = client
-                    return client
-                })
-                .catch(e => {
-                    console.warn('Supabase init failed:', e)
-                    dbUnavailable = true
-                    return null
-                })
-        }
-        return dbPromise
-    }
-
     const ctx = {
         dom,
         state,
         getDb,
         perf,
         releases,
-        DEFAULT_COLOR,
-        colorCache,
-        colorPromiseCache,
         releasePlayCountCache,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
         ANNOUNCE,
-        LYRICS_INDEX_URL,
-        TRACK_NOTES_URL,
         utils,
         modules: {}
     }
 
     const modules = ctx.modules
 
-    modules.colors = createColorsModule(ctx)
+    modules.colors = colors
     modules.fullscreen = createFullscreenModule(ctx)
     modules.lyrics = createLyricsModule(ctx)
     modules.player = createPlayerModule(ctx)

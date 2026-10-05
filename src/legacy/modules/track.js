@@ -2,40 +2,13 @@
  * Страница отдельного трека: обложка, метаданные, описание, текст с
  * разборами строк и ссылки на соседние треки релиза.
  */
+import { loadTrackNotes as loadNotes, notesKey } from '../../site/services/lyricsFiles'
+
 export function createTrackModule(ctx) {
-    const { dom, state, releases, utils, TRACK_NOTES_URL } = ctx
-    const { buildAssetUrl, escapeHtml, getTrackSlug, buildNoteMap, renderLyricsHtml, renderAboutHtml, normalizeForSearch } = utils
+    const { dom, state, releases, utils } = ctx
+    const { escapeHtml, getTrackSlug, buildNoteMap, renderLyricsHtml, renderAboutHtml, normalizeForSearch } = utils
     // Сопоставление разборов со строками живёт в src/utils/trackNotes.ts:
     // тем же кодом рендерит предпросмотр админка.
-
-    // Разборы и описания подгружаются одним файлом на весь сайт и кэшируются.
-    let notesPromise = null
-    let notesBundle = null
-
-    function loadNotes() {
-        if (notesBundle) return Promise.resolve(notesBundle)
-        if (!TRACK_NOTES_URL) return Promise.resolve({})
-        if (!notesPromise) {
-            // no-cache: дешёвая проверка по ETag, чтобы разборы из админки
-            // были видны сразу, а не через 10 минут HTTP-кэша GitHub Pages.
-            notesPromise = fetch(TRACK_NOTES_URL, { cache: 'no-cache' })
-                .then(res => (res.ok ? res.json() : {}))
-                .then(data => {
-                    notesBundle = data && typeof data === 'object' && !Array.isArray(data) ? data : {}
-                    return notesBundle
-                })
-                .catch(() => {
-                    notesBundle = {}
-                    return notesBundle
-                })
-        }
-        return notesPromise
-    }
-
-    function notesKey(release, track) {
-        const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        return release.lyricsPath + base + '.notes.json'
-    }
 
     // Тот же файл, что грузит плеер: если трек играет, запроса второй раз не будет.
     async function fetchPlainLyrics(release, track) {

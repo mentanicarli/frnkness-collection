@@ -1,11 +1,10 @@
 import { createApp } from 'vue'
-import ColorThief from 'colorthief'
 import App from './App.vue'
 import './assets/app.css'
 
 import { initLegacyApp } from './legacy/app-core'
 import { ANNOUNCE, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
-import { DEFAULT_COLOR, runtimeCaches, runtimeState } from './runtime/sharedState'
+import { runtimeCaches, runtimeState } from './runtime/sharedState'
 import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
 import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
 import { buildTrackHash, findTrackRefBySlug, getTrackSlug } from './utils/slug'
@@ -20,32 +19,14 @@ import { isAnnounceActive, renderAnnounceCardHtml, startAnnounceCountdown } from
 const app = createApp(App)
 app.mount('#app')
 
-// Supabase-клиент нужен только чарту и счётчику прослушиваний, а весит
-// заметно больше остального кода. Поэтому он не входит в основной бандл:
-// чанк подтягивается при первом реальном обращении к статистике.
-const createSupabaseClient = async (url: string, key: string) => {
-    const { createClient } = await import('@supabase/supabase-js')
-    return createClient(url, key)
-}
-
-// Инициализируем ColorThief из npm и кладём в runtimeState,
-// чтобы legacy-код мог использовать его без зависимости от window.ColorThief.
-runtimeState.colorThief = new ColorThief()
-
 const legacyDeps = {
     config: {
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY,
-        createSupabaseClient,
         PROMO_RELEASE_ID,
         SHOW_NEW_RELEASE_PROMO,
         ANNOUNCE,
-        LYRICS_INDEX_URL: `${import.meta.env.BASE_URL}lyrics-index.json`,
-        TRACK_NOTES_URL: `${import.meta.env.BASE_URL}track-notes.json`,
         releases
     },
     shared: {
-        DEFAULT_COLOR,
         runtimeState,
         runtimeCaches
     },

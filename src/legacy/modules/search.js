@@ -1,6 +1,8 @@
+import { ensureLyricsIndex, isLyricsIndexLoading, isLyricsIndexReady, searchCatalog as searchIndex } from '../../site/services/searchIndex'
+
 export function createSearchModule(ctx) {
-    const { dom, state, perf, releases, utils, LYRICS_INDEX_URL } = ctx
-    const { parseLRC, escapeHtml, debounce, createMatcher, normalizeForSearch } = utils
+    const { dom, releases, utils } = ctx
+    const { escapeHtml, debounce, normalizeForSearch } = utils
 
     // Последняя выдача: по индексу из onclick достаём строку текста целиком,
     // не протаскивая её через inline-обработчик.
@@ -59,160 +61,16 @@ export function createSearchModule(ctx) {
         dom.searchResults.innerHTML = `<p class="font-mono text-xs text-[var(--fg-faint)] mb-2">Результатов: ${results.length}</p>${html}`
     }
 
-    function lrcKey(release, track) {
-        const base = track.lyricsFile.replace(/\.[^/.]+$/, '')
-        return release.lyricsPath + base + '.lrc'
-    }
-
-    function txtKey(release, track) {
-        return release.lyricsPath + track.lyricsFile
-    }
-
-    function pushLine(entries, releaseId, release, trackIndex, track, line, time) {
-        entries.push({
-            releaseId, releaseTitle: release.title, trackIndex,
-            trackTitle: track.title, line,
-            normalized: normalizeForSearch(line), time
-        })
-    }
-
-    // Строки из .lrc — со временем: клик по ним открывает караоке.
-    function collectLrcLines(entries, releaseId, release, trackIndex, track, lrc) {
-        parseLRC(lrc).forEach(item => {
-            const clean = (item.text || '').trim()
-            if (clean) pushLine(entries, releaseId, release, trackIndex, track, clean, item.time)
-        })
-    }
-
-    // Строки из .txt (трек без караоке) — без времени: клик ведёт на страницу
-    // трека. Пустые строки и метки вида [Припев] не ищутся.
-    function collectTxtLines(entries, releaseId, release, trackIndex, track, txt) {
-        String(txt).split('\n').forEach(raw => {
-            const clean = raw.trim()
-            if (!clean || /^\[.+\]$/.test(clean)) return
-            pushLine(entries, releaseId, release, trackIndex, track, clean, -1)
-        })
-    }
-
-    // Индекс, собранный на этапе сборки: один файл вместо запроса на трек.
-    // Если его нет (или он битый), возвращаем null и уходим на обход по файлам.
-    async function fetchPrebuiltIndex() {
-        if (!LYRICS_INDEX_URL) return null
-        try {
-            // no-cache: свежий индекс сразу после публикации из админки.
-            const res = await fetch(LYRICS_INDEX_URL, { cache: 'no-cache' })
-            if (!res.ok) return null
-            const data = await res.json()
-            return data && typeof data === 'object' && !Array.isArray(data) ? data : null
-        } catch {
-            return null
-        }
-    }
-
-    async function ensureLyricsIndex() {
-        if (state.lyricsIndexReady) return
-        if (state.lyricsIndexPromise) return state.lyricsIndexPromise
-
-        state.lyricsIndexPromise = (async () => {
-            const entries = []
-            const prebuilt = await fetchPrebuiltIndex()
-            const tasks = []
-
-            Object.entries(releases).forEach(([releaseId, release]) => {
-                release.tracks.forEach((track, trackIndex) => {
-                    if (prebuilt) {
-                        const lrc = prebuilt[lrcKey(release, track)]
-                        const txt = prebuilt[txtKey(release, track)]
-                        if (lrc) collectLrcLines(entries, releaseId, release, trackIndex, track, lrc)
-                        else if (txt) collectTxtLines(entries, releaseId, release, trackIndex, track, txt)
-                        return
-                    }
-                    tasks.push(async () => {
-                        const lrc = await ctx.modules.lyrics.fetchTrackLrc(release, track)
-                        if (lrc) {
-                            collectLrcLines(entries, releaseId, release, trackIndex, track, lrc)
-                            return
-                        }
-                        // Запасной путь без собранного индекса: .lrc, а если его нет — .txt.
-                        const txt = await ctx.modules.lyrics.fetchTrackTxt(release, track)
-                        if (txt) collectTxtLines(entries, releaseId, release, trackIndex, track, txt)
-                    })
-                })
-            })
-
-            if (tasks.length) {
-                const concurrency = 4
-                let pointer = 0
-                const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, async () => {
-                    while (pointer < tasks.length) {
-                        const taskIndex = pointer; pointer += 1
-                        await tasks[taskIndex]()
-                    }
-                })
-                await Promise.all(workers)
-            }
-
-            state.lyricsIndex = entries
-            state.lyricsIndexReady = true
-        })()
-
-        try { await state.lyricsIndexPromise } finally { state.lyricsIndexPromise = null }
-    }
-
-    // Совпадение только с начала слова (см. utils/search.ts). Сначала
-    // результаты, где слово совпало целиком, потом — по началу слова;
-    // внутри одного ранга порядок прежний: релизы, треки, строки.
     function searchCatalog(query) {
-        const normalized = normalizeForSearch(query)
-        if (!normalized) return []
-
-        const cacheKey = `${normalized}|${state.lyricsIndexReady ? 1 : 0}|${state.lyricsIndex.length}`
-        const cached = perf.searchCache.get(cacheKey)
-        if (cached) return cached
-
-        const match = createMatcher(normalized)
-        const results = []
-
-        Object.entries(releases).forEach(([releaseId, release]) => {
-            const releaseRank = match(release.title)
-            if (releaseRank) {
-                results.push({ type: 'release', releaseId, title: release.title, trackIndex: -1, line: '', time: -1, rank: releaseRank })
-            }
-            release.tracks.forEach((track, trackIndex) => {
-                const trackRank = match(track.title)
-                if (trackRank) {
-                    results.push({ type: 'track', releaseId, title: release.title, trackTitle: track.title, trackIndex, line: '', time: -1, rank: trackRank })
-                }
-            })
-        })
-
-        if (state.lyricsIndexReady) {
-            const seenLyricKeys = new Set()
-            state.lyricsIndex.forEach(item => {
-                const rank = match(item.normalized)
-                if (!rank) return
-                const dedupeKey = `${item.releaseId}|${item.trackIndex}|${item.normalized}`
-                if (seenLyricKeys.has(dedupeKey)) return
-                seenLyricKeys.add(dedupeKey)
-                results.push({ type: 'lyric', releaseId: item.releaseId, title: item.releaseTitle, trackTitle: item.trackTitle, trackIndex: item.trackIndex, line: item.line, time: item.time, rank })
-            })
-        }
-
-        // sort стабильный: внутри ранга сохраняется исходный порядок.
-        results.sort((a, b) => b.rank - a.rank)
-        const output = results.slice(0, 28)
-        perf.searchCache.set(cacheKey, output)
-        if (perf.searchCache.size > 45) perf.searchCache.delete(perf.searchCache.keys().next().value)
-        return output
+        return searchIndex(releases, query)
     }
 
     function handleSearchInput(value) {
         const query = normalizeForSearch(value)
         const baseResults = searchCatalog(query)
         renderSearchResults(baseResults, query)
-        if (!query || state.lyricsIndexReady || state.lyricsIndexPromise) return
-        ensureLyricsIndex().then(() => {
-            perf.searchCache.clear()
+        if (!query || isLyricsIndexReady() || isLyricsIndexLoading()) return
+        ensureLyricsIndex(releases).then(() => {
             if (!dom.searchInput) return
             const freshQuery = normalizeForSearch(dom.searchInput.value)
             if (!freshQuery) return
@@ -266,5 +124,5 @@ export function createSearchModule(ctx) {
         ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
     }
 
-    return { toggleSearchPanel, renderSearchResults, ensureLyricsIndex, searchCatalog, handleSearchInput, initGlobalSearch, openSearchResult }
+    return { toggleSearchPanel, renderSearchResults, searchCatalog, handleSearchInput, initGlobalSearch, openSearchResult }
 }

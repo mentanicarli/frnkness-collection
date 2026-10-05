@@ -1,0 +1,209 @@
+import ColorThief from 'colorthief'
+import type { ColorSet } from '@/types'
+
+/**
+ * Акцентные цвета из обложек: страница, плеер, карточки релизов.
+ * Цвет обложки считается один раз и кэшируется по адресу картинки.
+ */
+
+// Базовый акцент, который используется до вычисления цвета из обложки.
+export const DEFAULT_COLOR: ColorSet = {
+    hex: 'rgb(103, 114, 131)',
+    glow: 'rgba(103, 114, 131, 0.32)',
+    soft: 'rgba(103, 114, 131, 0.18)'
+}
+
+type Rgb = [number, number, number]
+
+const colorCache: Record<string, Rgb | undefined> = {}
+const colorPromiseCache: Record<string, Promise<Rgb> | undefined> = {}
+let colorThief: { getColor(img: HTMLImageElement): Rgb } | null = null
+
+function getColorThief() {
+    if (!colorThief) {
+        try {
+            colorThief = new ColorThief() as unknown as { getColor(img: HTMLImageElement): Rgb }
+        } catch {
+            colorThief = null
+        }
+    }
+    return colorThief
+}
+
+function getAverageColorFromImage(img: HTMLImageElement): Rgb {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+    const width = Math.max(1, Math.min(64, img.naturalWidth || 64))
+    const height = Math.max(1, Math.min(64, img.naturalHeight || 64))
+    canvas.width = width
+    canvas.height = height
+    ctx.drawImage(img, 0, 0, width, height)
+    const { data } = ctx.getImageData(0, 0, width, height)
+    let r = 0, g = 0, b = 0, count = 0
+    for (let i = 0; i < data.length; i += 16) {
+        const alpha = data[i + 3]
+        if (alpha < 16) continue
+        r += data[i]; g += data[i + 1]; b += data[i + 2]; count++
+    }
+    if (!count) throw new Error('Average color extraction failed')
+    return [Math.round(r / count), Math.round(g / count), Math.round(b / count)]
+}
+
+export function getDominantColor(imageUrl: string): Promise<Rgb> {
+    const cached = colorCache[imageUrl]
+    if (cached) return Promise.resolve(cached)
+    const pending = colorPromiseCache[imageUrl]
+    if (pending) return pending
+    const img = new Image()
+    img.crossOrigin = 'Anonymous'
+    const promise = new Promise<Rgb>((resolve, reject) => {
+        img.onload = () => {
+            try {
+                let rgb: Rgb
+                const thief = getColorThief()
+                if (thief) {
+                    try { rgb = thief.getColor(img) } catch { rgb = getAverageColorFromImage(img) }
+                } else {
+                    rgb = getAverageColorFromImage(img)
+                }
+                colorCache[imageUrl] = rgb
+                delete colorPromiseCache[imageUrl]
+                resolve(rgb)
+            } catch (e) {
+                delete colorPromiseCache[imageUrl]
+                reject(e)
+            }
+        }
+        img.onerror = () => {
+            delete colorPromiseCache[imageUrl]
+            reject(new Error('Image load error'))
+        }
+    })
+    colorPromiseCache[imageUrl] = promise
+    img.src = imageUrl
+    return promise
+}
+
+function rgbToHsl(r: number, g: number, b: number) {
+    r /= 255; g /= 255; b /= 255
+    const max = Math.max(r, g, b), min = Math.min(r, g, b)
+    let h = 0, s = 0
+    const l = (max + min) / 2
+    if (max !== min) {
+        const d = max - min
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+        switch (max) {
+            case r: h = ((g - b) / d + (g < b ? 6 : 0)); break
+            case g: h = ((b - r) / d + 2); break
+            case b: h = ((r - g) / d + 4); break
+        }
+        h /= 6
+    }
+    return { h: h * 360, s: s * 100, l: l * 100 }
+}
+
+function hslToRgb(h: number, s: number, l: number) {
+    h /= 360; s /= 100; l /= 100
+    let r: number, g: number, b: number
+    if (s === 0) {
+        r = g = b = l
+    } else {
+        const hue2rgb = (p: number, q: number, t: number) => {
+            if (t < 0) t += 1
+            if (t > 1) t -= 1
+            if (t < 1 / 6) return p + (q - p) * 6 * t
+            if (t < 1 / 2) return q
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+            return p
+        }
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+        const p = 2 * l - q
+        r = hue2rgb(p, q, h + 1 / 3)
+        g = hue2rgb(p, q, h)
+        b = hue2rgb(p, q, h - 1 / 3)
+    }
+    return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) }
+}
+
+export function normalizeColor(rgb: Rgb): ColorSet {
+    const [r, g, b] = rgb
+    const hsl = rgbToHsl(r, g, b)
+    if (hsl.s < 12) {
+        const neutralLightness = hsl.l > 75 ? 90 : hsl.l < 30 ? 72 : Math.min(88, Math.max(72, hsl.l + 10))
+        const n = hslToRgb(0, 0, neutralLightness)
+        return {
+            hex: `rgb(${n.r}, ${n.g}, ${n.b})`,
+            glow: `rgba(${n.r}, ${n.g}, ${n.b}, 0.24)`,
+            soft: `rgba(${n.r}, ${n.g}, ${n.b}, 0.14)`
+        }
+    }
+    if (hsl.l < 30) hsl.l = 66
+    else if (hsl.l > 82) hsl.l = 74
+    else hsl.l = Math.min(76, Math.max(64, hsl.l + 8))
+    if (hsl.s < 22) hsl.s = 32
+    else if (hsl.s > 72) hsl.s = 52
+    else hsl.s = Math.min(56, Math.max(34, hsl.s - 10))
+    const f = hslToRgb(hsl.h, hsl.s, hsl.l)
+    return {
+        hex: `rgb(${f.r}, ${f.g}, ${f.b})`,
+        glow: `rgba(${f.r}, ${f.g}, ${f.b}, 0.28)`,
+        soft: `rgba(${f.r}, ${f.g}, ${f.b}, 0.14)`
+    }
+}
+
+// Тёмный приглушённый тон обложки для фона полноэкранного караоке
+// + читаемый «ink» поверх него (как в утверждённом дизайне).
+function deriveFsTheme(rgb: Rgb) {
+    const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2])
+    const bgS = Math.min(Math.max(hsl.s, 16), 42)
+    const bg = hslToRgb(hsl.h, bgS, 22)
+    const onS = Math.min(hsl.s, 30)
+    const on = hslToRgb(hsl.h, onS, 95)
+    return { bg: `rgb(${bg.r}, ${bg.g}, ${bg.b})`, on: `rgb(${on.r}, ${on.g}, ${on.b})` }
+}
+
+export async function updatePlayerAccent(imageUrl: string): Promise<void> {
+    try {
+        const rgb = await getDominantColor(imageUrl)
+        const vars = normalizeColor(rgb)
+        const root = document.documentElement
+        root.style.setProperty('--player-accent', vars.hex)
+        root.style.setProperty('--player-accent-glow', vars.glow)
+        root.style.setProperty('--player-accent-soft', vars.soft)
+        const fs = deriveFsTheme(rgb)
+        root.style.setProperty('--fs-bg', fs.bg)
+        root.style.setProperty('--fs-on', fs.on)
+    } catch { /* обложка не загрузилась — остаётся прежний цвет */ }
+}
+
+export async function updatePageAccent(imageUrl: string): Promise<void> {
+    try {
+        const vars = normalizeColor(await getDominantColor(imageUrl))
+        const root = document.documentElement
+        root.style.setProperty('--page-accent', vars.hex)
+        root.style.setProperty('--page-accent-glow', vars.glow)
+        root.style.setProperty('--page-accent-soft', vars.soft)
+    } catch { /* обложка не загрузилась — остаётся прежний цвет */ }
+}
+
+export function resetPageAccent(): void {
+    const root = document.documentElement
+    root.style.setProperty('--page-accent', DEFAULT_COLOR.hex)
+    root.style.setProperty('--page-accent-glow', DEFAULT_COLOR.glow)
+    root.style.setProperty('--page-accent-soft', DEFAULT_COLOR.soft)
+}
+
+export async function applyCardAccent(card: HTMLElement, imageUrl: string): Promise<void> {
+    try {
+        const vars = normalizeColor(await getDominantColor(imageUrl))
+        card.style.setProperty('--card-accent', vars.hex)
+        card.style.setProperty('--card-glow', vars.glow)
+        card.style.setProperty('--card-soft', vars.soft)
+    } catch { /* без акцента карточка выглядит как обычно */ }
+}
+
+export function resetCardAccent(card: HTMLElement): void {
+    card.style.removeProperty('--card-accent')
+    card.style.removeProperty('--card-glow')
+    card.style.removeProperty('--card-soft')
+}
