@@ -1,123 +1,17 @@
 <template>
   <main class="min-h-screen relative z-10">
-    <div id="page-home" class="page active">
-      <div class="shell px-6" style="padding-top: clamp(1.75rem,5vw,4rem); padding-bottom: 0.5rem;">
-        <section class="stagger-item" style="margin-bottom: clamp(1.625rem,4vw,3.25rem);">
-          <h1 class="hero-title">Pupsiks<br><span class="hero-accent">Saga</span></h1>
-          <p class="text-[var(--fg-muted)] max-w-xl leading-relaxed" style="margin-top: 1.5rem; font-size: clamp(0.9375rem,1.4vw,1.0625rem);">Полная коллекция релизов frnk ness про компанию Пупсиков. Альбомы, синглы и тексты песен в одном месте.</p>
-          <div class="mt-8 flex flex-wrap items-center gap-3">
-            <button
-              id="flow-mode-btn"
-              @click="toggleFlowMode"
-              class="chart-btn flow-btn flex items-center gap-2 px-7 transition-all"
-              style="height: 3.125rem;"
-              aria-pressed="false"
-              aria-label="Включить поток"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 7h6m0 0L7 4m3 3L7 10" />
-                <path d="M20 17h-6m0 0 3-3m-3 3 3 3" />
-                <path d="M4 17c3.5 0 5.5-3 8-7s4.5-7 8-7" />
-              </svg>
-              <span id="flow-mode-label">Поток</span>
-            </button>
-          </div>
-        </section>
-        <section id="home-promo" class="stagger-item" style="margin-bottom: clamp(1.625rem,4vw,3.25rem);"></section>
-        <section class="stagger-item" style="animation-delay: 0.1s; margin-bottom: clamp(1.625rem,3.5vw,2.875rem);">
-          <h2 class="text-xs mb-5">Альбомы</h2>
-          <div id="albums-grid"></div>
-        </section>
-        <section class="stagger-item" style="animation-delay: 0.2s;">
-          <h2 class="text-xs mb-5">Синглы</h2>
-          <div id="singles-grid"></div>
-        </section>
-      </div>
-    </div>
-
-    <div id="page-chart" class="page">
-      <div class="shell shell-narrow px-6" style="padding-top: 1.5rem; padding-bottom: 8.125rem;">
-        <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors mb-8 group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span class="text-sm">Назад</span>
-        </button>
-        <div class="mb-8">
-          <h1 class="text-3xl font-bold tracking-tight">Чарт песен</h1>
-        </div>
-        <div id="chart-list" class="flex flex-col"></div>
-      </div>
-    </div>
-
-    <div id="page-release" class="page">
-      <div class="shell px-6" style="padding-top: 1.5rem; padding-bottom: 0.5rem;">
-        <button @click="showHome" class="flex items-center gap-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors mb-8 group">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:-translate-x-1 transition-transform">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span class="text-sm">Назад</span>
-        </button>
-        <div class="flex flex-col lg:flex-row gap-8 lg:gap-16" style="padding-bottom: 8.125rem;">
-          <div class="lg:w-80 flex-shrink-0">
-            <div id="release-cover" class="aspect-square overflow-hidden bg-[var(--bg-card)] mb-6"></div>
-            <h1 id="release-title" class="text-3xl mb-3 leading-tight"></h1>
-            <p class="text-[var(--page-accent)] text-sm mb-3 tracking-wide lowercase">frnk ness</p>
-            <p id="release-meta" class="text-sm text-[var(--fg-muted)] font-mono"></p>
-            <p id="release-plays" class="hidden text-sm text-[var(--fg-muted)] font-mono mt-1.5"></p>
-            <div id="download-container" class="mt-6 hidden">
-              <a
-                id="download-lyrics-btn"
-                href="#"
-                download
-                class="inline-flex items-center gap-2 text-xs px-5 py-2.5 transition-all group"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-hover:translate-y-0.5 transition-transform">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                <span>Lyrics Book</span>
-              </a>
-            </div>
-          </div>
-          <div class="flex-1 max-w-none xl:max-w-4xl">
-            <div id="video-container" class="mb-10 hidden">
-              <div class="flex items-center gap-4 mb-4">
-                <h3 class="text-xs tracking-[0.2em] uppercase text-[var(--fg-muted)]">Видео</h3>
-                <div class="flex-1 h-px bg-[var(--line)]"></div>
-              </div>
-              <div class="aspect-video overflow-hidden bg-[var(--bg-card)] border border-white/5">
-                <iframe
-                  id="video-iframe"
-                  class="w-full h-full"
-                  src=""
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  title="YouTube video player"
-                  frameborder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowfullscreen
-                ></iframe>
-              </div>
-            </div>
-            <div class="flex items-center gap-4 mb-5">
-              <h3 class="text-xs tracking-[0.2em] uppercase text-[var(--fg-muted)]">Треклист</h3>
-              <div class="flex-1 h-px bg-[var(--line)]"></div>
-            </div>
-            <div id="tracklist"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Страница трека. Содержимое рисует src/legacy/modules/track.js. -->
-    <div id="page-track" class="page"></div>
+    <HomePage />
+    <ChartPage />
+    <ReleasePage />
+    <TrackPage />
   </main>
 </template>
 
 <script setup lang="ts">
-import { legacyBridge } from '@/runtime/legacyBridge'
-
-const showHome = () => legacyBridge.showPage('home')
-const toggleFlowMode = () => legacyBridge.toggleFlowMode()
+// Все страницы смонтированы всегда, видна только активная (класс .active):
+// legacy-код ещё рисует содержимое внутри них по id.
+import HomePage from '@/site/pages/HomePage.vue'
+import ChartPage from '@/site/pages/ChartPage.vue'
+import ReleasePage from '@/site/pages/ReleasePage.vue'
+import TrackPage from '@/site/pages/TrackPage.vue'
 </script>

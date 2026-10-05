@@ -58,8 +58,9 @@
 
 <script setup lang="ts">
 import { legacyBridge } from '@/runtime/legacyBridge'
+import { goChart, goHome } from '@/site/router'
 
-const showHome = () => legacyBridge.showPage('home')
+const showHome = () => goHome()
 let lastChartOpenAt = 0
 const openChartFromInteraction = (event: MouseEvent | PointerEvent) => {
   const now = performance.now()
@@ -68,7 +69,7 @@ const openChartFromInteraction = (event: MouseEvent | PointerEvent) => {
     event.preventDefault()
   }
   lastChartOpenAt = now
-  legacyBridge.showPage('chart')
+  goChart()
 }
 const closeSearchPanel = () => legacyBridge.toggleSearchPanel(false)
 </script>

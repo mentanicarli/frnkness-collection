@@ -15,7 +15,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
     "colorthief": "^2.4.0",
-    "vue": "^3.3.0"
+    "vue": "^3.3.0",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
