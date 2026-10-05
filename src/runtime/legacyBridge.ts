@@ -19,6 +19,7 @@ export interface LegacyAppApi {
     showPage(name: PageName): void
     toggleFlowMode(): void
     toggleSearchPanel(open?: boolean): void
+    playTrackFromPage(releaseId: string, trackIndex: number): void
 }
 
 declare global {
@@ -85,5 +86,9 @@ export const legacyBridge = {
     },
     toggleSearchPanel(open?: boolean) {
         invoke('toggleSearchPanel', open)
+    },
+    // Запуск трека по (релиз, индекс) — явно задаёт играющий релиз.
+    playTrack(releaseId: string, trackIndex: number) {
+        invoke('playTrackFromPage', releaseId, trackIndex)
     }
 }

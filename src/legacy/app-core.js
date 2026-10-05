@@ -86,7 +86,6 @@ export function initLegacyApp(deps = {}) {
         dom.fsVolumeSlider = $('fs-volume-slider')
         dom.fsVolWave1 = $('fs-vol-wave-1')
         dom.fsVolWave2 = $('fs-vol-wave-2')
-        dom.chartList = $('chart-list')
         dom.tracklist = $('tracklist')
         dom.playerTrack = $('player-track')
         dom.releaseCover = $('release-cover')
@@ -181,7 +180,6 @@ export function initLegacyApp(deps = {}) {
             else if (n === 'chart') modules.router.goChart()
             else modules.ui.showPage(n)
         },
-        playChart: (r, i) => modules.chart.playChart(r, i),
         openSearchResult: (t, r, i, time, n) => modules.search.openSearchResult(t, r, i, time, n),
         toggleSearchPanel: s => modules.search.toggleSearchPanel(s),
         toggleMute: () => modules.player.toggleMute(),

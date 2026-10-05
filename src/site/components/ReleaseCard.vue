@@ -1,13 +1,14 @@
 <template>
   <button ref="card" class="release-card text-left transition-all group relative" :data-id="releaseId" @click="goRelease(releaseId)">
     <div class="aspect-square overflow-hidden mb-3 bg-[var(--bg)] relative">
+      <!-- loading и fetchpriority — до src: браузер решает, как грузить, в момент установки адреса. -->
       <img
-        :src="release.cover"
-        :alt="release.title"
-        class="card-image w-full h-full object-cover"
         :loading="priority < 6 ? 'eager' : 'lazy'"
         decoding="async"
         :fetchpriority="priority < 4 ? 'high' : 'low'"
+        :src="release.cover"
+        :alt="release.title"
+        class="card-image w-full h-full object-cover"
         @error="hideBrokenImage"
       >
     </div>

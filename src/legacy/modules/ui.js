@@ -104,7 +104,6 @@ export function createUiModule(ctx) {
         if (name === 'home') ctx.modules.colors.resetPageAccent()
         if (name === 'home') setTimeout(initStaggerAnimation, 50)
         if (name === 'home' && dom.searchInput) ctx.modules.search.handleSearchInput(dom.searchInput.value)
-        if (name === 'chart') ctx.modules.chart.renderChart()
         if (name !== 'home') ctx.modules.search.toggleSearchPanel(false)
     }
 

@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, releases } from '@/config'
 import { parseTrackKey } from '@/utils/lyrics'
@@ -36,6 +37,17 @@ export function getDb(): Promise<SupabaseClient | null> {
             })
     }
     return clientPromise
+}
+
+/**
+ * Растёт после каждого засчитанного прослушивания: открытые экраны (чарт,
+ * счётчики на странице релиза) по нему перечитывают цифры.
+ */
+export const statsVersion = ref(0)
+
+export function markStatsChanged(releaseId: string): void {
+    delete releasePlaysCache[releaseId]
+    statsVersion.value += 1
 }
 
 interface ReleasePlays {
@@ -101,7 +113,7 @@ export async function incrementPlayCount(releaseId: string, trackIndex: number):
         if (!db) return false
         const { error } = await db.rpc('increment_play_count', { track_key_input: `${releaseId}-${trackIndex}` })
         if (error) throw error
-        delete releasePlaysCache[releaseId]
+        markStatsChanged(releaseId)
         return true
     } catch (e) {
         console.warn('Play count update failed:', e)

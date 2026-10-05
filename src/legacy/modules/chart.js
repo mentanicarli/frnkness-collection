@@ -1,6 +1,8 @@
+import { markStatsChanged } from '../../site/services/stats'
+
 export function createChartModule(ctx) {
     const { dom, state, releases, releasePlayCountCache, utils, getDb } = ctx
-    const { parseTrackKey, escapeHtml } = utils
+    const { parseTrackKey } = utils
 
     // Один запрос на релиз отдаёт и сумму по релизу, и разбивку по трекам,
     // поэтому странице трека не нужен отдельный поход в базу.
@@ -88,8 +90,8 @@ export function createChartModule(ctx) {
                     }
                 })
             }
-            const chartPage = document.getElementById('page-chart')
-            if (chartPage && chartPage.classList.contains('active')) renderChart()
+            // Открытый чарт перечитает цифры сам.
+            markStatsChanged(releaseId)
         } catch (e) {
             console.warn('Play count update failed:', e)
         } finally {
@@ -97,54 +99,5 @@ export function createChartModule(ctx) {
         }
     }
 
-    async function renderChart() {
-        if (!dom.chartList) return
-        const db = await getDb()
-        if (!db) {
-            dom.chartList.innerHTML = '<p class="text-center text-[var(--fg-muted)] mt-10">База недоступна.</p>'
-            return
-        }
-        const { data, error } = await db
-            .from('play_counts').select('track_key, plays')
-            .order('plays', { ascending: false }).limit(50)
-        if (error) {
-            dom.chartList.innerHTML = '<p class="text-center text-[var(--fg-muted)] mt-10">Ошибка загрузки.</p>'
-            return
-        }
-        const tracksMap = new Map()
-        ;(data || []).forEach(item => {
-            const parsed = parseTrackKey(item.track_key)
-            if (!parsed) return
-            const release = releases[parsed.releaseId]
-            const track = release && release.tracks[parsed.trackIndex]
-            if (!track) return
-            const aggregateKey = `${parsed.releaseId}::${parsed.trackIndex}`
-            const existing = tracksMap.get(aggregateKey)
-            const plays = Number(item.plays) || 0
-            if (existing) {
-                existing.plays += plays
-            } else {
-                tracksMap.set(aggregateKey, { title: track.title, cover: release.cover, plays, releaseId: parsed.releaseId, trackIndex: parsed.trackIndex })
-            }
-        })
-
-        const tracks = Array.from(tracksMap.values()).sort((a, b) => b.plays - a.plays).slice(0, 50)
-        dom.chartList.innerHTML = tracks.length === 0
-            ? '<p class="text-center text-[var(--fg-muted)] mt-10">Список пуст.</p>'
-            : tracks.map((t, i) => `
-                <div class="chart-row cursor-pointer group" onclick="App.playChart('${escapeHtml(t.releaseId)}', ${t.trackIndex})">
-                    <div class="chart-num ${i < 3 ? `top-${i + 1}` : ''}">${i + 1}</div>
-                    <div class="chart-cover"><img src="${t.cover}" alt="" loading="${i < 8 ? 'eager' : 'lazy'}" decoding="async" fetchpriority="${i < 3 ? 'high' : 'low'}"></div>
-                    <div class="chart-info"><div class="chart-title">${escapeHtml(t.title)}</div><div class="chart-artist">frnk ness</div></div>
-                    <div class="chart-plays"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>${t.plays}</div>
-                </div>
-            `).join('')
-    }
-
-    function playChart(releaseId, trackIndex) {
-        ctx.modules.router.goRelease(releaseId)
-        ctx.modules.player.playTrackByRef(releaseId, trackIndex, 'fade')
-    }
-
-    return { getReleasePlayCount, getTrackPlayCount, incrementPlayCount, renderChart, playChart }
+    return { getReleasePlayCount, getTrackPlayCount, incrementPlayCount }
 }
