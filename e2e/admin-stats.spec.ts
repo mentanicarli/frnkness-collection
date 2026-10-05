@@ -107,8 +107,7 @@ test('сводка, график, топы и карточка релиза', as
 
     // По умолчанию — 30 дней: 30 столбцов.
     await expect(page.getByTestId('period-note')).toHaveText('Период: 2 сен 2026 — 1 окт 2026.')
-    await expect(page.locator('.adm-chart-bar').first()).toBeAttached()
-    expect(await page.locator('.adm-card').first().locator('.adm-chart-bar').count()).toBe(30)
+    await expect(page.locator('.adm-card').first().locator('.adm-chart-bar')).toHaveCount(30)
     await expect.poll(() => mock.rpcCalls.find((c) => c.name === 'admin_stats_daily')?.body).toEqual({ p_from: '2026-09-02', p_to: TODAY })
 
     const topTracks = page.getByTestId('top-tracks')
@@ -123,7 +122,7 @@ test('сводка, график, топы и карточка релиза', as
     await expect(card.locator('tbody tr').first()).toContainText('Маканочки')
     await expect(card.locator('tbody tr').first()).toContainText('120')
     await expect(page.getByTestId('window-note')).toHaveText('С 26 авг 2026 по 1 сен 2026: 28 прослушиваний.')
-    expect(await card.locator('.adm-chart-bar').count()).toBe(7)
+    await expect(card.locator('.adm-chart-bar')).toHaveCount(7)
 
     await card.getByRole('button', { name: '30 дней' }).click()
     await expect(page.getByTestId('window-note')).toContainText('С 26 авг 2026 по 24 сен 2026')
@@ -151,7 +150,8 @@ test('переключение периода и «Всё время» со ст
     await page.getByLabel('С', { exact: true }).fill('2026-09-10')
     await page.getByLabel('По', { exact: true }).fill('2026-09-12')
     await expect(page.getByTestId('period-note')).toHaveText('Период: 10 сен 2026 — 12 сен 2026.')
-    expect(await page.locator('.adm-card').first().locator('.adm-chart-bar').count()).toBe(3)
+    // Подпись периода меняется сразу, столбики — когда придут данные.
+    await expect(page.locator('.adm-card').first().locator('.adm-chart-bar')).toHaveCount(3)
 })
 
 test('журнал запущен позже релиза — честные подписи', async ({ page }) => {
@@ -209,7 +209,8 @@ test('сессии: доля дослушанных, средняя доля, у
     // Сбор с 25 сен; период 30 дней обрезается по началу сбора.
     await expect(page.getByTestId('listen-note')).toContainText('Данные собираются с 25 сен 2026 — с применения миграции.')
     await expect(page.getByTestId('listen-note')).toContainText('Период: 25 сен 2026 — 1 окт 2026.')
-    expect(mock.rpcCalls.find((c) => c.name === 'admin_listen_by_key')!.body).toEqual({ p_from: '2026-09-25', p_to: '2026-10-01' })
+    // Подпись приходит из admin_listen_meta, а запрос по трекам может уйти чуть позже.
+    await expect.poll(() => mock.rpcCalls.find((c) => c.name === 'admin_listen_by_key')?.body).toEqual({ p_from: '2026-09-25', p_to: '2026-10-01' })
     const rows = listen.locator('tbody tr')
     await expect(rows.nth(0)).toContainText('ГОУТЫ')
     await expect(rows.nth(0)).toContainText('20')
@@ -220,8 +221,8 @@ test('сессии: доля дослушанных, средняя доля, у
     const card = page.getByTestId('release-card')
     await expect(card.locator('tbody tr').nth(0)).toContainText('20%') // Маканочки: 2 из 10
     await expect(card.locator('tbody tr').nth(1)).toContainText('—') // нет сессий
-    await expect.poll(() => mock.retentionCalls!.length).toBeGreaterThan(0)
-    expect(mock.retentionCalls![mock.retentionCalls!.length - 1]).toEqual({ p_track_key: 'zlaya-nostalgia-0', p_from: '2026-09-25', p_to: '2026-10-01' })
+    // Удержание запрашивается заново при смене периода и релиза — ждём итоговый запрос.
+    await expect.poll(() => mock.retentionCalls!.at(-1)).toEqual({ p_track_key: 'zlaya-nostalgia-0', p_from: '2026-09-25', p_to: '2026-10-01' })
     await expect(page.getByTestId('retention-note')).toHaveText('Сколько слушателей ещё слушают на каждой 5-й секунде (из 10 сессий).')
     await expect(card.locator('[data-testid="retention-chart"] .adm-chart-bar')).toHaveCount(4)
 

@@ -18,9 +18,13 @@ const EXISTING = {
 
 async function openPromo(page: Page, announce?: object) {
     await page.clock.install({ time: NOW })
+    // До первого коммита «репозиторий» отдаёт site.json с этим анонсом,
+    // после — то, что закоммитили (как GitHub). Иначе фоновая перезагрузка
+    // после сохранения возвращала бы прежний site.json.
+    let committed = false
     const mocks = await installMocks(page, {
         content: (call: ContentCall) => {
-            if (call.action === 'read' && announce && (call.body.paths as string[]).includes('src/content/site.json')) {
+            if (call.action === 'read' && announce && !committed && (call.body.paths as string[]).includes('src/content/site.json')) {
                 const site = { promo: { enabled: true, releaseId: 'zlaya-nostalgia' }, announce }
                 const files: Record<string, string | null> = {}
                 for (const p of call.body.paths as string[]) files[p] = p === 'src/content/site.json' ? JSON.stringify(site, null, 4) + '\n' : null
@@ -30,7 +34,10 @@ async function openPromo(page: Page, announce?: object) {
                 return { body: { files } }
             }
             if (call.action === 'stage-blob') return { body: { sha: 'e'.repeat(40), path: call.body.path, size: 10, token: 't'.repeat(64) } }
-            if (call.action === 'commit') return { body: { sha: '8'.repeat(40), url: 'u', message: call.body.message } }
+            if (call.action === 'commit') {
+                committed = true
+                return { body: { sha: '8'.repeat(40), url: 'u', message: call.body.message } }
+            }
             return undefined
         }
     })

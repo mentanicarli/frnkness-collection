@@ -70,26 +70,41 @@ test('откат на 2 с после паузы — и его можно вык
     const toggle = player.getByRole('checkbox', { name: /Откат на 2 с/ })
     await expect(toggle).toBeChecked()
 
+    // События play/pause у <audio> асинхронные: «где поставили на паузу»
+    // плеер запоминает в обработчике pause. Поэтому после каждого нажатия
+    // ждём, что плеер его обработал (подпись кнопки сменилась), — иначе
+    // перемотка из теста могла бы попасть раньше обработчика.
+    const playBtn = player.getByRole('button', { name: 'Играть' })
+    const pauseBtn = player.getByRole('button', { name: 'Пауза' })
+    // Запуск: время читаем сразу после нажатия (откат делается синхронно), потом ждём play.
+    const play = async () => {
+        await playBtn.click()
+        const t = await audioTime(page)
+        await expect(pauseBtn).toBeVisible()
+        return t
+    }
+    const pause = async () => {
+        await pauseBtn.click()
+        await expect(playBtn).toBeVisible()
+    }
+
     await setTime(page, 10)
-    await player.getByRole('button', { name: 'Играть' }).click()
-    await player.getByRole('button', { name: 'Пауза' }).click()
+    await play()
+    await pause()
     const pausedAt = await audioTime(page)
-    await player.getByRole('button', { name: 'Играть' }).click()
-    const resumed = await audioTime(page)
+    const resumed = await play()
     expect(resumed).toBeLessThan(pausedAt - 1.5)
-    await player.getByRole('button', { name: 'Пауза' }).click()
+    await pause()
 
     // Перемотали на паузе — откат не нужен.
     await setTime(page, 12)
-    await player.getByRole('button', { name: 'Играть' }).click()
-    expect(await audioTime(page)).toBeGreaterThanOrEqual(11.95)
-    await player.getByRole('button', { name: 'Пауза' }).click()
+    expect(await play()).toBeGreaterThanOrEqual(11.95)
+    await pause()
 
     await toggle.uncheck()
     const t0 = await audioTime(page)
-    await player.getByRole('button', { name: 'Играть' }).click()
-    expect(await audioTime(page)).toBeGreaterThanOrEqual(t0 - 0.05)
-    await player.getByRole('button', { name: 'Пауза' }).click()
+    expect(await play()).toBeGreaterThanOrEqual(t0 - 0.05)
+    await pause()
 })
 
 test('с .lrc: подсветка звучащей строки, клик в предпросмотре — перемотка', async ({ page }) => {
