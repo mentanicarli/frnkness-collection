@@ -329,8 +329,36 @@ body.adm-body::before { opacity: 0.6; }
 @media (max-width: 760px) { .adm-savebar { margin: 1rem -1rem 0; padding-left: 1rem; padding-right: 1rem; } }
 
 /* ── Караоке ───────────────────────────────────────────────────────── */
-.adm-lrc-player { margin-bottom: 0.25rem; }
-.adm-lrc-controls { gap: 0.5rem; }
+/* Плеер — общий для «Караоке» и «Текстов» (components/AudioPlayer.vue). */
+.adm-player { margin-bottom: 0.25rem; }
+.adm-player-controls { gap: 0.5rem; }
+.adm-player.is-sticky {
+  position: sticky; z-index: 25; margin-bottom: 1rem; padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  backdrop-filter: blur(1rem); -webkit-backdrop-filter: blur(1rem);
+}
+.adm-player-seekrow { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; }
+.adm-player-seekrow .adm-lrc-seek { flex: 1; min-width: 0; margin: 0; }
+.adm-player-seekrow .adm-lrc-time { flex-shrink: 0; }
+.adm-player.is-sticky .adm-player-seekrow { margin-top: 0.5rem; }
+.adm-player-play { min-width: 5.5rem; }
+.adm-player-extra { gap: 0.25rem 1rem; margin-top: 0.5rem; font-size: 0.8125rem; }
+.adm-player-now { min-width: 0; flex: 1 1 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
+.adm-check-sm { font-size: 0.75rem; color: var(--fg-muted); }
+.adm-player-keys { margin: 0.375rem 0 0; }
+@media (max-width: 760px) {
+  .adm-player.is-sticky { padding: 0.5rem 0.625rem; margin-left: -0.25rem; margin-right: -0.25rem; }
+  .adm-player.is-sticky .adm-btn { height: 2.125rem; padding: 0 0.625rem; }
+  .adm-player-play { min-width: 4.5rem; }
+  .adm-player-controls { flex-wrap: nowrap; gap: 0.375rem; }
+  .adm-player-seekrow .adm-lrc-time { font-size: 0.6875rem; }
+}
+/* На сенсорном экране горячих клавиш нет — экономим высоту закреплённого плеера. */
+@media (hover: none) and (pointer: coarse) { .adm-player-keys { display: none; } }
+/* Звучащая строка в «Текстах»: список разборов и предпросмотр. */
+.adm-line.is-playing { background: var(--bg-3); box-shadow: inset 2px 0 0 var(--fg); }
+.adm-preview .lyric-line.is-seekable { cursor: pointer; }
+.adm-preview .lyric-line.is-playing { color: var(--fg); background: var(--bg-3); box-shadow: inset 2px 0 0 var(--fg); border-radius: 0.25rem; transition: background var(--fast); }
 .adm-lrc-time { font-size: 0.8125rem; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
 .adm-lrc-seek { width: 100%; margin-top: 0.75rem; accent-color: var(--fg); }
 .adm-lrc-actions { gap: 0.5rem; margin-bottom: 0.5rem; }

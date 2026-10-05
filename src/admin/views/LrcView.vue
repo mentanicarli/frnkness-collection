@@ -24,44 +24,7 @@
             </div>
 
             <!-- Плеер -->
-            <div class="adm-card adm-lrc-player">
-                <audio
-                    ref="audio"
-                    :src="audioUrl"
-                    preload="auto"
-                    data-testid="audio"
-                    @loadedmetadata="duration = audio?.duration || 0"
-                    @play="playing = true; tick()"
-                    @pause="playing = false"
-                    @ended="playing = false"
-                    @error="audioError = true"
-                    @timeupdate="syncTime"
-                    @seeked="syncTime"
-                ></audio>
-                <div v-if="audioError" class="adm-alert adm-alert-error">Не удалось загрузить аудио {{ paths.audio }}</div>
-                <div class="adm-row adm-lrc-controls">
-                    <button class="adm-btn adm-btn-primary" type="button" :aria-label="playing ? 'Пауза' : 'Играть'" @click="togglePlay">
-                        {{ playing ? 'Пауза' : 'Играть' }}
-                    </button>
-                    <button class="adm-btn" type="button" aria-label="Назад 3 секунды" @click="seekBy(-3)">−3 с</button>
-                    <button class="adm-btn" type="button" aria-label="Вперёд 3 секунды" @click="seekBy(3)">+3 с</button>
-                    <span class="adm-mono adm-lrc-time" data-testid="time">{{ formatLrcTime(currentTime) }} / {{ formatLrcTime(duration) }}</span>
-                    <span class="adm-spacer"></span>
-                    <div class="adm-segmented adm-segmented-sm" role="group" aria-label="Скорость">
-                        <button v-for="r in [0.75, 1]" :key="r" type="button" :class="{ active: rate === r }" :aria-pressed="rate === r" @click="setRate(r)">{{ r }}×</button>
-                    </div>
-                </div>
-                <input
-                    class="adm-lrc-seek"
-                    type="range"
-                    min="0"
-                    :max="duration || 0"
-                    step="0.01"
-                    :value="currentTime"
-                    aria-label="Позиция"
-                    @input="seekTo(Number(($event.target as HTMLInputElement).value))"
-                />
-            </div>
+            <AudioPlayer :player="player" :src="audioUrl" :path="paths.audio" />
 
             <div class="adm-row" style="margin: 1rem 0 0.75rem">
                 <div class="adm-segmented" role="tablist" aria-label="Режим">
@@ -170,6 +133,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Release } from '@/types'
 import TrackPicker from '../components/TrackPicker.vue'
 import CommitDialog from '../components/CommitDialog.vue'
+import AudioPlayer from '../components/AudioPlayer.vue'
+import { useAudioPlayer } from '../composables/useAudioPlayer'
 import { useRepo } from '../composables/useRepo'
 import { navigate, useRoute } from '../composables/useRoute'
 import { useCommitFlow } from '../composables/useCommitFlow'
@@ -221,13 +186,9 @@ const original = ref({ lrc: null as string | null, lines: [] as LrcLine[], textL
 const mode = ref<'sync' | 'edit' | 'preview'>('sync')
 const linesDraft = ref('')
 
-const audio = ref<HTMLAudioElement | null>(null)
+const player = useAudioPlayer()
+const { audio, currentTime, togglePlay, seekTo, seekBy } = player
 const previewBox = ref<HTMLElement | null>(null)
-const playing = ref(false)
-const currentTime = ref(0)
-const duration = ref(0)
-const rate = ref(1)
-const audioError = ref(false)
 
 const cursor = computed(() => nextUnstamped(lines.value))
 const stampedCount = computed(() => lines.value.filter((l) => l.time !== null).length)
@@ -287,7 +248,7 @@ let token = 0
 async function loadTrack() {
     loaded.value = false
     loadError.value = ''
-    audioError.value = false
+    player.error.value = false
     if (!release.value || !track.value || !repo.state.sha) return
     const my = ++token
     loading.value = true
@@ -333,39 +294,6 @@ function resetShiftState() {
     shiftTotalCs.value = 0
     shiftNote.value = ''
     flashes.value = {}
-}
-
-// ── Аудио ────────────────────────────────────────────────────────────
-function syncTime() {
-    currentTime.value = audio.value?.currentTime ?? 0
-}
-
-function tick() {
-    const el = audio.value
-    if (!el) return
-    currentTime.value = el.currentTime
-    if (!el.paused) requestAnimationFrame(tick)
-}
-
-function togglePlay() {
-    const el = audio.value
-    if (!el) return
-    if (el.paused) el.play().catch(() => (audioError.value = true))
-    else el.pause()
-}
-
-function seekTo(t: number) {
-    const el = audio.value
-    if (!el) return
-    el.currentTime = Math.max(0, Math.min(t, el.duration || t))
-    currentTime.value = el.currentTime
-}
-
-const seekBy = (d: number) => seekTo((audio.value?.currentTime ?? 0) + d)
-
-function setRate(r: number) {
-    rate.value = r
-    if (audio.value) audio.value.playbackRate = r
 }
 
 // ── Разметка ─────────────────────────────────────────────────────────

@@ -22,6 +22,28 @@
                 <a class="adm-link adm-small" :href="siteTrackUrl" target="_blank" rel="noopener">Открыть на сайте</a>
             </div>
 
+            <AudioPlayer :player="player" :src="audioUrl" :path="paths.audio" sticky>
+                <div class="adm-row adm-player-extra">
+                    <span v-if="points.length" class="adm-player-now" data-testid="now-line" :title="nowText">
+                        <span class="adm-faint">Сейчас:</span> {{ nowText }}
+                    </span>
+                    <span v-else class="adm-small adm-faint" data-testid="no-lrc">Караоке (.lrc) нет — без подсветки строк</span>
+                    <span class="adm-spacer"></span>
+                    <label class="adm-check adm-check-sm">
+                        <input v-model="rewindOnResume" type="checkbox" />
+                        Откат на {{ REWIND_SEC }} с после паузы
+                    </label>
+                    <label v-if="points.length" class="adm-check adm-check-sm">
+                        <input v-model="follow" type="checkbox" />
+                        Следить за строкой
+                    </label>
+                </div>
+                <p class="adm-hint adm-player-keys" data-testid="player-keys">
+                    <template v-for="(k, i) in PLAYER_KEYS" :key="k.code"><span v-if="i"> · </span><kbd>{{ k.label }}</kbd> {{ k.hint }}</template>
+                    — работают и во время набора текста
+                </p>
+            </AudioPlayer>
+
             <div class="adm-segmented adm-editor-tabs" role="tablist" aria-label="Режим">
                 <button v-if="!wide" type="button" role="tab" :aria-selected="tab === 'text'" :class="{ active: tab === 'text' }" @click="tab = 'text'">Текст</button>
                 <button type="button" role="tab" :aria-selected="notesTabActive" :class="{ active: notesTabActive }" @click="tab = 'notes'">
@@ -67,15 +89,15 @@
                             </ul>
                         </div>
                         <p class="adm-hint" style="margin: 0 0 0.5rem">Нажми на строку, чтобы добавить или изменить разбор.</p>
-                        <div class="adm-lines" data-testid="lines">
+                        <div ref="linesBox" class="adm-lines" data-testid="lines">
                             <template v-for="(row, i) in rows" :key="i">
                                 <div v-if="row.kind === 'blank'" class="adm-line-blank"></div>
                                 <div v-else-if="row.kind === 'section'" class="adm-line-section">{{ row.text }}</div>
-                                <div v-else class="adm-line-wrap">
+                                <div v-else class="adm-line-wrap" :data-line="row.lineNo">
                                     <button
                                         type="button"
                                         class="adm-line"
-                                        :class="{ 'has-note': row.note, 'is-repeat': row.repeat, active: editing === i }"
+                                        :class="{ 'has-note': row.note, 'is-repeat': row.repeat, active: editing === i, 'is-playing': row.lineNo === playingLine }"
                                         @click="openEditor(i, row.text)"
                                     >
                                         <span>{{ row.text }}</span>
@@ -106,7 +128,7 @@
                         </div>
                     </template>
 
-                    <div v-else class="adm-preview" data-testid="preview" @click="togglePreviewNote" @keydown="previewKey">
+                    <div v-else ref="previewBox" class="adm-preview" data-testid="preview" @click="onPreviewClick" @keydown="previewKey">
                         <div class="track-page-inner" v-html="previewHtml"></div>
                     </div>
                 </section>
@@ -139,7 +161,12 @@ import { AdminApiError, readFiles } from '../api/content'
 import { buildNoteMap, findDanglingAnnotations, layoutLyrics, renderAboutHtml, renderLyricsHtml, validateTrackNotes, type TrackAnnotation } from '@/utils/trackNotes'
 import { getTrackSlug } from '@/utils/slug'
 import { isNotesEmpty, noteFor, normalizeNewlines, parseNotes, removeNote, serializeNotes, setNote } from '../lib/notesEdit'
-import { notesPath, txtPath } from '../lib/paths'
+import { audioPath, lrcPath, notesPath, siteUrl, txtPath } from '../lib/paths'
+import AudioPlayer from '../components/AudioPlayer.vue'
+import { REWIND_SEC, useAudioPlayer } from '../composables/useAudioPlayer'
+import { linesFromLrc } from '../lib/lrc'
+import { activeLine, lineTime, songLines, syncPoints } from '../lib/lyricsSync'
+import { PLAYER_KEYS, playerKeyAction } from '../lib/playerKeys'
 
 const repo = useRepo()
 const route = useRoute()
@@ -153,8 +180,16 @@ const trackIndex = computed(() => {
 const release = computed<Release | null>(() => repo.state.releases?.[releaseId.value] ?? null)
 const track = computed(() => release.value?.tracks[trackIndex.value] ?? null)
 const paths = computed(() =>
-    release.value && track.value ? { txt: txtPath(release.value, track.value), notes: notesPath(release.value, track.value) } : { txt: '', notes: '' }
+    release.value && track.value
+        ? {
+              txt: txtPath(release.value, track.value),
+              notes: notesPath(release.value, track.value),
+              lrc: lrcPath(release.value, track.value),
+              audio: audioPath(release.value, track.value)
+          }
+        : { txt: '', notes: '', lrc: '', audio: '' }
 )
+const audioUrl = computed(() => (paths.value.audio ? siteUrl(paths.value.audio) : ''))
 
 // ── Состояние редактора ──────────────────────────────────────────────
 const loading = ref(false)
@@ -211,11 +246,13 @@ const validation = computed(() => {
 const rows = computed(() => {
     const noteMap = buildNoteMap({ annotations: annotations.value })
     const seen = new Set<string>()
+    let lineNo = 0
     return layoutLyrics(normalizeNewlines(text.value), noteMap).map((row) => {
-        if (row.kind !== 'line') return { ...row, repeat: false }
+        if (row.kind !== 'line') return { ...row, repeat: false, lineNo: -1 }
         const repeat = seen.has(row.key)
         seen.add(row.key)
-        return { ...row, repeat: repeat && noteMap.has(row.key) }
+        // lineNo — номер строки песни (songLines), по нему подсвечивается звучащая строка.
+        return { ...row, repeat: repeat && noteMap.has(row.key), lineNo: lineNo++ }
     })
 })
 const dangling = computed(() => findDanglingAnnotations(normalizeNewlines(text.value), { annotations: annotations.value }))
@@ -234,6 +271,88 @@ const previewHtml = computed(() => {
 const siteTrackUrl = computed(() =>
     track.value ? `./#/track/${encodeURIComponent(releaseId.value)}/${encodeURIComponent(getTrackSlug(track.value))}` : './'
 )
+
+// ── Плеер и звучащая строка ──────────────────────────────────────────
+// Переключатели запоминаются в браузере; хранилище может быть недоступно.
+function stored(key: string, fallback: boolean) {
+    try {
+        const v = localStorage.getItem(key)
+        return v === null ? fallback : v === '1'
+    } catch {
+        return fallback
+    }
+}
+function store(key: string, value: boolean) {
+    try {
+        localStorage.setItem(key, value ? '1' : '0')
+    } catch {
+        // не страшно — просто не запомнится
+    }
+}
+
+const player = useAudioPlayer({ rewindOnResume: stored('adm-player-rewind', true) })
+const { rewindOnResume, currentTime } = player
+const follow = ref(stored('adm-lyrics-follow', true))
+watch(rewindOnResume, (v) => store('adm-player-rewind', v))
+watch(follow, (v) => store('adm-lyrics-follow', v))
+
+const lrcRaw = ref<string | null>(null)
+const lrcLines = computed(() => (lrcRaw.value ? linesFromLrc(lrcRaw.value) : []))
+const lyricLines = computed(() => songLines(normalizeNewlines(text.value)))
+const points = computed(() => syncPoints(lyricLines.value, lrcLines.value))
+const playingLine = computed(() => activeLine(points.value, currentTime.value))
+const nowText = computed(() => (playingLine.value >= 0 ? lyricLines.value[playingLine.value] : '—'))
+
+const linesBox = ref<HTMLElement | null>(null)
+const previewBox = ref<HTMLElement | null>(null)
+
+function scrollWithin(box: HTMLElement | null, el: Element | null | undefined) {
+    if (!box || !(el instanceof HTMLElement)) return
+    const b = box.getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    box.scrollTo({ top: box.scrollTop + (r.top - b.top) - box.clientHeight / 2 + r.height / 2, behavior: 'smooth' })
+}
+
+// Предпросмотр — разметка сайта (v-html), поэтому подсветку и номера строк
+// ставим на готовые элементы после каждой перерисовки.
+function markPreview() {
+    const lines = previewBox.value?.querySelectorAll<HTMLElement>('.lyric-line:not(.is-blank)') ?? []
+    lines.forEach((el, n) => {
+        el.dataset.line = String(n)
+        el.classList.toggle('is-playing', n === playingLine.value)
+        el.classList.toggle('is-seekable', lineTime(points.value, n) !== null)
+    })
+}
+watch([previewHtml, playingLine, points, rightTab, loaded], markPreview, { flush: 'post' })
+
+watch(
+    playingLine,
+    (n) => {
+        if (n < 0 || !follow.value) return
+        scrollWithin(linesBox.value, linesBox.value?.querySelector(`[data-line="${n}"]`))
+        scrollWithin(previewBox.value, previewBox.value?.querySelector(`.lyric-line[data-line="${n}"]`))
+    },
+    { flush: 'post' }
+)
+
+function onPreviewClick(e: Event) {
+    togglePreviewNote(e)
+    // Клик по строке — перемотка к её времени из .lrc.
+    const line = (e.target as HTMLElement).closest<HTMLElement>('.lyric-line[data-line]')
+    const t = line ? lineTime(points.value, Number(line.dataset.line)) : null
+    if (t !== null) player.seekTo(t)
+}
+
+function onKey(e: KeyboardEvent) {
+    if (!loaded.value || flow.state.open) return
+    const action = playerKeyAction(e)
+    if (!action) return
+    e.preventDefault()
+    if (action === 'toggle') player.togglePlay()
+    else player.seekBy(action === 'back' ? -3 : 3)
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 function marker(r: Release, i: number) {
     const t = r.tracks[i]
@@ -254,8 +373,9 @@ async function loadTrack() {
     const token = ++loadToken
     loading.value = true
     try {
-        const files = await readFiles(repo.state.sha, [paths.value.txt, paths.value.notes])
+        const files = await readFiles(repo.state.sha, [paths.value.txt, paths.value.notes, paths.value.lrc])
         if (token !== loadToken) return
+        lrcRaw.value = files[paths.value.lrc] ?? null
         const parsed = parseNotes(files[paths.value.notes])
         if (parsed.error) throw new AdminApiError('notes', 0, parsed.error)
         const t = normalizeNewlines(files[paths.value.txt] ?? '')
@@ -286,6 +406,7 @@ function reset() {
 function select(id: string, index: number) {
     if (id === releaseId.value && index === trackIndex.value) return
     if (!confirmLeave()) return
+    player.pause()
     loaded.value = false
     if (index >= 0) navigate('lyrics', id, index)
     else navigate('lyrics', id)

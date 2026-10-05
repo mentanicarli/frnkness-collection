@@ -46,7 +46,7 @@ test('загрузка текста и разборов, предпросмот�
     await expect(preview.locator('.lyric-section').first()).toHaveText('[Припев]')
 
     const read = mocks.calls.find((c) => c.action === 'read' && (c.body.paths as string[]).includes('lyrics/album1/01-poopsicks.txt'))!
-    expect(read.body).toEqual({ action: 'read', ref: HEAD_SHA, paths: ['lyrics/album1/01-poopsicks.txt', 'lyrics/album1/01-poopsicks.notes.json'] })
+    expect(read.body).toEqual({ action: 'read', ref: HEAD_SHA, paths: ['lyrics/album1/01-poopsicks.txt', 'lyrics/album1/01-poopsicks.notes.json', 'lyrics/album1/01-poopsicks.lrc'] })
 })
 
 test('добавить разбор и сохранить: подтверждение, один коммит, статус публикации', async ({ page }) => {
