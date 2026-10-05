@@ -44,9 +44,12 @@ export function getDb(): Promise<SupabaseClient | null> {
  * счётчики на странице релиза) по нему перечитывают цифры.
  */
 export const statsVersion = ref(0)
+/** Релиз, которому засчитали последнее прослушивание. */
+export let lastChangedReleaseId: string | null = null
 
 export function markStatsChanged(releaseId: string): void {
     delete releasePlaysCache[releaseId]
+    lastChangedReleaseId = releaseId
     statsVersion.value += 1
 }
 

@@ -64,11 +64,9 @@ const legacyDeps = {
     }
 }
 
-if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(() => initLegacyApp(legacyDeps), { timeout: 600 })
-} else {
-    setTimeout(() => initLegacyApp(legacyDeps), 0)
-}
+// Сразу после монтирования: страницы рисует Vue, и кнопки на них должны
+// работать с первого клика.
+initLegacyApp(legacyDeps)
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

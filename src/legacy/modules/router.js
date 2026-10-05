@@ -23,7 +23,7 @@ export function createRouterModule(ctx) {
         }
 
         if (route.name === 'release') {
-            ctx.modules.ui.renderRelease(String(route.params.releaseId))
+            // Содержимое рисует ReleasePage.vue.
             ctx.modules.ui.showPage('release')
             return
         }

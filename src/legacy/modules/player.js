@@ -340,6 +340,7 @@ export function createPlayerModule(ctx) {
     // ── Mini player ─────────────────────────────────────────────────────
 
     function setMiniPlayerVisible(isVisible) {
+        state.miniPlayerVisible = isVisible
         if (!dom.player) return
         dom.player.classList.toggle('visible', isVisible)
         document.body.classList.toggle('mini-player-visible', isVisible)

@@ -1,7 +1,7 @@
 import { markStatsChanged } from '../../site/services/stats'
 
 export function createChartModule(ctx) {
-    const { dom, state, releases, releasePlayCountCache, utils, getDb } = ctx
+    const { state, releases, releasePlayCountCache, utils, getDb } = ctx
     const { parseTrackKey } = utils
 
     // Один запрос на релиз отдаёт и сумму по релизу, и разбивку по трекам,
@@ -80,17 +80,7 @@ export function createChartModule(ctx) {
             if (isSameSession()) state.trackCounted = true
             delete releasePlayCountCache[releaseId]
             delete releaseTrackPlaysCache[releaseId]
-            // Счётчик на странице — только если открыт тот релиз, которому засчитали.
-            if (state.viewedReleaseId === releaseId && dom.releasePlays) {
-                dom.releasePlays.textContent = 'Счетчик прослушиваний обновляется...'
-                getReleasePlayCount(releaseId).then(total => {
-                    if (state.viewedReleaseId === releaseId && dom.releasePlays) {
-                        const type = release.type === 'album' ? 'альбома' : 'сингла'
-                        dom.releasePlays.textContent = `Прослушиваний ${type}: ${total}`
-                    }
-                })
-            }
-            // Открытый чарт перечитает цифры сам.
+            // Открытые чарт и страница этого релиза перечитают цифры сами.
             markStatsChanged(releaseId)
         } catch (e) {
             console.warn('Play count update failed:', e)

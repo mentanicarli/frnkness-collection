@@ -13,6 +13,8 @@ export interface RuntimeState {
     // отличает «свой» запуск от следующего (в том числе повтор того же трека).
     playSession: number
     isPlaying: boolean
+    // Мини-плеер показан (после первого запуска, до нажатия «закрыть»).
+    miniPlayerVisible: boolean
     trackCounted: boolean
     trackCountPending: boolean
     fsLyricsOpen: boolean
@@ -40,6 +42,7 @@ export const runtimeState: RuntimeState = shallowReactive<RuntimeState>({
     currentTrackIndex: -1,
     playSession: 0,
     isPlaying: false,
+    miniPlayerVisible: false,
     trackCounted: false,
     trackCountPending: false,
     fsLyricsOpen: false,
