@@ -1,12 +1,11 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { Announce } from '@/types'
 import {
     formatCountdown,
     formatReleaseMoment,
     isAnnounceActive,
     isAnnounceExpired,
-    renderAnnounceCardHtml,
-    startAnnounceCountdown
+    safeAnnounceUrl
 } from '../announceCard'
 
 const base: Announce = {
@@ -18,8 +17,6 @@ const base: Announce = {
     url: 'https://example.com/presave'
 }
 const AT = Date.parse('2026-11-01T15:00:00Z')
-
-afterEach(() => vi.useRealTimers())
 
 describe('анонс: время', () => {
     it('активен до момента выхода, потом — нет', () => {
@@ -41,34 +38,14 @@ describe('анонс: время', () => {
     })
 })
 
-describe('карточка анонса', () => {
-    it('экранирует текст, ссылка только https', () => {
-        const html = renderAnnounceCardHtml(base, AT - 60_000)
-        expect(html).toContain('Новый &lt;альбом&gt;')
-        expect(html).toContain('0 дн. 00:01:00')
-        expect(html).toContain('href="https://example.com/presave"')
-        expect(html).toContain('Пресейв уже открыт')
-        expect(renderAnnounceCardHtml({ ...base, url: 'javascript:alert(1)' }, 0)).not.toContain('href=')
-        expect(renderAnnounceCardHtml({ ...base, text: undefined, url: undefined }, 0)).not.toContain('announce-text')
-    })
-
-    it('живой отсчёт и снятие карточки по истечении', () => {
-        vi.useFakeTimers()
-        let now = AT - 2500
-        document.body.innerHTML = renderAnnounceCardHtml(base, now)
-        const card = document.querySelector<HTMLElement>('.announce-card')!
-        const expired = vi.fn()
-        startAnnounceCountdown(card, expired, () => now)
-        expect(card.querySelector('.announce-countdown')!.textContent).toBe('0 дн. 00:00:03')
-        now += 1000
-        vi.advanceTimersByTime(1000)
-        expect(card.querySelector('.announce-countdown')!.textContent).toBe('0 дн. 00:00:02')
-        now += 2000
-        vi.advanceTimersByTime(2000)
-        expect(expired).toHaveBeenCalledTimes(1)
-        now += 5000
-        vi.advanceTimersByTime(5000)
-        expect(expired).toHaveBeenCalledTimes(1)
+// Сама карточка — src/site/__tests__/components.test.ts (AnnounceCard).
+describe('ссылка «Подробнее»', () => {
+    it('только https без кавычек и пробелов', () => {
+        expect(safeAnnounceUrl('https://example.com/presave')).toBe('https://example.com/presave')
+        expect(safeAnnounceUrl('javascript:alert(1)')).toBeNull()
+        expect(safeAnnounceUrl('http://example.com')).toBeNull()
+        expect(safeAnnounceUrl('https://a.b/"onmouseover=x')).toBeNull()
+        expect(safeAnnounceUrl(undefined)).toBeNull()
     })
 })
 
@@ -85,26 +62,4 @@ describe('анонс без даты', () => {
         expect(isAnnounceExpired(base, AT - 1)).toBe(false)
     })
 
-    it('карточка: «Скоро» без таймера и без «Выйдет…»', () => {
-        const html = renderAnnounceCardHtml(noDate, 0)
-        expect(html).toContain('announce-soon')
-        expect(html).toContain('>Скоро<')
-        expect(html).not.toContain('role="timer"')
-        expect(html).not.toContain('announce-when')
-        expect(html).not.toContain('data-release-at')
-        expect(html).toContain('Новый &lt;альбом&gt;')
-        expect(html).toContain('href="https://example.com/presave"')
-    })
-
-    it('отсчёт не запускается и карточку не снимает', () => {
-        vi.useFakeTimers()
-        document.body.innerHTML = renderAnnounceCardHtml(noDate)
-        const card = document.querySelector<HTMLElement>('.announce-card')!
-        const expired = vi.fn()
-        const stop = startAnnounceCountdown(card, expired, () => Date.parse('2099-01-01T00:00:00Z'))
-        vi.advanceTimersByTime(10_000)
-        expect(expired).not.toHaveBeenCalled()
-        expect(card.querySelector('.announce-countdown')!.textContent).toBe('Скоро')
-        stop()
-    })
 })

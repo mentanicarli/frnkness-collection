@@ -31,7 +31,7 @@ export function createRouterModule(ctx) {
         if (route.name === 'track') {
             const ref = findTrackRefBySlug(releases, String(route.params.releaseId), String(route.params.slug))
             if (!ref) return
-            ctx.modules.track.renderTrackPage(ref.releaseId, ref.trackIndex)
+            // Содержимое рисует TrackPage.vue.
             ctx.modules.ui.showPage('track')
             return
         }

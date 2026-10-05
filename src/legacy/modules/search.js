@@ -1,3 +1,4 @@
+import { focusLyricLine } from '../../site/services/lyricFocus'
 import { ensureLyricsIndex, isLyricsIndexLoading, isLyricsIndexReady, searchCatalog as searchIndex } from '../../site/services/searchIndex'
 
 export function createSearchModule(ctx) {
@@ -112,7 +113,7 @@ export function createSearchModule(ctx) {
             } else {
                 // Нет .lrc: страница трека, прокрутка к строке, трек не запускаем.
                 ctx.modules.router.goTrack(releaseId, trackIndex)
-                if (line) ctx.modules.track.focusLyricLine(releaseId, trackIndex, line)
+                if (line) focusLyricLine(releaseId, trackIndex, line)
             }
             return
         }

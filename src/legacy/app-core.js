@@ -12,7 +12,6 @@ import { createPlayerModule } from './modules/player'
 import { createChartModule } from './modules/chart'
 import { createSearchModule } from './modules/search'
 import { createUiModule } from './modules/ui'
-import { createTrackModule } from './modules/track'
 import { createRouterModule } from './modules/router'
 
 export function initLegacyApp(deps = {}) {
@@ -89,7 +88,6 @@ export function initLegacyApp(deps = {}) {
         dom.searchPanel = $('header-search-panel')
         dom.searchToggle = $('search-toggle-btn')
         dom.searchBackdrop = $('search-backdrop')
-        dom.trackPage = $('page-track')
         dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch')
         dom.fsLyricsModeText = $('fs-lyrics-mode-text')
         dom.fsLyricsModeKaraoke = $('fs-lyrics-mode-karaoke')
@@ -141,7 +139,6 @@ export function initLegacyApp(deps = {}) {
     modules.chart = createChartModule(ctx)
     modules.search = createSearchModule(ctx)
     modules.ui = createUiModule(ctx)
-    modules.track = createTrackModule(ctx)
     modules.router = createRouterModule(ctx)
 
     // ── window.App ─────────────────────────────────────────────────────
@@ -151,8 +148,7 @@ export function initLegacyApp(deps = {}) {
         // Кнопка «Текст» в строке треклиста: трек открытого релиза.
         openTrackPage: i => modules.router.goTrack(state.viewedReleaseId, i),
         openCurrentTrackPage: () => modules.router.goCurrentTrack(),
-        playTrackFromPage: (r, i) => modules.track.playTrackFromPage(r, i),
-        copyTrackLink: btn => modules.track.copyTrackLink(btn),
+        playTrackFromPage: (r, i) => modules.player.playTrackByRef(r, i, 'fade'),
         handleTrackClick: (i, src) => modules.player.handleTrackClick(i, src),
         setLyricsMode: m => modules.lyrics.setLyricsMode(m),
         toggleFlowMode: () => modules.player.toggleFlowMode(),

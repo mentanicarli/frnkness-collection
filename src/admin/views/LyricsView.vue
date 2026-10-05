@@ -151,8 +151,17 @@
                         </div>
                     </template>
 
-                    <div v-else ref="previewBox" class="adm-preview" data-testid="preview" @click="onPreviewClick" @keydown="previewKey">
-                        <div class="track-page-inner" v-html="previewHtml"></div>
+                    <!-- Предпросмотр — те же компоненты, что на странице трека сайта. -->
+                    <div v-else ref="previewBox" class="adm-preview" data-testid="preview">
+                        <div class="track-page-inner">
+                            <TrackAbout :about="about" />
+                            <section class="track-section">
+                                <h2 class="track-section-title">Текст</h2>
+                                <div class="track-lyrics-body">
+                                    <TrackLyrics :text="previewText" :note-map="previewNoteMap" :line-class="previewLineClass" @line-click="seekToLine" />
+                                </div>
+                            </section>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -219,6 +228,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Release } from '@/types'
 import TrackPicker from '../components/TrackPicker.vue'
 import CommitDialog from '../components/CommitDialog.vue'
+import TrackAbout from '@/site/components/TrackAbout.vue'
+import TrackLyrics from '@/site/components/TrackLyrics.vue'
 import { useRepo } from '../composables/useRepo'
 import { useRoute, navigate } from '../composables/useRoute'
 import { useCommitFlow } from '../composables/useCommitFlow'
@@ -230,8 +241,6 @@ import {
     isSectionLabel,
     layoutLyrics,
     normalizeLine,
-    renderAboutHtml,
-    renderLyricsHtml,
     validateTrackNotes,
     type TrackAnnotation
 } from '@/utils/trackNotes'
@@ -459,15 +468,11 @@ const rows = computed(() => {
 const dangling = computed(() => findDanglingAnnotations(normalizeNewlines(text.value), { annotations: annotations.value }))
 const annotationCount = computed(() => annotations.value.filter((a) => a.note.trim()).length)
 
-const previewHtml = computed(() => {
+const previewText = computed(() => {
     const t = normalizeNewlines(text.value)
-    const lyrics = renderLyricsHtml(t.trim() ? t : '', buildNoteMap({ annotations: annotations.value }))
-    return `${renderAboutHtml({ about: about.value })}
-        <section class="track-section">
-            <h2 class="track-section-title">Текст</h2>
-            <div class="track-lyrics-body">${lyrics.html}</div>
-        </section>`
+    return t.trim() ? t : ''
 })
+const previewNoteMap = computed(() => buildNoteMap({ annotations: annotations.value }))
 
 const siteTrackUrl = computed(() =>
     track.value ? `./#/track/${encodeURIComponent(releaseId.value)}/${encodeURIComponent(getTrackSlug(track.value))}` : './'
@@ -514,17 +519,10 @@ function scrollWithin(box: HTMLElement | null, el: Element | null | undefined) {
     box.scrollTo({ top: box.scrollTop + (r.top - b.top) - box.clientHeight / 2 + r.height / 2, behavior: 'smooth' })
 }
 
-// Предпросмотр — разметка сайта (v-html), поэтому подсветку и номера строк
-// ставим на готовые элементы после каждой перерисовки.
-function markPreview() {
-    const lines = previewBox.value?.querySelectorAll<HTMLElement>('.lyric-line:not(.is-blank)') ?? []
-    lines.forEach((el, n) => {
-        el.dataset.line = String(n)
-        el.classList.toggle('is-playing', n === playingLine.value)
-        el.classList.toggle('is-seekable', lineTime(points.value, n) !== null)
-    })
+// Подсветка звучащей строки и строк, к которым можно перемотать, в предпросмотре.
+function previewLineClass(n: number) {
+    return { 'is-playing': n === playingLine.value, 'is-seekable': lineTime(points.value, n) !== null }
 }
-watch([previewHtml, playingLine, points, rightTab, loaded], markPreview, { flush: 'post' })
 
 watch(
     playingLine,
@@ -536,11 +534,9 @@ watch(
     { flush: 'post' }
 )
 
-function onPreviewClick(e: Event) {
-    togglePreviewNote(e)
-    // Клик по строке — перемотка к её времени из .lrc.
-    const line = (e.target as HTMLElement).closest<HTMLElement>('.lyric-line[data-line]')
-    const t = line ? lineTime(points.value, Number(line.dataset.line)) : null
+// Клик по строке предпросмотра — перемотка к её времени из .lrc.
+function seekToLine(n: number) {
+    const t = lineTime(points.value, n)
     if (t !== null) player.seekTo(t)
 }
 
@@ -641,24 +637,6 @@ function saveNote(line: string) {
 function dropAnnotation(line: string) {
     annotations.value = removeNote(annotations.value, line)
     editing.value = -1
-}
-
-// Раскрытие разборов в предпросмотре — как на сайте.
-function togglePreviewNote(e: Event) {
-    const line = (e.target as HTMLElement).closest<HTMLElement>('.lyric-line.has-note')
-    if (!line) return
-    const target = line.parentElement?.querySelector<HTMLElement>(`#${line.dataset.noteTarget}`)
-    if (!target) return
-    const open = target.hasAttribute('hidden')
-    target.toggleAttribute('hidden', !open)
-    line.classList.toggle('open', open)
-    line.setAttribute('aria-expanded', String(open))
-}
-function previewKey(e: KeyboardEvent) {
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    if (!(e.target as HTMLElement).closest('.lyric-line.has-note')) return
-    e.preventDefault()
-    togglePreviewNote(e)
 }
 
 // ── Сохранение ───────────────────────────────────────────────────────

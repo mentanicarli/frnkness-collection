@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Announce } from '@/types'
-import { formatCountdown, formatReleaseMoment, hasReleaseDate, releaseTime } from '@/utils/announceCard'
+import { formatCountdown, formatReleaseMoment, hasReleaseDate, releaseTime, safeAnnounceUrl } from '@/utils/announceCard'
 import { applyCardAccent } from '../services/colors'
 import { hideBrokenImage, useCardHover } from '../composables/useCardHover'
 
@@ -53,11 +53,7 @@ useCardHover(card)
 
 const dated = computed(() => hasReleaseDate(props.announce))
 const at = computed(() => releaseTime(props.announce))
-// Ссылка — только https без кавычек и пробелов (как проверяет админка).
-const link = computed(() => {
-  const url = props.announce.url
-  return url && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null
-})
+const link = computed(() => safeAnnounceUrl(props.announce.url))
 
 const now = ref(Date.now())
 const countdown = computed(() => formatCountdown(at.value - now.value))

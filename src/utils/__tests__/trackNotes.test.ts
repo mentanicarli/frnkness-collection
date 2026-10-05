@@ -5,8 +5,6 @@ import {
     isSectionLabel,
     layoutLyrics,
     normalizeLine,
-    renderAboutHtml,
-    renderLyricsHtml,
     validateTrackNotes
 } from '../trackNotes'
 
@@ -74,32 +72,7 @@ describe('layoutLyrics', () => {
     })
 })
 
-describe('renderLyricsHtml', () => {
-    it('shows placeholder for empty text', () => {
-        expect(renderLyricsHtml('', new Map()).html).toContain('Текст будет позже...')
-    })
-
-    it('renders notes with sequential ids and escapes html', () => {
-        const map = buildNoteMap({ annotations: [{ line: 'a <b>', note: 'x & y' }, { line: 'c', note: 'z' }] })
-        const { html, annotated } = renderLyricsHtml('a <b>\nc\na <b>', map)
-        expect(annotated).toBe(2)
-        expect(html).toContain('id="lyric-note-0" hidden>x &amp; y</div>')
-        expect(html).toContain('data-note-target="lyric-note-1">c</p>')
-        expect(html).toContain('<p class="lyric-line">a &lt;b&gt;</p>')
-    })
-})
-
-describe('renderAboutHtml', () => {
-    it('splits paragraphs on blank lines', () => {
-        const html = renderAboutHtml({ about: 'Первый\nвсё ещё первый\n\nВторой' })
-        expect(html).toContain('<p>Первый\nвсё ещё первый</p><p>Второй</p>')
-    })
-
-    it('returns empty string without about', () => {
-        expect(renderAboutHtml({ about: '   ' })).toBe('')
-        expect(renderAboutHtml(null)).toBe('')
-    })
-})
+// Отрисовка текста и «О треке» — src/site/__tests__/components.test.ts.
 
 describe('findDanglingAnnotations', () => {
     it('reports annotations whose line is gone or is a label', () => {

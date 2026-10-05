@@ -1,9 +1,8 @@
 import type { Announce } from '@/types'
-import { escapeHtml } from './helpers'
 
 /**
- * Анонс «скоро выйдет» на главной: карточка будущего релиза с живым
- * отсчётом. Общий код сайта и превью в админке.
+ * Анонс «скоро выйдет» на главной: время и подписи для карточки будущего
+ * релиза (src/site/components/AnnounceCard.vue — она же в превью админки).
  *
  * Время выхода хранится в ISO с +03:00 (по Москве), отсчёт считается в
  * браузере. Когда время вышло, карточка убирается — сайт не висит с нулями.
@@ -57,69 +56,7 @@ export function formatReleaseMoment(releaseAt: string): string {
     return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} в ${m[4]}:${m[5]} по Москве`
 }
 
-function safeUrl(url: string | undefined): string | null {
+/** Ссылка «Подробнее» — только https без кавычек и пробелов, иначе null. */
+export function safeAnnounceUrl(url: string | undefined): string | null {
     return url && /^https:\/\/[^\s"'<>]+$/.test(url) ? url : null
-}
-
-export function renderAnnounceCardHtml(announce: Announce, now: number = Date.now()): string {
-    const title = escapeHtml(announce.title)
-    const dated = hasReleaseDate(announce)
-    const at = releaseTime(announce)
-    // Без даты: вместо отсчёта — «Скоро», бейдж «анонс», чтобы «скоро» не повторялось дважды.
-    const when = dated
-        ? `<div class="announce-countdown" aria-live="off" role="timer">${formatCountdown(at - now)}</div>
-                            <p class="announce-when">Выйдет ${escapeHtml(formatReleaseMoment(announce.releaseAt!))}</p>`
-        : `<div class="announce-countdown announce-soon">Скоро</div>`
-    const link = safeUrl(announce.url)
-    const text = announce.text ? `<p class="announce-text">${escapeHtml(announce.text)}</p>` : ''
-    const cta = link
-        ? `<a class="promo-cta announce-cta inline-flex items-center gap-2" href="${escapeHtml(link)}" target="_blank" rel="noopener" style="height: 2.75rem; padding: 0 1.25rem; border-radius: 0.375rem; font-size: 0.8125rem;">
-                                    Подробнее
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                                </a>`
-        : ''
-    return `
-                <div class="release-card promo-release-card announce-card text-left relative w-full"${dated ? ` data-release-at="${at}"` : ''} style="padding: clamp(1rem,2vw,1.625rem);">
-                    <div class="flex flex-col sm:flex-row items-start sm:items-center" style="gap: clamp(1.125rem,3vw,2.5rem);">
-                        <div class="promo-cover-wrap aspect-square overflow-hidden bg-[var(--bg)] flex-shrink-0" style="border-radius: 0.5rem;">
-                            <img src="${escapeHtml(announce.cover)}" alt="${title}" class="card-image w-full h-full object-cover" loading="eager" decoding="async" onerror="this.style.display='none'">
-                        </div>
-                        <div class="flex-1 min-w-0 flex flex-col" style="gap: 1rem;">
-                            <div class="promo-badge">${dated ? 'скоро' : 'анонс'}</div>
-                            <h3 class="promo-title line-clamp-2 relative z-10" style="font-size: clamp(1.5rem,4vw,3.125rem); line-height: 1;">${title}</h3>
-                            ${when}
-                            ${text}
-                            ${cta}
-                        </div>
-                    </div>
-                </div>
-            `
-}
-
-/**
- * Живой отсчёт в отрисованной карточке. Когда время вышло — onExpire
- * (сайт убирает карточку). Карточка без даты (нет data-release-at) не
- * отсчитывает и не истекает. Возвращает функцию остановки.
- */
-export function startAnnounceCountdown(card: HTMLElement, onExpire: () => void, now: () => number = Date.now): () => void {
-    if (card.dataset.releaseAt === undefined) return () => {}
-    const at = Number(card.dataset.releaseAt)
-    const el = card.querySelector<HTMLElement>('.announce-countdown')
-    let timer: ReturnType<typeof setInterval> | null = null
-    const stop = () => {
-        if (timer !== null) clearInterval(timer)
-        timer = null
-    }
-    const tick = () => {
-        const left = at - now()
-        if (!Number.isFinite(at) || left <= 0) {
-            stop()
-            onExpire()
-            return
-        }
-        if (el) el.textContent = formatCountdown(left)
-    }
-    tick()
-    if (Number.isFinite(at) && at > now()) timer = setInterval(tick, 1000)
-    return stop
 }

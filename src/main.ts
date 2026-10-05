@@ -6,16 +6,12 @@ import { initLegacyApp } from './legacy/app-core'
 import { ANNOUNCE, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, SUPABASE_ANON_KEY, SUPABASE_URL, releases } from './config'
 import { runtimeCaches, runtimeState } from './runtime/sharedState'
 import { normalizeInitialHash, router } from './site/router'
-import { buildAssetUrl, debounce, escapeHtml, formatTime, normalizeSearchText, throttle } from './utils/helpers'
-import { getAllTrackRefs, isSameTrackRef, parseLRC, parseTrackKey, pickRandomTrackRef } from './utils/lyrics'
-import { buildTrackHash, findTrackRefBySlug, getTrackSlug } from './utils/slug'
-import { createMatcher, normalizeForSearch } from './utils/search'
+import { buildAssetUrl, debounce, escapeHtml, formatTime } from './utils/helpers'
+import { parseLRC, parseTrackKey } from './utils/lyrics'
+import { normalizeForSearch } from './utils/search'
 import { fetchTextFile } from './utils/textFiles'
-import { buildNoteMap, renderAboutHtml, renderLyricsHtml } from './utils/trackNotes'
-import { renderPromoCardHtml } from './utils/promoCard'
 import { setupMediaSession } from './runtime/mediaSession'
 import { createListenSender, setupListenTracker } from './runtime/listenTracker'
-import { isAnnounceActive, renderAnnounceCardHtml, startAnnounceCountdown } from './utils/announceCard'
 
 normalizeInitialHash()
 const app = createApp(App)
@@ -35,32 +31,16 @@ const legacyDeps = {
     },
     utils: {
         buildAssetUrl,
-        buildNoteMap,
-        buildTrackHash,
-        createMatcher,
         debounce,
         escapeHtml,
         fetchTextFile,
-        findTrackRefBySlug,
         formatTime,
-        getAllTrackRefs,
-        getTrackSlug,
-        isSameTrackRef,
         normalizeForSearch,
-        normalizeSearchText,
         parseLRC,
         parseTrackKey,
-        pickRandomTrackRef,
-        renderAboutHtml,
-        renderLyricsHtml,
-        renderPromoCardHtml,
-        renderAnnounceCardHtml,
-        isAnnounceActive,
-        startAnnounceCountdown,
         setupMediaSession,
         setupListenTracker,
-        sendListenSession: createListenSender(SUPABASE_URL, SUPABASE_ANON_KEY),
-        throttle
+        sendListenSession: createListenSender(SUPABASE_URL, SUPABASE_ANON_KEY)
     }
 }
 
