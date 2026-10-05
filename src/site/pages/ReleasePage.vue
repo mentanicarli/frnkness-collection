@@ -63,10 +63,7 @@
             <h3 class="text-xs tracking-[0.2em] uppercase text-[var(--fg-muted)]">Треклист</h3>
             <div class="flex-1 h-px bg-[var(--line)]"></div>
           </div>
-          <!--
-            Касание строки на телефоне запускает трек сразу по pointerdown
-            (обработчик на #tracklist в legacy-слое), клик мышью — по click.
-          -->
+          <!-- Касание строки на телефоне запускает трек сразу по pointerdown, клик мышью — по click. -->
           <div id="tracklist">
             <template v-if="release">
               <div
@@ -75,7 +72,8 @@
                 class="track-row cursor-pointer group"
                 :class="rowClass(i)"
                 :data-track-index="i"
-                @click="legacyBridge.handleTrackClick(i)"
+                @click="handleTrackClick(i, 'click')"
+                @pointerdown="onRowPointerDown($event, i)"
               >
                 <span class="track-num">
                   <span class="track-num-digit group-hover:hidden">{{ String(t.num).padStart(2, '0') }}</span>
@@ -99,9 +97,10 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { releases } from '@/config'
-import { runtimeState as state } from '@/runtime/sharedState'
-import { legacyBridge } from '@/runtime/legacyBridge'
 import { lyricsBookFilename } from '@/utils/lyricsBook'
+import { view } from '../stores/view'
+import { isTrackHighlighted, player } from '../player/state'
+import { handleTrackClick, handleTrackPointer } from '../player/engine'
 import { updatePageAccent } from '../services/colors'
 import { getReleasePlayCount, lastChangedReleaseId, statsVersion } from '../services/stats'
 import { goTrack } from '../router'
@@ -133,13 +132,15 @@ const lyricsBook = computed(() => {
 // Подсветка строк — только если на экране открыт именно играющий релиз:
 // иначе индекс играющего трека к этому списку отношения не имеет.
 function rowClass(index: number) {
-  const current = Boolean(
-    releaseId.value &&
-    releaseId.value === state.currentReleaseId &&
-    state.miniPlayerVisible &&
-    index === state.currentTrackIndex
-  )
-  return { playing: current, paused: current && !state.isPlaying }
+  const current = isTrackHighlighted(releaseId.value, index)
+  return { playing: current, paused: current && !player.isPlaying }
+}
+
+function onRowPointerDown(e: PointerEvent, index: number) {
+  if (e.pointerType === 'mouse') return
+  if ((e.target as Element | null)?.closest?.('.lyrics-action-btn')) return
+  handleTrackPointer(index)
+  e.preventDefault()
 }
 
 function loadPlays(id: string, loadingText: string) {
@@ -147,7 +148,7 @@ function loadPlays(id: string, loadingText: string) {
   if (!r || r.upcoming) return
   playsText.value = loadingText
   void getReleasePlayCount(id).then((total) => {
-    if (releaseId.value !== id || state.viewedReleaseId !== id) return
+    if (releaseId.value !== id || view.viewedReleaseId !== id) return
     playsText.value = `Прослушиваний ${r.type === 'album' ? 'альбома' : 'сингла'}: ${total}`
   })
 }
@@ -159,7 +160,7 @@ function show(id: string) {
   if (!r) return
   releaseId.value = id
   coverBroken.value = false
-  state.viewedReleaseId = id
+  view.viewedReleaseId = id
   void updatePageAccent(r.cover)
   loadPlays(id, 'Счетчик прослушиваний загружается...')
 
@@ -182,7 +183,7 @@ watch(
 // Засчитали прослушивание открытому релизу — счётчик обновляется.
 watch(statsVersion, () => {
   const id = releaseId.value
-  if (id && state.viewedReleaseId === id && lastChangedReleaseId === id) {
+  if (id && view.viewedReleaseId === id && lastChangedReleaseId === id) {
     loadPlays(id, 'Счетчик прослушиваний обновляется...')
   }
 })

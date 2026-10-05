@@ -17,7 +17,7 @@
           <p class="track-hero-artist">frnk ness</p>
           <p id="track-hero-meta" class="track-hero-meta">{{ heroMeta }}</p>
           <div class="track-hero-actions">
-            <button class="track-play-btn" @click="legacyBridge.playTrack(view.releaseId, view.trackIndex)">
+            <button class="track-play-btn" @click="playTrackByRef(view.releaseId, view.trackIndex, 'fade')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               <span>Слушать</span>
             </button>
@@ -63,8 +63,8 @@ import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { releases } from '@/config'
 import type { Release, Track } from '@/types'
-import { runtimeState as state } from '@/runtime/sharedState'
-import { legacyBridge } from '@/runtime/legacyBridge'
+import { view as screen } from '../stores/view'
+import { playTrackByRef } from '../player/engine'
 import { findTrackRefBySlug } from '@/utils/slug'
 import { normalizeForSearch } from '@/utils/search'
 import { buildNoteMap, type TrackNotes } from '@/utils/trackNotes'
@@ -123,8 +123,8 @@ async function show(releaseId: string, trackIndex: number) {
   content.value = null
   plays.value = 0
   copied.value = false
-  // Открытый на экране релиз; плеер (state.currentRelease*) не трогаем.
-  state.viewedReleaseId = releaseId
+  // Открытый на экране релиз; плеер (player.currentRelease*) не трогаем.
+  screen.viewedReleaseId = releaseId
   void updatePageAccent(release.cover)
   window.scrollTo(0, 0)
 

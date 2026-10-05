@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { legacyBridge } from '@/runtime/legacyBridge'
+import { playTrackByRef } from '../player/engine'
 import { loadChart, statsVersion, type ChartResult } from '../services/stats'
 import { goRelease } from '../router'
 import BackButton from '../components/BackButton.vue'
@@ -53,6 +53,6 @@ watch([() => route.name, statsVersion], async () => {
 // Клик по строке — релиз этого трека и сразу воспроизведение.
 function play(releaseId: string, trackIndex: number) {
   goRelease(releaseId)
-  legacyBridge.playTrack(releaseId, trackIndex)
+  playTrackByRef(releaseId, trackIndex, 'fade')
 }
 </script>

@@ -9,10 +9,10 @@
             id="flow-mode-btn"
             @click="toggleFlowMode"
             class="chart-btn flow-btn flex items-center gap-2 px-7 transition-all"
-            :class="{ active: state.flowModeActive }"
+            :class="{ active: player.flowModeActive }"
             style="height: 3.125rem;"
-            :aria-pressed="state.flowModeActive ? 'true' : 'false'"
-            :aria-label="state.flowModeActive ? 'Остановить поток' : 'Включить поток'"
+            :aria-pressed="player.flowModeActive ? 'true' : 'false'"
+            :aria-label="player.flowModeActive ? 'Остановить поток' : 'Включить поток'"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M4 7h6m0 0L7 4m3 3L7 10" />
@@ -47,15 +47,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ANNOUNCE, PROMO_RELEASE_ID, SHOW_NEW_RELEASE_PROMO, releases } from '@/config'
-import { runtimeState as state } from '@/runtime/sharedState'
-import { legacyBridge } from '@/runtime/legacyBridge'
 import { isAnnounceActive } from '@/utils/announceCard'
 import { goRelease } from '../router'
+import { player } from '../player/state'
+import { toggleFlowMode } from '../player/engine'
 import AnnounceCard from '../components/AnnounceCard.vue'
 import PromoCard from '../components/PromoCard.vue'
 import ReleaseCard from '../components/ReleaseCard.vue'
-
-const toggleFlowMode = () => legacyBridge.toggleFlowMode()
 
 const promoRelease = SHOW_NEW_RELEASE_PROMO ? releases[PROMO_RELEASE_ID] ?? null : null
 // Анонс проверяется при открытии сайта; время вышло — карточка исчезает.

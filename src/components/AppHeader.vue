@@ -88,7 +88,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { releases } from '@/config'
-import { legacyBridge } from '@/runtime/legacyBridge'
+import { playTrackByRef, seekTo } from '@/site/player/engine'
+import { openFsLyrics, revealKaraokeAt } from '@/site/player/karaoke'
 import { debounce } from '@/utils/helpers'
 import { goChart, goHome, goRelease, goTrack } from '@/site/router'
 import { focusLyricLine } from '@/site/services/lyricFocus'
@@ -142,7 +143,10 @@ function openResult(item: SearchHit) {
     if (Number.isFinite(time) && time >= 0) {
       // Есть .lrc: трек с этой строки, полноэкранный плеер в караоке.
       goRelease(releaseId)
-      legacyBridge.playLyricAt(releaseId, trackIndex, time)
+      playTrackByRef(releaseId, trackIndex, 'fade')
+      seekTo(time)
+      void revealKaraokeAt(time)
+      openFsLyrics()
     } else {
       // Нет .lrc: страница трека, прокрутка к строке, трек не запускаем.
       goTrack(releaseId, trackIndex)
@@ -154,6 +158,6 @@ function openResult(item: SearchHit) {
   goRelease(releaseId)
   if (item.type === 'release' || trackIndex < 0) return
   // Трек запускаем явно по (релиз, индекс): страница релиза плеер не трогает.
-  legacyBridge.playTrack(releaseId, trackIndex)
+  playTrackByRef(releaseId, trackIndex, 'fade')
 }
 </script>
