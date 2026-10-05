@@ -18,7 +18,7 @@ export interface LegacyAppApi {
     closeMiniPlayer(): void
     showPage(name: PageName): void
     toggleFlowMode(): void
-    toggleSearchPanel(open?: boolean): void
+    playLyricAt(releaseId: string, trackIndex: number, time: number): void
     playTrackFromPage(releaseId: string, trackIndex: number): void
     handleTrackClick(trackIndex: number): void
 }
@@ -85,8 +85,9 @@ export const legacyBridge = {
     toggleFlowMode() {
         invoke('toggleFlowMode')
     },
-    toggleSearchPanel(open?: boolean) {
-        invoke('toggleSearchPanel', open)
+    // Строка из поиска с таймкодом: трек с этого места, караоке на весь экран.
+    playLyricAt(releaseId: string, trackIndex: number, time: number) {
+        invoke('playLyricAt', releaseId, trackIndex, time)
     },
     // Запуск трека по (релиз, индекс) — явно задаёт играющий релиз.
     playTrack(releaseId: string, trackIndex: number) {

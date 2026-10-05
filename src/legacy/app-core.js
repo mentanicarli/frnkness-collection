@@ -10,7 +10,7 @@ import { createFullscreenModule } from './modules/fullscreen'
 import { createLyricsModule } from './modules/lyrics'
 import { createPlayerModule } from './modules/player'
 import { createChartModule } from './modules/chart'
-import { createSearchModule } from './modules/search'
+import { search, setSearchOpen } from '../site/stores/search'
 import { createUiModule } from './modules/ui'
 import { createRouterModule } from './modules/router'
 
@@ -83,11 +83,6 @@ export function initLegacyApp(deps = {}) {
         dom.fsVolWave2 = $('fs-vol-wave-2')
         dom.tracklist = $('tracklist')
         dom.playerTrack = $('player-track')
-        dom.searchInput = $('global-search')
-        dom.searchResults = $('search-results')
-        dom.searchPanel = $('header-search-panel')
-        dom.searchToggle = $('search-toggle-btn')
-        dom.searchBackdrop = $('search-backdrop')
         dom.fsLyricsModeSwitch = $('fs-lyrics-mode-switch')
         dom.fsLyricsModeText = $('fs-lyrics-mode-text')
         dom.fsLyricsModeKaraoke = $('fs-lyrics-mode-karaoke')
@@ -137,7 +132,6 @@ export function initLegacyApp(deps = {}) {
     modules.lyrics = createLyricsModule(ctx)
     modules.player = createPlayerModule(ctx)
     modules.chart = createChartModule(ctx)
-    modules.search = createSearchModule(ctx)
     modules.ui = createUiModule(ctx)
     modules.router = createRouterModule(ctx)
 
@@ -168,8 +162,13 @@ export function initLegacyApp(deps = {}) {
             else if (n === 'chart') modules.router.goChart()
             else modules.ui.showPage(n)
         },
-        openSearchResult: (t, r, i, time, n) => modules.search.openSearchResult(t, r, i, time, n),
-        toggleSearchPanel: s => modules.search.toggleSearchPanel(s),
+        // Строка из поиска с таймкодом: трек с этого места, полноэкранный плеер в караоке.
+        playLyricAt: (r, i, time) => {
+            modules.player.playTrackByRef(r, i, 'fade')
+            modules.player.seekTo(time)
+            modules.lyrics.revealKaraokeAt(time)
+            modules.fullscreen.openFsLyrics()
+        },
         toggleMute: () => modules.player.toggleMute(),
         closeMiniPlayer: () => modules.player.closeMiniPlayer()
     }
@@ -179,7 +178,7 @@ export function initLegacyApp(deps = {}) {
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
             if (dom.fsPlayer && dom.fsPlayer.classList.contains('open')) modules.fullscreen.closeFsPlayer()
-            else if (dom.searchPanel && dom.searchPanel.classList.contains('open')) modules.search.toggleSearchPanel(false)
+            else if (search.open) setSearchOpen(false)
         }
         const activeTag = document.activeElement ? document.activeElement.tagName : ''
         if (e.key === ' ' && !['BUTTON', 'INPUT', 'TEXTAREA'].includes(activeTag)) {
@@ -234,7 +233,6 @@ export function initLegacyApp(deps = {}) {
 
         cacheDomElements()
         modules.router.start()
-        modules.search.initGlobalSearch()
         modules.player.updateFlowButtonState()
         modules.ui.initStaggerAnimation()
         modules.player.setupAudioEvents()

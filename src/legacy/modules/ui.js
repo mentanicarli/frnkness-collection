@@ -1,5 +1,7 @@
+import { runSearch, search, setSearchOpen } from '../../site/stores/search'
+
 export function createUiModule(ctx) {
-    const { dom, state } = ctx
+    const { state } = ctx
 
     function initStaggerAnimation() {
         document.querySelectorAll('.stagger-item').forEach((item, i) => {
@@ -18,8 +20,8 @@ export function createUiModule(ctx) {
         window.scrollTo(0, 0)
         if (name === 'home') ctx.modules.colors.resetPageAccent()
         if (name === 'home') setTimeout(initStaggerAnimation, 50)
-        if (name === 'home' && dom.searchInput) ctx.modules.search.handleSearchInput(dom.searchInput.value)
-        if (name !== 'home') ctx.modules.search.toggleSearchPanel(false)
+        if (name === 'home') runSearch(search.input)
+        if (name !== 'home') setSearchOpen(false)
     }
 
     return { initStaggerAnimation, showPage }
