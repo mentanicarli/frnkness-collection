@@ -15,7 +15,10 @@
             <div class="adm-history-head">
                 <span class="adm-badge" :class="c.source">{{ c.source === 'admin' ? 'админка' : 'код' }}</span>
                 <span class="adm-history-msg">{{ c.message }}</span>
-                <span class="adm-history-meta">{{ formatDate(c.date) }} · <span class="adm-mono">{{ c.sha.slice(0, 7) }}</span></span>
+                <span class="adm-history-meta">
+                    <span v-if="c.user" class="adm-history-user" data-testid="history-user">{{ c.user }} · </span>{{ formatDate(c.date) }} ·
+                    <span class="adm-mono">{{ c.sha.slice(0, 7) }}</span>
+                </span>
                 <button
                     v-if="c.source === 'admin'"
                     class="adm-btn adm-btn-sm"

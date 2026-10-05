@@ -111,6 +111,7 @@ function setup() {
         },
         toBase64: (bytes) => Buffer.from(bytes).toString('base64'),
         now: () => now,
+        sleep: async () => undefined,
         playsFor: async (ids) => Object.fromEntries(ids.map((id) => [id, 0]))
     }
     handle = createHandler(deps)
@@ -222,18 +223,14 @@ describe('admin-content: commit', () => {
         expect(state.head).toBe(data.sha)
     })
 
-    it('ветка ушла вперёд — 409 без записи', async () => {
-        state.head = sha(2)
-        const res = await call({ action: 'commit', baseSha: BASE, message: 'x', files: [{ path: 'lyrics/singles/faaa.txt', content: 'a' }] })
-        expect(res.status).toBe(409)
-        expect((await res.json()).message).toContain('Обнови страницу')
-        expect(writes()).toHaveLength(0)
-    })
+    // Ветка ушла вперёд — см. concurrentCommits.test.ts (там модель git с историей).
 
-    it('гонка при обновлении ветки — тоже 409', async () => {
+    it('ветка всё время уходит вперёд — несколько попыток, потом 409', async () => {
         state.moveRefOnPatch = true
         const res = await call({ action: 'commit', baseSha: BASE, message: 'x', files: [{ path: 'lyrics/singles/faaa.txt', content: 'a' }] })
         expect(res.status).toBe(409)
+        expect((await res.json()).message).toContain('правки на странице не потеряны')
+        expect(writes().filter((w) => w.method === 'PATCH')).toHaveLength(4)
     })
 
     it('защищённая ветка — отдельная ошибка, а не «данные изменились»', async () => {
@@ -436,7 +433,7 @@ describe('admin-content: анонс в site.json', () => {
             const blob = await (await call({ action: 'stage-blob', stagingPath: uuidName('jpg'), path: announce.cover })).json()
             return call({
                 action: 'commit',
-                baseSha: BASE,
+                baseSha: state.head,
                 message: 'анонс',
                 files: [
                     { path: 'src/content/site.json', content: JSON.stringify({ promo: { enabled: true, releaseId: 'zlaya-nostalgia' }, announce: a }) },

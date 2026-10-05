@@ -17,6 +17,7 @@
 
         <template v-else-if="loaded && release && track">
             <p class="adm-small adm-faint" style="margin: 1rem 0 0.5rem" data-testid="source-note">{{ sourceNote }}</p>
+            <DraftBanner :draft="draft.offer.value" :stale="draft.offerStale.value" @restore="draft.restore" @discard="draft.discard" />
             <div v-if="mismatch" class="adm-alert adm-alert-warn" data-testid="mismatch">
                 В готовом .lrc {{ mismatchCount }} строк(и) не совпадают с текстом трека — например, караоке правили отдельно.
                 Ничего делать не нужно, если так и задумано.
@@ -30,6 +31,7 @@
                 <div class="adm-segmented" role="tablist" aria-label="Режим">
                     <button type="button" role="tab" :aria-selected="mode === 'sync'" :class="{ active: mode === 'sync' }" @click="mode = 'sync'">Разметка</button>
                     <button type="button" role="tab" :aria-selected="mode === 'edit'" :class="{ active: mode === 'edit' }" @click="openLineEditor">Строки</button>
+                    <button type="button" role="tab" :aria-selected="mode === 'paste'" :class="{ active: mode === 'paste' }" @click="openPaste">Вставить .lrc</button>
                     <button type="button" role="tab" :aria-selected="mode === 'preview'" :class="{ active: mode === 'preview' }" @click="mode = 'preview'">Предпросмотр</button>
                 </div>
                 <span class="adm-spacer"></span>
@@ -102,6 +104,33 @@
                 </div>
             </div>
 
+            <!-- Вставка готового .lrc -->
+            <div v-else-if="mode === 'paste'" class="adm-stack" data-testid="lrc-paste">
+                <p class="adm-hint">
+                    Вставь готовый .lrc (из другой программы) или выбери файл. Метки вида [мм:сс.сс] и [мм:сс.ссс], несколько меток
+                    на строке — повтор. Строки и отметки заменятся вставленными; сохранится только после «Сохранить…».
+                </p>
+                <textarea
+                    v-model="pasteText"
+                    class="adm-textarea adm-mono"
+                    rows="16"
+                    aria-label="Текст .lrc"
+                    spellcheck="false"
+                    placeholder="[00:12.34]Первая строка&#10;[00:15.80]Вторая строка"
+                ></textarea>
+                <div class="adm-row" style="gap: 0.5rem">
+                    <label class="adm-btn adm-btn-sm adm-file-btn">
+                        Выбрать файл…
+                        <input type="file" accept=".lrc,.txt,text/plain" aria-label="Файл .lrc" @change="onPasteFile" />
+                    </label>
+                    <span class="adm-small adm-muted" data-testid="paste-summary">{{ pasteSummary }}</span>
+                </div>
+                <div class="adm-row">
+                    <button class="adm-btn adm-btn-primary" type="button" :disabled="!pasted.lines.length" @click="applyPaste">Применить</button>
+                    <button class="adm-btn adm-btn-ghost" type="button" @click="mode = 'sync'">Отмена</button>
+                </div>
+            </div>
+
             <!-- Предпросмотр -->
             <div v-else ref="previewBox" class="adm-karaoke fs-lyrics-body" data-testid="karaoke">
                 <p
@@ -135,6 +164,9 @@ import TrackPicker from '../components/TrackPicker.vue'
 import CommitDialog from '../components/CommitDialog.vue'
 import AudioPlayer from '../components/AudioPlayer.vue'
 import { useAudioPlayer } from '../composables/useAudioPlayer'
+import DraftBanner from '../components/DraftBanner.vue'
+import { useDraft } from '../composables/useDraft'
+import { draftKey } from '../lib/drafts'
 import { useRepo } from '../composables/useRepo'
 import { navigate, useRoute } from '../composables/useRoute'
 import { useCommitFlow } from '../composables/useCommitFlow'
@@ -152,6 +184,7 @@ import {
     nextUnstamped,
     nudge,
     outOfOrder,
+    parsePastedLrc,
     shiftAll,
     stamp,
     undoStamp,
@@ -183,7 +216,7 @@ const loaded = ref(false)
 const loadError = ref('')
 const lines = ref<LrcLine[]>([])
 const original = ref({ lrc: null as string | null, lines: [] as LrcLine[], textLines: [] as string[] })
-const mode = ref<'sync' | 'edit' | 'preview'>('sync')
+const mode = ref<'sync' | 'edit' | 'paste' | 'preview'>('sync')
 const linesDraft = ref('')
 
 const player = useAudioPlayer()
@@ -205,6 +238,25 @@ const dirty = computed(() => {
     return lines.value.map((l) => l.text).join('\n') !== original.value.lines.map((l) => l.text).join('\n')
 })
 const confirmLeave = useUnsaved(dirty)
+
+// Версия main, на которой загружен .lrc: при сохранении конфликт — только
+// если этот файл с тех пор изменили (например, другой админ).
+const loadedSha = ref('')
+
+// Черновик в браузере: строки и отметки. Восстанавливается после перезагрузки.
+const draft = useDraft<{ lines: LrcLine[] }>({
+    key: computed(() => (loaded.value && paths.value.lrc ? draftKey('lrc', paths.value.lrc) : '')),
+    ready: loaded,
+    dirty,
+    snapshot: () => ({ lines: lines.value }),
+    original: () => (original.value.lrc ?? '') + '\n--\n' + original.value.textLines.join('\n'),
+    baseSha: () => loadedSha.value,
+    apply: (d) => {
+        lines.value = d.lines.map((l) => ({ text: String(l.text), time: typeof l.time === 'number' ? l.time : null }))
+        resetShiftState()
+        mode.value = 'sync'
+    }
+})
 
 const mismatch = computed(
     () =>
@@ -253,8 +305,10 @@ async function loadTrack() {
     const my = ++token
     loading.value = true
     try {
-        const files = await readFiles(repo.state.sha, [paths.value.txt, paths.value.lrc])
+        const base = repo.state.sha
+        const files = await readFiles(base, [paths.value.txt, paths.value.lrc])
         if (my !== token) return
+        loadedSha.value = base
         const textLines = linesFromTxt(files[paths.value.txt] ?? '')
         const lrc = files[paths.value.lrc]
         const fromLrc = lrc !== null ? linesFromLrc(lrc) : null
@@ -274,6 +328,7 @@ async function loadTrack() {
 function select(id: string, index: number) {
     if (id === releaseId.value && index === trackIndex.value) return
     if (!confirmLeave()) return
+    draft.flush()
     audio.value?.pause()
     loaded.value = false
     if (index >= 0) navigate('lrc', id, index)
@@ -377,8 +432,40 @@ function applyLines() {
     mode.value = 'sync'
 }
 
+// ── Вставка готового .lrc ────────────────────────────────────────────
+const pasteText = ref('')
+const pasted = computed(() => parsePastedLrc(pasteText.value))
+const pasteSummary = computed(() => {
+    if (!pasteText.value.trim()) return ''
+    const n = pasted.value.lines.length
+    if (!n) return 'Строк с метками времени не найдено'
+    const skipped = pasted.value.skipped ? `, пропущено без метки или текста: ${pasted.value.skipped}` : ''
+    return `Строк с метками: ${n}${skipped}`
+})
+
+function openPaste() {
+    pasteText.value = ''
+    mode.value = 'paste'
+}
+
+async function onPasteFile(e: Event) {
+    const input = e.target as HTMLInputElement
+    const file = input.files?.[0]
+    if (file) pasteText.value = await file.text()
+    input.value = ''
+}
+
+function applyPaste() {
+    if (!pasted.value.lines.length) return
+    const hasStamps = stampedCount.value > 0
+    if (hasStamps && !window.confirm('Заменить текущие строки и отметки вставленным .lrc?')) return
+    lines.value = pasted.value.lines.map((l) => ({ ...l }))
+    resetShiftState()
+    mode.value = 'sync'
+}
+
 function onKey(e: KeyboardEvent) {
-    if (!loaded.value || flow.state.open || mode.value === 'edit') return
+    if (!loaded.value || flow.state.open || mode.value === 'edit' || mode.value === 'paste') return
     const el = e.target as HTMLElement
     if (el.closest('input, textarea, select, [contenteditable]')) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
@@ -425,9 +512,16 @@ async function save() {
         message: `караоке «${track.value.title}» (${release.value.title})`,
         files: [{ path: paths.value.lrc, kind: original.value.lrc === null ? 'new' : 'changed' }],
         notes: [`${lines.value.length} строк, последняя — ${formatLrcTime(lines.value[lines.value.length - 1].time ?? 0)}.`],
-        prepare: async () => [{ path: paths.value.lrc, content }]
+        prepare: async () => [{ path: paths.value.lrc, content }],
+        baseSha: loadedSha.value,
+        draft: true
     })
-    if (result) original.value = { ...original.value, lrc: content, lines: lines.value.map((l) => ({ ...l })) }
+    if (!result) return
+    original.value = { ...original.value, lrc: content, lines: lines.value.map((l) => ({ ...l })) }
+    // Файл теперь такой, каким он стал в этом коммите: следующее сохранение —
+    // относительно него, а не версии, с которой начинали.
+    loadedSha.value = result.sha
+    draft.clear()
 }
 
 watch([() => repo.state.releases !== null, releaseId, trackIndex], () => {

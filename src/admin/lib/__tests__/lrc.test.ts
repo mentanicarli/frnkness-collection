@@ -13,6 +13,7 @@ import {
     nextUnstamped,
     nudge,
     outOfOrder,
+    parsePastedLrc,
     shiftAll,
     stamp,
     undoStamp,
@@ -176,6 +177,28 @@ describe('синхронизация', () => {
         expect(formatShift(-0.1)).toBe('−0.1 с')
         expect(formatShift(-0.05)).toBe('−0.05 с')
         expect(formatShift(1.25)).toBe('+1.25 с')
+    })
+
+    it('вставка готового .lrc: форматы меток, метаданные, повторы', () => {
+        const r = parsePastedLrc(
+            '[ar:frnk ness]\r\n[ti:FAAA]\n[00:01.5]Раз\n[00:02.345]Два\n[00:03:10]Три\n[00:04]Четыре\n[00:10.00][00:20.00]Припев\nбез метки\n[00:30.00]\n\n'
+        )
+        expect(r.lines).toEqual([
+            { text: 'Раз', time: 1.5 },
+            { text: 'Два', time: 2.35 },
+            { text: 'Три', time: 3.1 },
+            { text: 'Четыре', time: 4 },
+            { text: 'Припев', time: 10 },
+            { text: 'Припев', time: 20 }
+        ])
+        expect(r.skipped).toBe(2)
+        // То, что собрали из вставки, сохраняется в формате сайта.
+        expect(buildLrc(r.lines)).toBe('[00:01.50]Раз\n[00:02.35]Два\n[00:03.10]Три\n[00:04.00]Четыре\n[00:10.00]Припев\n[00:20.00]Припев\n')
+    })
+
+    it('вставка: строки по времени, при равном времени — по порядку', () => {
+        expect(parsePastedLrc('[00:05.00]Б\n[00:01.00]А\n[00:05.00]В').lines.map((l) => l.text)).toEqual(['А', 'Б', 'В'])
+        expect(parsePastedLrc('просто текст').lines).toEqual([])
     })
 
     it('строки не по порядку', () => {

@@ -21,12 +21,29 @@ const state = reactive({
 })
 
 let inflight: Promise<void> | null = null
+/** Последний свой коммит в этой вкладке. */
+let lastCommit: { sha: string; prev: string } | null = null
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function doLoad() {
+/**
+ * after — только что сделанный коммит: sha (новая вершина) и prev (база,
+ * поверх которой он сделан). Сразу после коммита GitHub иногда ещё отдаёт
+ * прошлую вершину; раньше она затирала уже известный новый sha, и следующее
+ * сохранение падало с «данные изменились» без всякой чужой правки.
+ */
+async function doLoad(after?: { sha: string; prev: string }) {
     state.loading = true
     state.error = ''
     try {
-        const head = await fetchHead()
+        let head = await fetchHead()
+        for (let i = 0; after && head.sha === after.prev && i < 4; i++) {
+            await sleep(500 * (i + 1))
+            head = await fetchHead()
+        }
+        // GitHub так и не отдал новую вершину (или это загрузка, начатая ещё
+        // до коммита) — оставляем свой sha и прежние данные, а не
+        // откатываемся на устаревшие.
+        if (lastCommit && head.sha === lastCommit.prev) return
         const files = await readFiles(head.sha, [RELEASES_PATH, SITE_PATH])
         if (!files[RELEASES_PATH]) throw new AdminApiError('missing', 404, `В репозитории нет ${RELEASES_PATH}`)
         state.releases = JSON.parse(files[RELEASES_PATH]!) as Releases
@@ -40,13 +57,16 @@ async function doLoad() {
     }
 }
 
-function load(force = false): Promise<void> {
-    if (inflight) return inflight
+function load(force = false, after?: { sha: string; prev: string }): Promise<void> {
+    if (inflight && !after) return inflight
     if (state.releases && !force) return Promise.resolve()
-    inflight = doLoad().finally(() => {
-        inflight = null
+    // Загрузка после своего коммита ждёт текущую, а не переиспользует её:
+    // та могла начаться до коммита и вернуть прошлую вершину.
+    const p: Promise<void> = (inflight ?? Promise.resolve()).then(() => doLoad(after)).finally(() => {
+        if (inflight === p) inflight = null
     })
-    return inflight
+    inflight = p
+    return p
 }
 
 /**
@@ -54,8 +74,10 @@ function load(force = false): Promise<void> {
  * остальное (дерево, JSON) обновляется в фоне.
  */
 function afterCommit(sha: string) {
+    const prev = state.sha
+    lastCommit = { sha, prev }
     state.sha = sha
-    load(true)
+    load(true, lastCommit)
 }
 
 export function useRepo() {

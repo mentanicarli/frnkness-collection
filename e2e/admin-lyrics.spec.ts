@@ -123,20 +123,63 @@ test('пустой текст: «Текст будет позже», .notes.json
     expect(files).toEqual([{ path: 'lyrics/album3/03-come-n-team.txt', content: '[Куплет 1]\nПервая строка\n' }])
 })
 
-test('конфликт: ветка ушла вперёд — понятная ошибка, правки не теряются', async ({ page }) => {
+test('конфликт: тот же файл изменили — кто и что, скачать свой вариант, черновик после перезагрузки', async ({ page }) => {
     // Трек без разборов: текст заменяется целиком, висящих разборов не будет.
+    const path = 'lyrics/album3/03-come-n-team.txt'
+    let conflict = true
     await openEditor(page, '#/lyrics/born-to-be-deluxe/2', {
-        commit: () => ({ status: 409, body: { error: 'conflict', message: 'Данные на сайте изменились, пока ты редактировал. Обнови страницу и повтори правку.' } })
+        commit: () =>
+            conflict
+                ? {
+                      status: 409,
+                      body: {
+                          error: 'conflict',
+                          message: 'Пока ты редактировал, этот файл изменили в main',
+                          details: [`${path} (anna@example.com)`],
+                          conflicts: [{ path, commits: [{ sha: '7'.repeat(40), message: 'admin: текст «come n team»', user: 'anna@example.com', date: '2026-10-05T10:00:00Z' }] }],
+                          head: HEAD_SHA
+                      }
+                  }
+                : undefined
     })
     await lyricsInput(page).fill('Новый текст')
     await page.getByRole('button', { name: 'Сохранить…' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: 'Опубликовать' }).click()
-    await expect(dialog.getByRole('alert')).toContainText('Данные на сайте изменились')
-    await expect(dialog.getByRole('button', { name: 'обнови страницу' })).toBeVisible()
+    await expect(dialog.getByRole('alert')).toContainText('этот файл изменили в main')
+    const panel = dialog.getByTestId('conflict')
+    await expect(panel).toContainText(path)
+    await expect(panel).toContainText('admin: текст «come n team» — anna@example.com')
+    await expect(panel).toContainText('черновик сохранён в этом браузере')
     await expect(dialog.getByRole('button', { name: 'Опубликовать' })).toBeDisabled()
-    await dialog.getByRole('button', { name: 'Отмена' }).click()
+
+    // Скачать свой вариант.
+    const [download] = await Promise.all([page.waitForEvent('download'), panel.getByRole('button', { name: 'Скачать мой вариант' }).click()])
+    expect(download.suggestedFilename()).toBe('03-come-n-team.txt')
+    const fs = await import('node:fs')
+    expect(fs.readFileSync((await download.path())!, 'utf8')).toBe('Новый текст')
+
+    // Что изменилось: «−» — сейчас в main, «+» — свой вариант.
+    await panel.getByRole('button', { name: 'Что изменилось' }).click()
+    await expect(panel.getByTestId('conflict-diff').locator('.add')).toHaveText(['+Новый текст'])
+    await expect(panel.getByTestId('conflict-diff').locator('.del').first()).toBeVisible()
+
+    await dialog.getByRole('button', { name: 'Закрыть' }).click()
     await expect(lyricsInput(page)).toHaveValue('Новый текст')
+
+    // Перезагрузка: работа не потеряна — черновик предлагается восстановить.
+    conflict = false
+    await page.reload()
+    await expect(page.getByTestId('draft-offer')).toContainText('Есть несохранённый черновик (admin@example.com)')
+    await expect(lyricsInput(page)).not.toHaveValue('Новый текст')
+    await page.getByRole('button', { name: 'Восстановить черновик' }).click()
+    await expect(lyricsInput(page)).toHaveValue('Новый текст')
+    await expect(page.getByText('Есть несохранённые изменения')).toBeVisible()
+    await page.getByRole('button', { name: 'Сохранить…' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'Опубликовать' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // После успешного сохранения черновика нет.
+    expect(await page.evaluate((p) => localStorage.getItem(`adm-draft:lyrics:${p}`), path)).toBeNull()
 })
 
 test('ошибка сборки — ссылка на запуск в GitHub Actions', async ({ page }) => {

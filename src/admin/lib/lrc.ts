@@ -48,6 +48,45 @@ export function buildLrc(lines: LrcLine[]): string {
     return timed.map((l) => `[${formatLrcTime(l.time)}]${l.text}`).join('\n') + '\n'
 }
 
+/**
+ * Готовый .lrc, вставленный в синхронизатор (из другой программы или с
+ * сайта). Принимает [mm:ss], [mm:ss.x], [mm:ss.xx], [mm:ss.xxx], [mm:ss:xx]
+ * и несколько меток на строке (повтор припева). Метаданные ([ar:…], [ti:…])
+ * и строки без метки или без текста пропускаются — их число в skipped.
+ * Время округляется до сотых, строки идут по времени.
+ */
+export function parsePastedLrc(text: string): { lines: { text: string; time: number }[]; skipped: number } {
+    const out: { text: string; time: number; order: number }[] = []
+    let skipped = 0
+    const stamp = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g
+    text.replace(/\r\n?/g, '\n')
+        .split('\n')
+        .forEach((raw) => {
+            const line = raw.trim()
+            if (!line) return
+            if (/^\[[a-z#]+:.*\]$/i.test(line)) return // метаданные
+            const times: number[] = []
+            let rest = line
+            stamp.lastIndex = 0
+            let m: RegExpExecArray | null
+            while ((m = stamp.exec(rest)) && m.index === 0) {
+                // В целых миллисекундах: 2.345 с в плавающей точке округлилось бы вниз.
+                const ms = (Number(m[1]) * 60 + Number(m[2])) * 1000 + (m[3] ? Number(m[3].padEnd(3, '0')) : 0)
+                times.push(Math.round(ms / 10) / 100)
+                rest = rest.slice(m[0].length)
+                stamp.lastIndex = 0
+            }
+            const body = cleanLrcText(rest)
+            if (!times.length || !body) {
+                skipped++
+                return
+            }
+            for (const time of times) out.push({ text: body, time, order: out.length })
+        })
+    out.sort((a, b) => a.time - b.time || a.order - b.order)
+    return { lines: out.map(({ text, time }) => ({ text, time })), skipped }
+}
+
 export function linesFromLrc(lrc: string): LrcLine[] {
     return parseLRC(lrc.replace(/\r\n?/g, '\n')).map((l) => ({ text: l.text, time: l.time }))
 }

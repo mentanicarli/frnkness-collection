@@ -21,6 +21,7 @@
                 <span class="adm-spacer"></span>
                 <a class="adm-link adm-small" :href="siteTrackUrl" target="_blank" rel="noopener">Открыть на сайте</a>
             </div>
+            <DraftBanner :draft="draft.offer.value" :stale="draft.offerStale.value" @restore="draft.restore" @discard="draft.discard" />
 
             <AudioPlayer :player="player" :src="audioUrl" :path="paths.audio" sticky>
                 <div class="adm-row adm-player-extra">
@@ -163,6 +164,9 @@ import { getTrackSlug } from '@/utils/slug'
 import { isNotesEmpty, noteFor, normalizeNewlines, parseNotes, removeNote, serializeNotes, setNote } from '../lib/notesEdit'
 import { audioPath, lrcPath, notesPath, siteUrl, txtPath } from '../lib/paths'
 import AudioPlayer from '../components/AudioPlayer.vue'
+import DraftBanner from '../components/DraftBanner.vue'
+import { useDraft } from '../composables/useDraft'
+import { draftKey } from '../lib/drafts'
 import { REWIND_SEC, useAudioPlayer } from '../composables/useAudioPlayer'
 import { linesFromLrc } from '../lib/lrc'
 import { activeLine, lineTime, songLines, syncPoints } from '../lib/lyricsSync'
@@ -227,6 +231,26 @@ const notesChanged = computed(() => {
 })
 const dirty = computed(() => loaded.value && (textChanged.value || notesChanged.value))
 const confirmLeave = useUnsaved(dirty)
+
+// Версия main, на которой загружены текст и разборы: при сохранении
+// конфликт — только если эти файлы с тех пор изменили.
+const loadedSha = ref('')
+
+// Черновик в браузере: текст, «О треке» и разборы.
+const draft = useDraft<{ text: string; about: string; annotations: TrackAnnotation[] }>({
+    key: computed(() => (loaded.value && paths.value.txt ? draftKey('lyrics', paths.value.txt) : '')),
+    ready: loaded,
+    dirty,
+    snapshot: () => ({ text: text.value, about: about.value, annotations: annotations.value }),
+    original: () => original.value.text + '\n--\n' + (original.value.notesRaw ?? ''),
+    baseSha: () => loadedSha.value,
+    apply: (d) => {
+        text.value = String(d.text ?? '')
+        about.value = String(d.about ?? '')
+        annotations.value = Array.isArray(d.annotations) ? d.annotations : []
+        editing.value = -1
+    }
+})
 
 const validation = computed(() => {
     let parsed: unknown
@@ -373,8 +397,10 @@ async function loadTrack() {
     const token = ++loadToken
     loading.value = true
     try {
-        const files = await readFiles(repo.state.sha, [paths.value.txt, paths.value.notes, paths.value.lrc])
+        const base = repo.state.sha
+        const files = await readFiles(base, [paths.value.txt, paths.value.notes, paths.value.lrc])
         if (token !== loadToken) return
+        loadedSha.value = base
         lrcRaw.value = files[paths.value.lrc] ?? null
         const parsed = parseNotes(files[paths.value.notes])
         if (parsed.error) throw new AdminApiError('notes', 0, parsed.error)
@@ -406,6 +432,7 @@ function reset() {
 function select(id: string, index: number) {
     if (id === releaseId.value && index === trackIndex.value) return
     if (!confirmLeave()) return
+    draft.flush()
     player.pause()
     loaded.value = false
     if (index >= 0) navigate('lyrics', id, index)
@@ -465,9 +492,13 @@ async function save() {
         message: `${parts.join(', ')} «${track.value.title}» (${release.value.title})`,
         files: files.map(({ path, kind }) => ({ path, kind })),
         notes: [],
-        prepare: async () => files.map(({ path, content }) => ({ path, content }))
+        prepare: async () => files.map(({ path, content }) => ({ path, content })),
+        baseSha: loadedSha.value,
+        draft: true
     })
     if (!result) return
+    loadedSha.value = result.sha
+    draft.clear()
     original.value = {
         text: normalizeNewlines(text.value),
         notesRaw: notesChanged.value || original.value.notesRaw !== null ? notesSerialized.value : null,

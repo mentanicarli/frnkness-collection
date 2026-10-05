@@ -24,7 +24,9 @@ import { parseTokenExpiration } from '../_shared/tokenExpiry.ts'
 import {
     RELEASES_PATH,
     SITE_PATH,
+    commitUser,
     isAdminCommit,
+    withCommitUser,
     planRevert,
     removedReleaseIds,
     revertMessage,
@@ -84,6 +86,8 @@ export interface HandlerDeps {
     }
     toBase64(bytes: Uint8Array): string
     now(): number
+    /** Пауза перед повторной попыткой коммита; в тестах — без ожидания. */
+    sleep?(ms: number): Promise<void>
     /** Прослушивания релизов (из play_counts) — для защиты статистики при откате. */
     playsFor(releaseIds: string[]): Promise<Record<string, number>>
 }
@@ -93,11 +97,25 @@ class HttpError extends Error {
         public status: number,
         public code: string,
         message: string,
-        public details?: string[]
+        public details?: string[],
+        /** Доп. поля ответа (например, какие файлы и кем изменены при конфликте). */
+        public extra?: Record<string, unknown>
     ) {
         super(message)
     }
 }
+
+/** Файл, который изменили в main после того, как его загрузили в админку. */
+export interface FileConflict {
+    path: string
+    commits: { sha: string; message: string; user: string | null; date: string | null }[]
+}
+
+// Сколько раз пробовать заново, если ветка сдвинулась между чтением и записью
+// или GitHub отдал устаревшую версию ветки (бывает сразу после коммита).
+const COMMIT_ATTEMPTS = 4
+const RETRY_DELAYS_MS = [250, 600, 1200]
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const SHA_RE = /^[0-9a-f]{40}$/
 
@@ -299,7 +317,7 @@ export function createHandler(deps: HandlerDeps) {
         }
     }
 
-    async function commit(body: Record<string, unknown>) {
+    async function commit(body: Record<string, unknown>, user: AuthUser) {
         const baseSha = body.baseSha
         const rawMessage = body.message
         const files = body.files
@@ -368,7 +386,7 @@ export function createHandler(deps: HandlerDeps) {
         }
         if (errors.length) throw new HttpError(422, 'validation', 'Коммит отклонён', errors)
 
-        // Содержательные проверки JSON.
+        // Содержательные проверки JSON, не зависящие от версии репозитория.
         for (const [p, content] of textByPath) {
             if (p.toLowerCase().endsWith('.notes.json')) {
                 const problems = validateTrackNotes(parseJson(content, p))
@@ -377,50 +395,154 @@ export function createHandler(deps: HandlerDeps) {
                 parseJson(content, p)
             }
         }
-        const RELEASES = 'src/content/releases.json'
-        const SITE = 'src/content/site.json'
-        let registry: unknown = null
-        if (textByPath.has(RELEASES)) {
-            const before = await readFile(RELEASES, baseSha)
-            registry = parseJson(textByPath.get(RELEASES)!, RELEASES)
-            errors.push(...checkRegistryChange(before === null ? {} : parseJson(before, RELEASES), registry))
-        }
-        if (textByPath.has(SITE)) {
-            if (registry === null) {
-                const current = await readFile(RELEASES, baseSha)
-                registry = current === null ? {} : parseJson(current, RELEASES)
-            }
-            const site = parseJson(textByPath.get(SITE)!, SITE)
-            errors.push(...validateSiteSettings(site, registry))
-            // Обложка анонса должна быть в этом коммите или уже в репозитории.
-            const cover = (site as { announce?: { cover?: unknown } })?.announce?.cover
-            if (typeof cover === 'string' && !(seen.has(cover) && !deletes.includes(cover)) && !(await fileExists(cover, baseSha))) {
-                errors.push(`обложка анонса не найдена: ${cover}`)
-            }
-        }
-        if (deletes.length) {
-            // Удалять можно только заменяемую обложку/PDF, на которую новая
-            // версия реестра (или site.json) больше не ссылается.
-            const baseReleases = await readFile(RELEASES, baseSha)
-            const baseSite = await readFile(SITE, baseSha)
-            const before = {
-                registry: baseReleases === null ? {} : parseJson(baseReleases, RELEASES),
-                site: baseSite === null ? {} : parseJson(baseSite, SITE)
-            }
-            const after = {
-                registry: textByPath.has(RELEASES) ? parseJson(textByPath.get(RELEASES)!, RELEASES) : before.registry,
-                site: textByPath.has(SITE) ? parseJson(textByPath.get(SITE)!, SITE) : before.site
-            }
-            errors.push(...checkDeletions(deletes, before, after))
-        }
         if (errors.length) throw new HttpError(422, 'validation', 'Коммит отклонён', errors)
 
-        // Удаляем только то, что действительно есть в базовой версии.
-        for (const p of deletes) {
-            if (await fileExists(p, baseSha)) treeEntries.push({ path: p, mode: '100644', type: 'blob', sha: null })
+        /**
+         * Проверки, которые читают репозиторий, — на той версии, поверх которой
+         * пойдёт коммит (актуальный main), а не на той, что видел браузер:
+         * между ними могли поменяться другие файлы (реестр, обложки).
+         */
+        async function checkAgainst(ref: string): Promise<TreeEntry[]> {
+            const errors: string[] = []
+            let registry: unknown = null
+            if (textByPath.has(RELEASES_PATH)) {
+                const before = await readFile(RELEASES_PATH, ref)
+                registry = parseJson(textByPath.get(RELEASES_PATH)!, RELEASES_PATH)
+                errors.push(...checkRegistryChange(before === null ? {} : parseJson(before, RELEASES_PATH), registry))
+            }
+            if (textByPath.has(SITE_PATH)) {
+                if (registry === null) {
+                    const current = await readFile(RELEASES_PATH, ref)
+                    registry = current === null ? {} : parseJson(current, RELEASES_PATH)
+                }
+                const site = parseJson(textByPath.get(SITE_PATH)!, SITE_PATH)
+                errors.push(...validateSiteSettings(site, registry))
+                // Обложка анонса должна быть в этом коммите или уже в репозитории.
+                const cover = (site as { announce?: { cover?: unknown } })?.announce?.cover
+                if (typeof cover === 'string' && !(seen.has(cover) && !deletes.includes(cover)) && !(await fileExists(cover, ref))) {
+                    errors.push(`обложка анонса не найдена: ${cover}`)
+                }
+            }
+            if (deletes.length) {
+                // Удалять можно только заменяемую обложку/PDF, на которую новая
+                // версия реестра (или site.json) больше не ссылается.
+                const baseReleases = await readFile(RELEASES_PATH, ref)
+                const baseSite = await readFile(SITE_PATH, ref)
+                const before = {
+                    registry: baseReleases === null ? {} : parseJson(baseReleases, RELEASES_PATH),
+                    site: baseSite === null ? {} : parseJson(baseSite, SITE_PATH)
+                }
+                const after = {
+                    registry: textByPath.has(RELEASES_PATH) ? parseJson(textByPath.get(RELEASES_PATH)!, RELEASES_PATH) : before.registry,
+                    site: textByPath.has(SITE_PATH) ? parseJson(textByPath.get(SITE_PATH)!, SITE_PATH) : before.site
+                }
+                errors.push(...checkDeletions(deletes, before, after))
+            }
+            if (errors.length) throw new HttpError(422, 'validation', 'Коммит отклонён', errors)
+            // Удаляем только то, что действительно есть в этой версии.
+            const removals: TreeEntry[] = []
+            for (const p of deletes) {
+                if (await fileExists(p, ref)) removals.push({ path: p, mode: '100644', type: 'blob', sha: null })
+            }
+            return [...treeEntries, ...removals]
         }
 
-        return writeCommit(baseSha, message, treeEntries)
+        const fullMessage = withCommitUser(message, user.email)
+        const touched = [...seen]
+        for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
+            if (attempt > 0) await (deps.sleep ?? sleep)(RETRY_DELAYS_MS[attempt - 1] ?? 1500)
+            const head = await headSha()
+            if (head !== baseSha) {
+                const status = await conflictsSince(baseSha, head, touched)
+                // GitHub отдал версию ветки старше той, что уже видел браузер, —
+                // так бывает сразу после коммита. Ждём и читаем заново.
+                if (status === 'stale') continue
+                if (status.length) throw conflictError(status, head)
+            }
+            const entries = await checkAgainst(head)
+            const result = await writeCommit(head, fullMessage, entries)
+            if (result === 'race') continue
+            return { ...result, message }
+        }
+        throw new HttpError(409, 'conflict', 'Ветка main всё время меняется — подожди немного и сохрани ещё раз. Твои правки на странице не потеряны.')
+    }
+
+    /**
+     * Какие из файлов коммита изменились в main между base (что видел
+     * браузер) и head. 'stale' — head старше base (устаревшее чтение ветки).
+     */
+    async function conflictsSince(base: string, head: string, paths: string[]): Promise<FileConflict[] | 'stale'> {
+        const cmp = await ghJson<{ status: string; commits: GhCommit[]; files?: CommitFileChange[] }>(
+            `${repoPath()}/compare/${base}...${head}`
+        )
+        if (cmp.status === 'behind') return 'stale'
+        if (cmp.status === 'identical') return []
+        let changed: Set<string>
+        const files = cmp.files ?? []
+        if (cmp.status === 'ahead' && files.length < 300) {
+            changed = new Set(files.flatMap((f) => [f.filename, ...(f.previous_filename ? [f.previous_filename] : [])]))
+        } else {
+            // Список файлов в compare обрезается на 300, а при расхождении веток
+            // (diverged) он считается от общего предка — сверяем blob напрямую.
+            changed = await changedBlobs(base, head, paths)
+        }
+        const hit = paths.filter((p) => changed.has(p))
+        if (!hit.length) return []
+        // Кто и когда менял эти файлы — для понятного сообщения. Ошибка здесь
+        // не должна прятать сам конфликт.
+        const after = new Set(cmp.commits.map((c) => c.sha))
+        return Promise.all(
+            hit.map(async (path): Promise<FileConflict> => {
+                try {
+                    const list = await ghJson<GhCommit[]>(`${repoPath()}/commits?sha=${head}&path=${encodeURIComponent(path)}&per_page=20`)
+                    return {
+                        path,
+                        commits: list
+                            .filter((c) => after.has(c.sha))
+                            .map((c) => ({
+                                sha: c.sha,
+                                message: firstLine(c.commit.message),
+                                user: commitUser(c.commit.message) ?? c.commit.author?.name ?? null,
+                                date: c.commit.committer?.date ?? c.commit.author?.date ?? null
+                            }))
+                    }
+                } catch {
+                    return { path, commits: [] }
+                }
+            })
+        )
+    }
+
+    async function treeBlobs(ref: string): Promise<Map<string, string> | null> {
+        const c = await ghJson<{ tree: { sha: string } }>(`${repoPath()}/git/commits/${ref}`)
+        const t = await ghJson<{ truncated?: boolean; tree: { path: string; type: string; sha: string }[] }>(
+            `${repoPath()}/git/trees/${c.tree.sha}?recursive=1`
+        )
+        if (t.truncated) return null
+        return new Map(t.tree.filter((e) => e.type === 'blob').map((e) => [e.path, e.sha]))
+    }
+
+    async function changedBlobs(base: string, head: string, paths: string[]): Promise<Set<string>> {
+        const [a, b] = await Promise.all([treeBlobs(base), treeBlobs(head)])
+        // Дерево не поместилось в ответ — считаем изменёнными все файлы (без риска перезаписи).
+        if (!a || !b) return new Set(paths)
+        return new Set(paths.filter((p) => (a.get(p) ?? null) !== (b.get(p) ?? null)))
+    }
+
+    function conflictError(conflicts: FileConflict[], head: string) {
+        const who = (c: FileConflict) => {
+            const users = [...new Set(c.commits.map((x) => x.user).filter(Boolean))]
+            return users.length ? ` (${users.join(', ')})` : ''
+        }
+        return new HttpError(
+            409,
+            'conflict',
+            conflicts.length === 1
+                ? 'Пока ты редактировал, этот файл изменили в main'
+                : 'Пока ты редактировал, эти файлы изменили в main',
+            conflicts.map((c) => `${c.path}${who(c)}`),
+            { conflicts, head }
+        )
     }
 
     async function fileExists(path: string, ref: string): Promise<boolean> {
@@ -430,12 +552,10 @@ export function createHandler(deps: HandlerDeps) {
 
     /**
      * Один коммит поверх baseSha: дерево → коммит → перенос ветки без force.
-     * Если ветка ушла вперёд — 409, ничего не перезаписывается.
+     * Если ветка успела уйти вперёд — 'race', ничего не перезаписывается:
+     * вызывающий решает, пробовать ли снова поверх новой версии.
      */
-    async function writeCommit(baseSha: string, message: string, treeEntries: TreeEntry[]) {
-        const conflict = () => new HttpError(409, 'conflict', 'Данные на сайте изменились, пока ты редактировал. Обнови страницу и повтори правку.')
-        if ((await headSha()) !== baseSha) throw conflict()
-
+    async function writeCommit(baseSha: string, message: string, treeEntries: TreeEntry[]): Promise<{ sha: string; url: string; message: string } | 'race'> {
         const baseCommit = await ghJson<{ tree: { sha: string } }>(`${repoPath()}/git/commits/${baseSha}`)
         const tree = await ghJson<{ sha: string }>(`${repoPath()}/git/trees`, {
             method: 'POST',
@@ -463,7 +583,7 @@ export function createHandler(deps: HandlerDeps) {
             if (/protected branch/i.test(text)) {
                 throw new HttpError(502, 'github_branch_protected', 'Ветка main защищена правилами GitHub — коммит из админки невозможен')
             }
-            throw conflict()
+            return 'race'
         }
         if (res.status === 401) throw new HttpError(502, 'github_token_invalid', 'Токен GitHub недействителен — обнови его в секретах функции')
         if (res.status === 403) throw new HttpError(502, 'github_forbidden', 'У токена GitHub не хватает прав (нужны Contents: read/write и Actions: read)')
@@ -485,6 +605,8 @@ export function createHandler(deps: HandlerDeps) {
                 message: firstLine(c.commit.message),
                 date: c.commit.committer?.date ?? c.commit.author?.date ?? null,
                 author: c.commit.author?.name ?? null,
+                // Кто из админов сделал правку — строка Admin-User в сообщении коммита.
+                user: commitUser(c.commit.message),
                 source: isAdminCommit(c.commit.message) ? 'admin' : 'code',
                 files: (c.files ?? []).map((f) => ({ path: f.filename, status: f.status, previous: f.previous_filename ?? null }))
             }))
@@ -582,7 +704,7 @@ export function createHandler(deps: HandlerDeps) {
         }
     }
 
-    async function revert(body: Record<string, unknown>) {
+    async function revert(body: Record<string, unknown>, user: AuthUser) {
         const baseSha = body.baseSha
         if (typeof baseSha !== 'string' || !SHA_RE.test(baseSha)) throw new HttpError(400, 'bad_request', 'Нужен baseSha')
         const { head, commit, plan } = await buildRevert(body)
@@ -594,7 +716,10 @@ export function createHandler(deps: HandlerDeps) {
             ]
             throw new HttpError(422, 'revert_blocked', 'Откат невозможен', details.length ? details : ['Откатывать нечего'])
         }
-        return writeCommit(head, revertMessage(commit.commit.message), plan.entries as TreeEntry[])
+        const message = revertMessage(commit.commit.message)
+        const result = await writeCommit(head, withCommitUser(message, user.email), plan.entries as TreeEntry[])
+        if (result === 'race') throw new HttpError(409, 'conflict', 'Данные на сайте изменились, пока ты смотрел историю. Обнови страницу и повтори откат.')
+        return { ...result, message }
     }
 
     async function deployStatus(body: Record<string, unknown>) {
@@ -653,7 +778,7 @@ export function createHandler(deps: HandlerDeps) {
                 case 'stage-blob':
                     return json(200, await stageBlob(body))
                 case 'commit':
-                    return json(200, await commit(body))
+                    return json(200, await commit(body, user))
                 case 'deploy-status':
                     return json(200, await deployStatus(body))
                 case 'history':
@@ -661,12 +786,12 @@ export function createHandler(deps: HandlerDeps) {
                 case 'revert-preview':
                     return json(200, await revertPreview(body))
                 case 'revert':
-                    return json(200, await revert(body))
+                    return json(200, await revert(body, user))
                 default:
                     throw new HttpError(400, 'bad_request', 'Неизвестное действие')
             }
         } catch (e) {
-            if (e instanceof HttpError) return json(e.status, { error: e.code, message: e.message, details: e.details })
+            if (e instanceof HttpError) return json(e.status, { ...e.extra, error: e.code, message: e.message, details: e.details })
             console.error(e)
             return json(500, { error: 'internal', message: 'Внутренняя ошибка функции' })
         }

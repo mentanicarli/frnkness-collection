@@ -43,6 +43,24 @@ export function isAdminCommit(message: string): boolean {
     return message.startsWith('admin: ')
 }
 
+/**
+ * Автор правки из админки — отдельной строкой-трейлером после пустой строки:
+ * «admin: …\n\nAdmin-User: user@example.com». Первая строка сообщения
+ * (её показывают история и GitHub) не меняется. Email берётся из входа на
+ * сервере, а не из запроса браузера.
+ */
+const USER_TRAILER = 'Admin-User'
+
+export function withCommitUser(message: string, email: string | null | undefined): string {
+    const clean = (email ?? '').replace(/[\r\n]/g, '').trim()
+    return clean ? `${message}\n\n${USER_TRAILER}: ${clean}` : message
+}
+
+export function commitUser(message: string): string | null {
+    const m = message.match(new RegExp(`^${USER_TRAILER}: (.+)$`, 'm'))
+    return m ? m[1].trim() : null
+}
+
 export function revertMessage(message: string): string {
     const first = message.split('\n')[0].replace(/^admin: /, '')
     const short = first.length > 150 ? first.slice(0, 149) + '…' : first

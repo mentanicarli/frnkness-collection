@@ -7,7 +7,9 @@ export class AdminApiError extends Error {
         public code: string,
         public status: number,
         message: string,
-        public details: string[] = []
+        public details: string[] = [],
+        /** Остальные поля ответа функции (например, conflicts при 409). */
+        public data: Record<string, unknown> = {}
     ) {
         super(message)
     }
@@ -53,7 +55,7 @@ export async function callContent<T>(action: string, payload: Record<string, unk
                 : `Ошибка функции admin-content (${res.status})`
             throw new AdminApiError('gateway', res.status, msg)
         }
-        throw new AdminApiError(body.error || 'http', res.status, body.message, body.details || [])
+        throw new AdminApiError(body.error || 'http', res.status, body.message, body.details || [], body)
     }
     return body as T
 }
@@ -114,8 +116,24 @@ export interface CommitResult {
     message: string
 }
 
+/**
+ * Коммит поверх актуального main. baseSha — версия, на которой файлы были
+ * загружены в админку: функция откажет (409 + conflicts), только если
+ * именно эти файлы с тех пор изменились в main.
+ */
 export const commitFiles = (baseSha: string, message: string, files: CommitFile[]) =>
     callContent<CommitResult>('commit', { baseSha, message, files })
+
+/** Файл, который изменили в main после загрузки в админку (ответ 409). */
+export interface FileConflict {
+    path: string
+    commits: { sha: string; message: string; user: string | null; date: string | null }[]
+}
+
+export function conflictsOf(e: AdminApiError): { conflicts: FileConflict[]; head: string | null } {
+    const list = Array.isArray(e.data.conflicts) ? (e.data.conflicts as FileConflict[]) : []
+    return { conflicts: list, head: typeof e.data.head === 'string' ? e.data.head : null }
+}
 
 export const stageBlob = (stagingPath: string, path: string) => callContent<StagedBlob>('stage-blob', { stagingPath, path })
 
@@ -152,6 +170,8 @@ export interface HistoryCommit {
     message: string
     date: string | null
     author: string | null
+    /** Email админа, сделавшего правку (строка Admin-User); null — старые коммиты и коммиты из кода. */
+    user?: string | null
     source: 'admin' | 'code'
     files: { path: string; status: string; previous: string | null }[]
 }
