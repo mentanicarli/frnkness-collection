@@ -355,25 +355,38 @@ describe('SQL из инструкции (supabase/setup)', () => {
         await applyMigrations(db)
     }, 60_000)
 
-    const ownerSql = (rows: string) => read('accounts_owner.sql').replace(/\('ТВОЙ_EMAIL@example\.com'[\s\S]*?'admin'\)/, rows)
-
-    // Ошибка в середине скрипта — вся транзакция откатывается (как в SQL Editor).
-    const fails = async (sql: string, re: RegExp) => {
-        await expect(db.exec(sql)).rejects.toThrow(re)
-        await db.exec('rollback')
+    // Подставляет значения в блок «ПАРАМЕТРЫ», как это делает человек в SQL Editor.
+    const ownerSql = (rows: [string, string, string][]) => {
+        const json = JSON.stringify(rows.map(([old_email, nick, role]) => ({ old_email, nick, role })))
+        const sql = read('accounts_owner.sql')
+        const out = sql.replace(/(-- ПАРАМЕТРЫ: начало\n\s*params constant jsonb := ')[\s\S]*?(';\n\s*-- ПАРАМЕТРЫ: конец)/, `$1${json}$2`)
+        expect(out).not.toBe(sql)
+        return out
     }
 
-    it('проверяет ник и находит аккаунт до любых изменений', async () => {
-        await fails(ownerSql("('owner@example.com', 'ab', 'owner')"), /не подходит/)
-        await fails(ownerSql("('nobody@example.com', 'frnkness', 'owner')"), /Не найден аккаунт/)
-        await fails(ownerSql("('owner@example.com', 'frnk.ness', 'owner'), ('admin@example.com', 'FRNK_NESS', 'admin')"), /совпадают/)
-        expect((await one(`select email from auth.users where id = '${OWNER.sub}'`)).email).toBe('owner@example.com')
+    it('без временных таблиц и транзакций, которые может разорвать SQL Editor', () => {
+        const sql = read('accounts_owner.sql').replace(/--.*$/gm, '')
+        expect(sql).not.toMatch(/\btemp(orary)?\b|\bbegin;|\bcommit;/i)
+    })
+
+    it('проверяет ник и находит аккаунт до любых изменений; при ошибке не меняет ничего', async () => {
+        await expect(db.exec(ownerSql([['owner@example.com', 'ab', 'owner']]))).rejects.toThrow(/не подходит/)
+        await expect(db.exec(ownerSql([['nobody@example.com', 'frnkness', 'owner']]))).rejects.toThrow(/Не найден аккаунт/)
+        await expect(
+            db.exec(ownerSql([['owner@example.com', 'frnk.ness', 'owner'], ['admin@example.com', 'FRNK_NESS', 'admin']]))
+        ).rejects.toThrow(/совпадают/)
+        // Ошибка на втором аккаунте — первый тоже не тронут.
+        await expect(db.exec(ownerSql([['owner@example.com', 'frnkness', 'owner'], ['nobody@example.com', 'Друг', 'admin']]))).rejects.toThrow(/Не найден/)
+        expect((await one(`select email, raw_app_meta_data ->> 'role' r from auth.users where id = '${OWNER.sub}'`))).toEqual({ email: 'owner@example.com', r: 'admin' })
+        expect((await one('select count(*)::int n from public.profiles')).n).toBe(0)
     })
 
     it('выдаёт ники, роли owner/admin и технические адреса; повтор безопасен', async () => {
-        const sql = ownerSql("('owner@example.com', 'frnkness', 'owner'), ('Admin@Example.com', 'Друг', 'admin')")
-        await db.exec(sql)
-        await db.exec(sql)
+        const sql = ownerSql([['owner@example.com', 'frnkness', 'owner'], ['Admin@Example.com', 'Друг', 'admin']])
+        const first = (await db.exec(sql)).at(-1)!.rows
+        expect(first).toHaveLength(2)
+        // Повтор — старых email уже нет, аккаунты находятся по нику; та же итоговая таблица.
+        expect((await db.exec(sql)).at(-1)!.rows).toEqual(first)
         const rows = (await db.query<any>(`select p.nick, p.nick_key, u.email, u.raw_app_meta_data ->> 'role' r from auth.users u join public.profiles p on p.id = u.id order by 1`)).rows
         expect(rows).toEqual([
             { nick: 'frnkness', nick_key: nickKey('frnkness'), email: await techEmail('frnkness'), r: 'owner' },
