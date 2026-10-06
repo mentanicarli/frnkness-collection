@@ -64,6 +64,45 @@
 
                 <p v-if="card.bio" class="adm-small adm-muted" style="white-space: pre-wrap; word-break: break-word">«{{ card.bio }}»</p>
 
+                <!-- Музыка и друзья (только чтение и модерация плейлистов) -->
+                <div v-if="social" class="adm-user-social" data-testid="user-social">
+                    <details>
+                        <summary class="adm-label">Избранное · {{ social.favorites.length }}</summary>
+                        <ol class="adm-small" style="margin: 0.25rem 0 0.75rem; padding-left: 1.25rem">
+                            <li v-for="f in social.favorites" :key="f.track_id">{{ trackTitleById(f.track_id) }}</li>
+                        </ol>
+                    </details>
+
+                    <h3 class="adm-label" style="margin-top: 0.75rem">Плейлисты · {{ social.playlists.length }}</h3>
+                    <p v-if="!social.playlists.length" class="adm-small adm-faint">Нет.</p>
+                    <ul class="adm-pl-list">
+                        <li v-for="p in social.playlists" :key="p.id" class="adm-pl" data-testid="admin-playlist">
+                            <div class="adm-row" style="justify-content: space-between">
+                                <span style="min-width: 0; word-break: break-word"><b>{{ p.title }}</b>
+                                    <span class="adm-faint adm-small"> · {{ p.track_count }} тр.<template v-if="p.is_public"> · публичный</template><template v-if="p.cover_version"> · своя обложка</template></span>
+                                </span>
+                            </div>
+                            <p v-if="p.description" class="adm-small adm-muted" style="white-space: pre-wrap; word-break: break-word; margin: 0.25rem 0">{{ p.description }}</p>
+                            <details class="adm-small">
+                                <summary class="adm-faint">Треки</summary>
+                                <ol style="margin: 0.25rem 0; padding-left: 1.25rem"><li v-for="t in p.tracks" :key="t">{{ trackTitleById(t) }}</li></ol>
+                            </details>
+                            <form v-if="can('playlist-rename')" class="adm-row" style="margin-top: 0.375rem" @submit.prevent="renamePlaylist(p)">
+                                <input v-model="playlistTitles[p.id]" class="adm-input" style="flex: 1; min-width: 8rem" maxlength="80" :aria-label="`Новое название плейлиста ${p.title}`" />
+                                <button class="adm-btn adm-btn-sm" type="submit" :disabled="busy || !playlistTitles[p.id]?.trim() || playlistTitles[p.id] === p.title">Переименовать</button>
+                                <button v-if="p.cover_version" class="adm-btn adm-btn-sm" type="button" :disabled="busy" @click="run({ action: 'playlist-cover-remove', playlistId: p.id }, 'Обложка удалена — вернулся коллаж')">Удалить обложку</button>
+                                <button class="adm-btn adm-btn-sm adm-btn-danger" type="button" :disabled="busy" @click="confirmRun(`Удалить плейлист «${p.title}»?`, { action: 'playlist-delete', playlistId: p.id }, 'Плейлист удалён')">Удалить</button>
+                            </form>
+                        </li>
+                    </ul>
+
+                    <h3 class="adm-label" style="margin-top: 0.75rem">Друзья · {{ social.friends.filter((f) => f.status === 'accepted').length }}</h3>
+                    <p v-if="!social.friends.length" class="adm-small adm-faint">Нет.</p>
+                    <ul class="adm-small" style="margin: 0.25rem 0 1rem; padding-left: 1.25rem">
+                        <li v-for="f in social.friends" :key="f.id">{{ f.nick }}<span class="adm-faint"> · {{ FRIEND_LABEL[f.direction] }} с {{ formatDate(f.since) }}</span></li>
+                    </ul>
+                </div>
+
                 <div v-if="notice" class="adm-alert" :class="noticeOk ? 'adm-alert-ok' : 'adm-alert-error'" role="status" data-testid="user-notice">{{ notice }}</div>
 
                 <div class="adm-user-actions">
@@ -129,13 +168,26 @@ import { parseTrackKey } from '@/utils/lyrics'
 import { useAuth } from '../composables/useAuth'
 import { useRepo } from '../composables/useRepo'
 import { AdminApiError } from '../api/content'
-import { fetchUserCard, fetchUsers, generateTempPassword, userAction, type UserAction, type UserCard, type UserRow } from '../api/users'
+import { findTrackById } from '@/utils/trackIds'
+import {
+    type AdminPlaylist,
+    type UserAction,
+    type UserCard,
+    type UserRow,
+    type UserSocial,
+    fetchUserCard,
+    fetchUserSocial,
+    fetchUsers,
+    generateTempPassword,
+    userAction
+} from '../api/users'
 import { formatNumber } from '../lib/format'
 import { formatSeconds } from '../lib/stats'
 import { adminPermission, type AdminAction } from '../../../supabase/functions/_shared/accountsCore.ts'
-import { cleanBio, validateBio, validateNick, validatePassword } from '../../../supabase/functions/_shared/accounts.ts'
+import { cleanBio, cleanPlaylistTitle, validateBio, validateNick, validatePassword, validatePlaylistTitle } from '../../../supabase/functions/_shared/accounts.ts'
 
 const ROLE_LABEL = { user: 'пользователь', admin: 'админ', owner: 'владелец' } as const
+const FRIEND_LABEL = { both: 'друзья', incoming: 'прислал(а) заявку', outgoing: 'ждёт ответа на заявку' } as const
 
 const auth = useAuth()
 const repo = useRepo()
@@ -145,6 +197,8 @@ const loading = ref(false)
 const error = ref('')
 const selectedId = ref<string | null>(null)
 const card = ref<UserCard | null>(null)
+const social = ref<UserSocial | null>(null)
+const playlistTitles = ref<Record<string, string>>({})
 const busy = ref(false)
 const notice = ref('')
 const noticeOk = ref(true)
@@ -161,6 +215,12 @@ function trackTitle(key: string): string {
     const release = parsed && repo.state.releases?.[parsed.releaseId]
     const track = release && release.tracks[parsed!.trackIndex]
     return track ? `${track.title} (${release!.title})` : key
+}
+
+function trackTitleById(id: string): string {
+    const releases = repo.state.releases
+    const ref = releases ? findTrackById(releases, id) : null
+    return ref ? `${releases![ref.releaseId].tracks[ref.trackIndex].title} (${releases![ref.releaseId].title})` : `${id} — нет в каталоге`
 }
 
 const actor = computed(() => ({ id: auth.userId.value, role: auth.role.value }))
@@ -194,20 +254,37 @@ watch(search, () => {
 
 async function loadCard() {
     if (!selectedId.value) return
+    const id = selectedId.value
     try {
-        card.value = await fetchUserCard(selectedId.value)
-        newNick.value = card.value.nick ?? ''
-        newBio.value = card.value.bio ?? ''
+        const [c, s] = await Promise.all([fetchUserCard(id), fetchUserSocial(id).catch(() => null)])
+        if (selectedId.value !== id) return
+        card.value = c
+        social.value = s
+        playlistTitles.value = Object.fromEntries((s?.playlists ?? []).map((p) => [p.id, p.title]))
+        newNick.value = c.nick ?? ''
+        newBio.value = c.bio ?? ''
     } catch (e) {
         noticeOk.value = false
         notice.value = message(e)
     }
 }
 
+async function renamePlaylist(p: AdminPlaylist) {
+    const title = cleanPlaylistTitle(playlistTitles.value[p.id] ?? '')
+    const problem = validatePlaylistTitle(title)
+    if (problem) {
+        noticeOk.value = false
+        notice.value = problem
+        return
+    }
+    await run({ action: 'playlist-rename', playlistId: p.id, title }, `Плейлист переименован в «${title}»`)
+}
+
 function select(id: string) {
     if (selectedId.value === id) return
     selectedId.value = id
     card.value = null
+    social.value = null
     notice.value = ''
     deleteConfirm.value = ''
     tempPassword.value = generateTempPassword()
