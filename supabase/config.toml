@@ -2,7 +2,21 @@
 # `supabase db push` и `supabase functions deploy`.
 project_id = "frnkness-collection"
 
+# Все функции проверяют вход сами (auth.getUser на сервере Auth, роль и бан
+# из базы), а register и recovery-request работают без входа. Проверку JWT
+# на шлюзе выключаем, иначе CORS-preflight (OPTIONS без токена) не проходит.
+
 [functions.admin-content]
-# JWT проверяет сама функция (auth.getUser + роль admin). Проверку на шлюзе
-# выключаем, иначе CORS-preflight (OPTIONS без токена) не проходит.
+verify_jwt = false
+
+[functions.admin-users]
+verify_jwt = false
+
+[functions.account]
+verify_jwt = false
+
+[functions.register]
+verify_jwt = false
+
+[functions.recovery-request]
 verify_jwt = false

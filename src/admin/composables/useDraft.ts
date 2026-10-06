@@ -58,7 +58,7 @@ export function useDraft<T>(opts: {
             baseSha: opts.baseSha(),
             original: opts.original(),
             data: opts.snapshot(),
-            user: auth.email.value || undefined
+            user: auth.state.nick || undefined
         })
     }
     watch([serialized, opts.dirty], () => {

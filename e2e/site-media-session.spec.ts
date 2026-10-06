@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { installMocks } from './mocks'
+import { installMocks, signInSite } from './mocks'
 
 // Основной сайт: Media Session в настоящем Chromium. Обработчики кнопок
 // экрана блокировки перехватываем, чтобы «нажать» их из теста.
@@ -14,6 +14,7 @@ test.beforeEach(async ({ page }) => {
         }
     })
     await installMocks(page)
+    await signInSite(page)
 })
 
 const press = (page: import('@playwright/test').Page, action: string, details: object = {}) =>

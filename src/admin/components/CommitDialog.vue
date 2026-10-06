@@ -6,8 +6,8 @@
                 Будет создан один коммит в ветку <span class="adm-mono">main</span> — сайт обновится через 1–2 минуты после сборки.
             </p>
             <div class="adm-commit-msg adm-mono" data-testid="commit-message">{{ fullMessage }}</div>
-            <p v-if="auth.email.value" class="adm-small adm-faint" style="margin: 0.375rem 0 0" data-testid="commit-author">
-                Автор правки: {{ auth.email.value }} — допишется в коммит
+            <p v-if="auth.state.nick" class="adm-small adm-faint" style="margin: 0.375rem 0 0" data-testid="commit-author">
+                Автор правки: {{ auth.state.nick }} — допишется в коммит
             </p>
             <h3 class="adm-h2" style="margin: 1rem 0 0.25rem">Файлы ({{ flow.state.plan.files.length }})</h3>
             <ul class="adm-file-list" data-testid="commit-files">

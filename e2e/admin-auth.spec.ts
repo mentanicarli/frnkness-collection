@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { ADMIN_USER, PLAIN_USER, STORAGE_KEY, fakeSession, installMocks, loginAs } from './mocks'
+import { ADMIN_USER, OWNER_USER, PLAIN_USER, STORAGE_KEY, fakeSession, installMocks, loginAs, signInSite } from './mocks'
 
 test('страница входа закрыта от индексации', async ({ page }) => {
     await installMocks(page)
@@ -10,8 +10,33 @@ test('страница входа закрыта от индексации', asy
 
 test('неверный пароль — понятная ошибка', async ({ page }) => {
     await installMocks(page)
-    await loginAs(page, { email: ADMIN_USER.email, password: 'wrong' })
-    await expect(page.getByRole('alert')).toHaveText('Неверный email или пароль')
+    await loginAs(page, { nick: ADMIN_USER.nick, password: 'wrong' })
+    await expect(page.getByRole('alert')).toHaveText('Неверный ник или пароль')
+    // Несуществующий ник — та же ошибка: по форме не узнать, какие ники есть.
+    await page.getByLabel('Ник').fill('нет-такого')
+    await page.getByRole('button', { name: 'Войти' }).click()
+    await expect(page.getByRole('alert')).toHaveText('Неверный ник или пароль')
+})
+
+test('ник входит без учёта регистра и похожих букв; владелец тоже админ', async ({ page }) => {
+    await installMocks(page)
+    await loginAs(page, { nick: 'FRNKNЕSS', password: OWNER_USER.password }) // «Е» кириллическая
+    await expect(page.getByRole('navigation', { name: 'Разделы' })).toBeVisible()
+    await expect(page.getByTestId('admin-nick')).toHaveText('frnkness')
+    await expect(page.getByRole('link', { name: 'Заявки' })).toBeVisible()
+})
+
+test('единый вход: вошёл на сайте админом — админка открывается без входа', async ({ page }) => {
+    await installMocks(page)
+    await signInSite(page, ADMIN_USER)
+    await page.goto('/#/')
+    await expect(page.getByTestId('user-menu')).toBeVisible()
+    await page.getByTestId('user-menu').click()
+    await page.getByRole('menuitem', { name: 'Админка' }).click()
+    await expect(page.getByRole('navigation', { name: 'Разделы' })).toBeVisible()
+    await expect(page.getByTestId('admin-nick')).toHaveText(ADMIN_USER.nick)
+    // Админ (не владелец) заявок не видит.
+    await expect(page.getByRole('link', { name: 'Заявки' })).toHaveCount(0)
 })
 
 test('вход админа: разделы и статус подключений', async ({ page }) => {
@@ -25,7 +50,7 @@ test('вход админа: разделы и статус подключени
     expect(mocks.calls.every((c) => c.authorization?.startsWith('Bearer '))).toBe(true)
     expect(mocks.unexpected).toEqual([])
 
-    // Сессия админа лежит под своим ключом, а не под ключом сайта.
+    // Сессия — под общим ключом сайта и админки, не под ключом supabase-js по умолчанию.
     const keys = await page.evaluate(() => Object.keys(localStorage))
     expect(keys).toContain(STORAGE_KEY)
     expect(keys.filter((k) => k.startsWith('sb-'))).toEqual([])
@@ -38,6 +63,7 @@ test('не-админ видит «Нет доступа» и не получа�
     const mocks = await installMocks(page)
     await loginAs(page, PLAIN_USER)
     await expect(page.getByRole('heading', { name: 'Нет доступа' })).toBeVisible()
+    await expect(page.getByTestId('no-access')).toContainText(PLAIN_USER.nick)
     await expect(page.getByRole('navigation')).toHaveCount(0)
     expect(mocks.calls).toEqual([])
     await page.getByRole('button', { name: 'Выйти' }).click()
@@ -66,7 +92,7 @@ test('истёкшая сессия при открытии — сообщени
     await installMocks(page, { refreshFails: true })
     await page.addInitScript(
         ([key, session]) => localStorage.setItem(key, JSON.stringify(session)),
-        [STORAGE_KEY, fakeSession({ email: ADMIN_USER.email, role: 'admin' }, -3600)] as const
+        [STORAGE_KEY, fakeSession({ id: ADMIN_USER.id, email: ADMIN_USER.email, role: 'admin' }, -3600)] as const
     )
     await page.goto('/admin.html')
     await expect(page.getByRole('status')).toHaveText('Сессия истекла — войди заново')

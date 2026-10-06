@@ -4,6 +4,7 @@ import { buildAssetUrl } from '@/utils/helpers'
 import { getAllTrackRefs, isSameTrackRef } from '@/utils/lyrics'
 import { setupMediaSession } from '@/runtime/mediaSession'
 import { createListenSender, setupListenTracker } from '@/runtime/listenTracker'
+import { currentAccessToken } from '../session'
 import { updatePageAccent, updatePlayerAccent } from '../services/colors'
 import { incrementPlayCount } from '../services/stats'
 import { view } from '../stores/view'
@@ -343,6 +344,6 @@ export function attachAudio(audio: HTMLAudioElement): void {
     setupListenTracker({
         audio,
         getTrackKey: currentStatsKey,
-        send: createListenSender(SUPABASE_URL, SUPABASE_ANON_KEY)
+        send: createListenSender(SUPABASE_URL, SUPABASE_ANON_KEY, currentAccessToken)
     })
 }

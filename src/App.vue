@@ -1,16 +1,28 @@
 <template>
-  <AppHeader />
-  <main class="min-h-screen relative z-10">
-    <RouterView />
-  </main>
-  <FullscreenPlayer />
-  <MiniPlayer />
+  <div v-if="!session.ready" class="acc-shell" aria-busy="true"><span class="acc-spinner" aria-label="Загрузка"></span></div>
+  <template v-else>
+    <AppHeader v-if="!bare" />
+    <main class="min-h-screen relative z-10">
+      <RouterView />
+    </main>
+    <!-- Плеер монтируется один раз после первого входа (attachAudio — раз за
+         жизнь страницы) и прячется на экранах входа. -->
+    <div v-if="playerMounted" v-show="!bare">
+      <FullscreenPlayer />
+      <MiniPlayer />
+    </div>
+  </template>
 </template>
 
 <script setup lang="ts">
 // Корень сайта: шапка, открытая страница (по адресу #/…) и плеер.
-import { onBeforeUnmount, onMounted, watch } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+// Без входа — только заставка и экраны входа (стена — в router.ts).
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
+import { session } from '@/site/session'
+import { welcomeLocation } from '@/site/auth/redirect'
+import { closeMiniPlayer } from '@/site/player/engine'
+import { goAfterLogin } from '@/site/router'
 import { releases } from '@/config'
 import AppHeader from '@/site/components/AppHeader.vue'
 import FullscreenPlayer from '@/site/components/FullscreenPlayer.vue'
@@ -23,6 +35,29 @@ import { closeFsPlayer } from '@/site/player/karaoke'
 import { runWhenIdle, togglePlay } from '@/site/player/engine'
 
 const route = useRoute()
+const router = useRouter()
+
+const bare = computed(() => !session.user || Boolean(route.meta.bare))
+const playerMounted = ref(false)
+
+// Вошли — плеер; вышли (сами, истекла сессия, удалили или забанили) — музыка
+// останавливается, с закрытого экрана уводим на заставку.
+watch(
+  () => session.user?.id ?? null,
+  (id, prev) => {
+    if (id) {
+      playerMounted.value = true
+      // Вошли в другой вкладке, пока здесь открыт экран входа.
+      if (route.meta.guestOnly) goAfterLogin(route.query.next)
+      return
+    }
+    if (prev === undefined) return
+    if (karaoke.fsOpen) closeFsPlayer()
+    closeMiniPlayer()
+    if (!route.meta.public) void router.replace(welcomeLocation(route.fullPath))
+  },
+  { immediate: true }
+)
 
 // Смена экрана (не повтор того же адреса): наверх страницы, поиск
 // закрывается (на главной — перечитывается), цвет страницы на главной —

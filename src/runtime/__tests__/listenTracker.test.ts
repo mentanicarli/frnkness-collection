@@ -192,23 +192,40 @@ describe('сессии прослушивания', () => {
 })
 
 describe('отправка', () => {
-    it('fetch keepalive, только apikey, ошибки глушатся', async () => {
+    const payload = {
+        session_id_input: 's',
+        track_key_input: 'faaa-0',
+        listened_input: 10,
+        max_position_input: 10,
+        duration_input: 100,
+        completed_input: false
+    }
+
+    it('fetch keepalive от имени вошедшего, ошибки глушатся', async () => {
         const calls: [string, RequestInit][] = []
         vi.stubGlobal('fetch', (url: string, init: RequestInit) => {
             calls.push([url, init])
             return Promise.reject(new Error('404'))
         })
-        createListenSender('https://x.supabase.co/', 'sb_publishable_k')({
-            session_id_input: 's',
-            track_key_input: 'faaa-0',
-            listened_input: 10,
-            max_position_input: 10,
-            duration_input: 100,
-            completed_input: false
-        })
+        createListenSender('https://x.supabase.co/', 'sb_publishable_k', () => 'user-token')(payload)
         await Promise.resolve()
         expect(calls[0][0]).toBe('https://x.supabase.co/rest/v1/rpc/record_listen_session')
-        expect(calls[0][1]).toMatchObject({ method: 'POST', keepalive: true, headers: { apikey: 'sb_publishable_k', 'Content-Type': 'application/json' } })
+        expect(calls[0][1]).toMatchObject({
+            method: 'POST',
+            keepalive: true,
+            headers: { apikey: 'sb_publishable_k', Authorization: 'Bearer user-token', 'Content-Type': 'application/json' }
+        })
+        vi.unstubAllGlobals()
+    })
+
+    it('без входа ничего не отправляется', () => {
+        const calls: unknown[] = []
+        vi.stubGlobal('fetch', (...args: unknown[]) => {
+            calls.push(args)
+            return Promise.resolve(new Response())
+        })
+        createListenSender('https://x.supabase.co/', 'k', () => null)(payload)
+        expect(calls).toHaveLength(0)
         vi.unstubAllGlobals()
     })
 })

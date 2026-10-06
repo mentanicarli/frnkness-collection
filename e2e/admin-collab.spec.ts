@@ -31,7 +31,7 @@ const commits = (mocks: { calls: ContentCall[] }) => mocks.calls.filter((c) => c
 async function publish(page: Page) {
     await page.getByRole('button', { name: 'Сохранить…' }).click()
     const dialog = page.getByRole('dialog')
-    await expect(dialog.getByTestId('commit-author')).toContainText(ADMIN_USER.email)
+    await expect(dialog.getByTestId('commit-author')).toContainText(ADMIN_USER.nick)
     await dialog.getByRole('button', { name: 'Опубликовать' }).click()
     await expect(dialog).toHaveCount(0)
 }

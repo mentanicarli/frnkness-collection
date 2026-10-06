@@ -10,7 +10,7 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "check:content": "vite-node scripts/check-content.ts --",
-    "check:function": "cd supabase/functions/admin-content && npx -y deno@2 check index.ts"
+    "check:function": "cd supabase/functions && npx -y deno@2 check admin-content/index.ts admin-users/index.ts account/index.ts register/index.ts recovery-request/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",

@@ -1,6 +1,8 @@
 import { createRouter, createWebHashHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
 import { releases } from '@/config'
 import { findTrackRefBySlug, getTrackSlug } from '@/utils/slug'
+import { sanitizeNext, welcomeLocation } from './auth/redirect'
+import { session, whenSessionReady } from './session'
 import HomePage from './pages/HomePage.vue'
 import ChartPage from './pages/ChartPage.vue'
 import ReleasePage from './pages/ReleasePage.vue'
@@ -12,22 +14,33 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/chart                            чарт
  *   #/release/<releaseId>              страница релиза
  *   #/track/<releaseId>/<slug>         страница трека
+ *   #/me                               мой профиль и настройки
+ *   #/u/<id>                           профиль другого пользователя
+ * Без входа («мягкая стена», раздел 2 плана):
+ *   #/welcome  #/login  #/register  #/forgot  #/privacy
+ *
+ * Гость с любого закрытого адреса попадает на заставку, адрес запоминается
+ * (?next=) и открывается после входа или регистрации.
  *
  * Битые и лишние адреса приводятся к рабочим без новой записи в истории:
  * «#/мусор» → «#/», «#/chart/лишнее» → «#/chart», неизвестный трек — на
  * страницу его релиза, неизвестный релиз — на главную.
- *
- * meta.public — задел на этап «Аккаунты»: какие экраны будут доступны без
- * входа. Сейчас проверка входа не включена, открыто всё.
  */
 
 declare module 'vue-router' {
     interface RouteMeta {
+        /** Доступно без входа. */
         public?: boolean
+        /** Только для гостей: вошедшего уводим дальше (на ?next= или главную). */
+        guestOnly?: boolean
+        /** Экран входа/регистрации: без шапки с поиском и без плеера. */
+        bare?: boolean
     }
 }
 
 const param = (value: unknown): string => (Array.isArray(value) ? String(value[0] ?? '') : String(value ?? ''))
+
+const guest = { public: true, guestOnly: true, bare: true }
 
 const routes: RouteRecordRaw[] = [
     { path: '/', name: 'home', component: HomePage },
@@ -43,6 +56,14 @@ const routes: RouteRecordRaw[] = [
         path: '/track/:releaseId/:slug/:rest(.*)+',
         redirect: (to) => ({ name: 'track', params: { releaseId: to.params.releaseId, slug: to.params.slug } })
     },
+    { path: '/me', name: 'me', component: () => import('./pages/MePage.vue') },
+    { path: '/u/:id', name: 'user', component: () => import('./pages/UserPage.vue') },
+    { path: '/change-password', name: 'change-password', component: () => import('./pages/ChangePasswordPage.vue'), meta: { bare: true } },
+    { path: '/welcome', name: 'welcome', component: () => import('./pages/WelcomePage.vue'), meta: guest },
+    { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: guest },
+    { path: '/register', name: 'register', component: () => import('./pages/RegisterPage.vue'), meta: guest },
+    { path: '/forgot', name: 'forgot', component: () => import('./pages/ForgotPage.vue'), meta: guest },
+    { path: '/privacy', name: 'privacy', component: () => import('./pages/PrivacyPage.vue'), meta: { public: true, bare: true } },
     { path: '/:pathMatch(.*)*', redirect: { name: 'home' } }
 ]
 
@@ -51,9 +72,32 @@ export const router = createRouter({
     routes
 })
 
-// Проверка на каждом переходе (beforeEnter не срабатывает при смене
-// параметров: с одного релиза на другой).
-router.beforeEach((to) => {
+/** Адрес из ?next= — если он ведёт на существующий экран сайта. */
+export function nextTarget(raw: unknown): string | null {
+    const next = sanitizeNext(raw)
+    if (!next) return null
+    const resolved = router.resolve(next)
+    if (!resolved.matched.length || resolved.matched.some((m) => m.path === '/:pathMatch(.*)*')) return null
+    return resolved.fullPath
+}
+
+// Проверка на каждом переходе (beforeEach, а не beforeEnter: тот не
+// срабатывает при смене параметров — с одного релиза на другой).
+router.beforeEach(async (to) => {
+    await whenSessionReady()
+
+    // ── Стена ──
+    if (!session.user) {
+        if (to.meta.public) return true
+        return { ...welcomeLocation(to.fullPath), replace: true }
+    }
+    if (session.mustChangePassword && to.name !== 'change-password' && to.name !== 'privacy') {
+        const next = sanitizeNext(to.fullPath)
+        return { name: 'change-password', query: next && next !== '/' ? { next } : {}, replace: true }
+    }
+    if (to.meta.guestOnly) return nextTarget(to.query.next) ?? { name: 'home', replace: true }
+
+    // ── Существование релиза и трека ──
     if (to.name === 'release') {
         return releases[param(to.params.releaseId)] ? true : { name: 'home', replace: true }
     }
@@ -69,7 +113,7 @@ router.beforeEach((to) => {
 // Канонический вид адреса («#/chart/» → «#/chart») — без записи в истории.
 router.afterEach((to) => {
     if (!to.name) return
-    const canonical = router.resolve({ name: to.name, params: to.params }).fullPath
+    const canonical = router.resolve({ name: to.name, params: to.params, query: to.query }).fullPath
     if (canonical !== to.fullPath) void router.replace(canonical)
 })
 
@@ -99,6 +143,11 @@ export function goRelease(releaseId: string): void {
 export function goTrack(releaseId: string, trackIndex: number): void {
     const route = trackRoute(releaseId, trackIndex)
     if (route) void router.push(route)
+}
+
+/** После входа или регистрации: на запомненный адрес или на главную. */
+export function goAfterLogin(rawNext: unknown): void {
+    void router.replace(nextTarget(rawNext) ?? { name: 'home' })
 }
 
 /**

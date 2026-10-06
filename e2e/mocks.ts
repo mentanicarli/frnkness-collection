@@ -2,14 +2,19 @@ import type { Page, Route } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { FIXTURE_ROOT, FIXTURE_UPLOADS, fixtureText, fixtureTree } from '../tests/fixtures/catalog'
+import { AccountsBackend, E2E_CAPTCHA, mkUser, type AccountRecord, type MockUser } from './accountsMock'
 
-// Моки Supabase Auth, PostgREST и функции admin-content. Тесты никогда не
+// Моки Supabase Auth, PostgREST, Storage и Edge Functions. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
 export const MOCK_SUPABASE = 'https://mock.supabase.test'
-export const STORAGE_KEY = 'frnk-admin-auth'
+// Сессия общая у сайта и админки (src/supabaseConfig.ts, AUTH_STORAGE_KEY).
+export const STORAGE_KEY = 'frnk-auth'
 
-export const ADMIN_USER = { email: 'admin@example.com', password: 'secret-admin', role: 'admin' }
-export const PLAIN_USER = { email: 'user@example.com', password: 'secret-user', role: null }
+export const OWNER_USER = mkUser(1, 'frnkness', 'secret-owner', 'owner')
+export const ADMIN_USER = mkUser(2, 'Друг', 'secret-admin', 'admin')
+export const PLAIN_USER = mkUser(3, 'Слушатель', 'secret-user', null)
+export const SECOND_USER = mkUser(4, 'Второй', 'secret-second', 'user')
+export { E2E_CAPTCHA }
 
 export const HEAD_SHA = 'a'.repeat(40)
 
@@ -17,25 +22,28 @@ function base64url(value: unknown) {
     return Buffer.from(JSON.stringify(value)).toString('base64url')
 }
 
-export function fakeJwt(email: string, role: string | null, expiresAt: number) {
-    const appMetadata = role ? { provider: 'email', role } : { provider: 'email' }
+type SessionUser = { email: string; role: string | null; id?: string }
+
+export function fakeJwt(user: SessionUser, expiresAt: number) {
+    const appMetadata = user.role ? { provider: 'email', role: user.role } : { provider: 'email' }
     return [
         base64url({ alg: 'HS256', typ: 'JWT' }),
-        base64url({ sub: email, email, role: 'authenticated', aud: 'authenticated', exp: expiresAt, app_metadata: appMetadata }),
+        base64url({ sub: user.id ?? 'id-' + user.email, email: user.email, role: 'authenticated', aud: 'authenticated', exp: expiresAt, app_metadata: appMetadata }),
         'signature'
     ].join('.')
 }
 
-export function fakeSession(user: { email: string; role: string | null }, expiresIn = 3600) {
+export function fakeSession(user: SessionUser, expiresIn = 3600) {
     const expiresAt = Math.floor(Date.now() / 1000) + expiresIn
+    const id = user.id ?? 'id-' + user.email
     return {
-        access_token: fakeJwt(user.email, user.role, expiresAt),
+        access_token: fakeJwt(user, expiresAt),
         token_type: 'bearer',
         expires_in: expiresIn,
         expires_at: expiresAt,
-        refresh_token: 'refresh-' + user.email,
+        refresh_token: 'refresh-' + id,
         user: {
-            id: 'id-' + user.email,
+            id,
             aud: 'authenticated',
             role: 'authenticated',
             email: user.email,
@@ -45,6 +53,32 @@ export function fakeSession(user: { email: string; role: string | null }, expire
         }
     }
 }
+
+const sessionOf = (a: AccountRecord) => fakeSession({ id: a.id, email: a.email, role: a.role })
+
+/** Сайт открывается уже вошедшим (сессия в localStorage, как после входа). */
+export async function signInSite(page: Page, user: MockUser = PLAIN_USER) {
+    await page.addInitScript(
+        ([key, session]) => {
+            if (!sessionStorage.getItem('e2e-signed-in')) {
+                localStorage.setItem(key, JSON.stringify(session))
+                sessionStorage.setItem('e2e-signed-in', '1')
+            }
+        },
+        [STORAGE_KEY, fakeSession({ id: user.id, email: user.email, role: user.role })] as const
+    )
+}
+
+// Поддельный Cloudflare Turnstile: виджет сразу «проходит» с E2E_CAPTCHA,
+// после reset() — снова (как настоящий: токен одноразовый, проверка повторяется).
+const TURNSTILE_STUB = `(() => {
+    const widgets = {}; let n = 0;
+    window.turnstile = {
+        render(el, opts) { const id = 'w' + (++n); widgets[id] = opts; const box = document.createElement('div'); box.dataset.testid = 'turnstile'; box.textContent = 'captcha ok'; el.appendChild(box); setTimeout(() => opts.callback('${E2E_CAPTCHA}'), 0); return id },
+        reset(id) { const o = widgets[id]; if (o) setTimeout(() => o.callback('${E2E_CAPTCHA}'), 0) },
+        remove(id) { delete widgets[id] }
+    };
+})();`
 
 export interface ContentCall {
     action: string
@@ -57,6 +91,8 @@ export type ContentResponder = (call: ContentCall) => { status?: number; body: u
 export interface MockOptions {
     content?: ContentResponder
     refreshFails?: boolean
+    /** Пользователи «базы» (по умолчанию — владелец, админ и два пользователя). */
+    users?: MockUser[]
     rpc?: (name: string, body: unknown) => { status?: number; body: unknown } | undefined
 }
 
@@ -158,7 +194,7 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
     const uploads: { name: string; size: number; contentType: string }[] = []
     const repoState = { sha: HEAD_SHA, files: {} as Record<string, string> }
     const unexpected: string[] = []
-    const users = [ADMIN_USER, PLAIN_USER]
+    const accounts = new AccountsBackend(options.users ?? [OWNER_USER, ADMIN_USER, PLAIN_USER, SECOND_USER])
 
     const json = (route: Route, status: number, body: unknown) =>
         route.fulfill({
@@ -176,6 +212,11 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         return route.abort()
     })
     await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort())
+    await page.route('https://challenges.cloudflare.com/**', (route) =>
+        route.request().url().includes('/turnstile/v0/api.js')
+            ? route.fulfill({ contentType: 'application/javascript', body: TURNSTILE_STUB })
+            : route.abort()
+    )
 
     await page.route(`${MOCK_SUPABASE}/**`, async (route) => {
         const req = route.request()
@@ -198,21 +239,73 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
             body = {}
         }
 
+        const caller = accounts.byJwt((req.headers()['authorization'] ?? '').replace(/^Bearer\s+/i, ''))
+
         if (url.pathname === '/auth/v1/token') {
             if (url.searchParams.get('grant_type') === 'password') {
-                const user = users.find((u) => u.email === body.email && u.password === body.password)
-                if (!user) return json(route, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' })
-                return json(route, 200, fakeSession(user))
+                const account = accounts.byEmail(String(body.email))
+                if (!account || account.password !== body.password) {
+                    return json(route, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' })
+                }
+                if (accounts.isBanned(account)) return json(route, 400, { code: 400, error_code: 'user_banned', msg: 'User is banned' })
+                account.lastSignInAt = new Date().toISOString()
+                return json(route, 200, sessionOf(account))
             }
             if (url.searchParams.get('grant_type') === 'refresh_token') {
-                if (options.refreshFails) {
+                const account = accounts.accounts.get(String(body.refresh_token ?? '').replace(/^refresh-/, ''))
+                if (options.refreshFails || !account || accounts.isBanned(account)) {
                     return json(route, 400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token: Refresh Token Not Found' })
                 }
-                return json(route, 200, fakeSession(ADMIN_USER))
+                return json(route, 200, sessionOf(account))
             }
         }
         if (url.pathname === '/auth/v1/logout') return json(route, 204, null)
-        if (url.pathname === '/auth/v1/user') return json(route, 200, fakeSession(ADMIN_USER).user)
+        if (url.pathname === '/auth/v1/user') {
+            return caller ? json(route, 200, sessionOf(caller).user) : json(route, 401, { code: 401, msg: 'invalid JWT' })
+        }
+
+        // ── Edge Functions аккаунтов — настоящие обработчики ──
+        const fn = url.pathname.match(/^\/functions\/v1\/(register|recovery-request|account|admin-users)$/)?.[1]
+        if (fn) {
+            const res = await accounts.handlers[fn](
+                new Request(req.url(), { method, headers: req.headers(), body: method === 'POST' ? req.postData() ?? '' : undefined })
+            )
+            return route.fulfill({ status: res.status, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await res.text() })
+        }
+
+        // ── PostgREST: профили ──
+        const eqId = url.searchParams.get('id')?.replace(/^eq\./, '') ?? null
+        const rows = (list: unknown[]) =>
+            (req.headers()['accept'] ?? '').includes('vnd.pgrst.object')
+                ? list.length ? json(route, 200, list[0]) : json(route, 406, { code: 'PGRST116', message: 'no rows' })
+                : json(route, 200, list)
+        if (url.pathname === '/rest/v1/profiles' && method === 'GET') return rows(caller ? accounts.profileRows(eqId) : [])
+        // Чарт и счётчики: читают только вошедшие (в тестах — пусто).
+        if (url.pathname === '/rest/v1/play_counts' && method === 'GET') {
+            return caller ? json(route, 200, []) : json(route, 401, { code: '42501', message: 'permission denied' })
+        }
+        if (url.pathname === '/rest/v1/account_private' && method === 'GET') return rows(accounts.privateRows(caller, eqId))
+        if (url.pathname === '/rest/v1/profiles' && method === 'PATCH') {
+            if (caller && eqId === caller.id) {
+                if (typeof body.avatar === 'string') caller.avatar = body.avatar
+                if (typeof body.bio === 'string') caller.bio = body.bio
+            }
+            return json(route, 204, null)
+        }
+
+        // ── Storage: свой аватар ──
+        if (url.pathname.startsWith('/storage/v1/object/avatars')) {
+            if (method === 'POST' || method === 'PUT') {
+                const name = decodeURIComponent(url.pathname.slice('/storage/v1/object/avatars/'.length))
+                if (!caller || name !== `${caller.id}/avatar`) return json(route, 403, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' })
+                accounts.avatarUploads.push(name)
+                return json(route, 200, { Key: `avatars/${name}`, Id: name })
+            }
+            if (method === 'DELETE') {
+                accounts.avatarRemovals.push(...((body.prefixes as string[]) ?? []))
+                return json(route, 200, [])
+            }
+        }
 
         if (url.pathname === '/functions/v1/admin-content') {
             const call = { action: String(body.action), body, authorization: req.headers()['authorization'] ?? null }
@@ -248,20 +341,25 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
 
         if (url.pathname.startsWith('/rest/v1/rpc/')) {
             const name = url.pathname.slice('/rest/v1/rpc/'.length)
-            const res = options.rpc?.(name, body)
+            const res = options.rpc?.(name, body) ?? accounts.rpc(name, body, caller)
             if (res) return json(route, res.status ?? 200, res.body)
+            // Статистика сайта: принимается только от вошедших.
+            if (name === 'increment_play_count' || name === 'record_listen_session') {
+                return caller ? json(route, 204, null) : json(route, 401, { code: '42501', message: 'Нужно войти' })
+            }
         }
 
         unexpected.push(`${method} ${url.pathname}`)
         return json(route, 404, { message: 'not mocked' })
     })
 
-    return { calls, unexpected, uploads }
+    return { calls, unexpected, uploads, accounts }
 }
 
-export async function loginAs(page: Page, user: { email: string; password: string }) {
+/** Вход в админку через форму (ник + пароль). */
+export async function loginAs(page: Page, user: { nick: string; password: string }) {
     await page.goto('/admin.html')
-    await page.getByLabel('Email').fill(user.email)
+    await page.getByLabel('Ник').fill(user.nick)
     await page.getByLabel('Пароль').fill(user.password)
     await page.getByRole('button', { name: 'Войти' }).click()
 }

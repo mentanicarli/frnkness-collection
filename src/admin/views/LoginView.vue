@@ -2,14 +2,14 @@
     <main class="adm-center">
         <div class="adm-login">
             <span class="adm-brand">frnk ness<small>админка</small></span>
-            <p class="adm-sub">Вход только для администратора.</p>
+            <p class="adm-sub">Вход тем же ником и паролем, что на сайте. Админка открыта только админам и владельцу.</p>
             <div v-if="auth.state.notice" class="adm-alert adm-alert-warn" style="margin-top: 1rem" role="status">
                 {{ auth.state.notice }}
             </div>
             <form @submit.prevent="submit" novalidate>
                 <label class="adm-field">
-                    <span class="adm-label">Email</span>
-                    <input v-model.trim="email" class="adm-input" type="email" name="email" autocomplete="username" required />
+                    <span class="adm-label">Ник</span>
+                    <input v-model="nick" class="adm-input" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="40" required />
                 </label>
                 <label class="adm-field">
                     <span class="adm-label">Пароль</span>
@@ -21,6 +21,7 @@
                     Войти
                 </button>
             </form>
+            <p class="adm-small adm-faint" style="margin-top: 1rem"><a href="./#/forgot">Забыли пароль?</a></p>
         </div>
     </main>
 </template>
@@ -30,20 +31,20 @@ import { ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 
 const auth = useAuth()
-const email = ref('')
+const nick = ref('')
 const password = ref('')
 const error = ref('')
 const busy = ref(false)
 
 async function submit() {
     error.value = ''
-    if (!email.value || !password.value) {
-        error.value = 'Введи email и пароль'
+    if (!nick.value.trim() || !password.value) {
+        error.value = 'Введи ник и пароль'
         return
     }
     busy.value = true
     try {
-        const message = await auth.signIn(email.value, password.value)
+        const message = await auth.signIn(nick.value, password.value)
         if (message) error.value = message
         else password.value = ''
     } finally {

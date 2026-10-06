@@ -496,3 +496,31 @@ kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3
   .adm-track-fields { grid-template-columns: 1fr; }
   .adm-track-tools { grid-column: 2; }
 }
+
+/* Пользователи и заявки */
+.avatar {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; overflow: hidden; background: var(--bg-3); color: #fff;
+  font-family: 'Unbounded'; font-weight: 700; user-select: none;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.adm-badge-err { color: #ffc4be; border-color: rgba(255, 138, 128, 0.4); }
+.adm-users { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.adm-users-list { padding: 0.375rem; max-height: 70vh; overflow-y: auto; }
+.adm-user-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.125rem; }
+.adm-user-row {
+  width: 100%; display: flex; align-items: center; gap: 0.625rem; text-align: left;
+  padding: 0.5rem; border-radius: var(--r-sm); background: none; border: 0; color: inherit; font: inherit;
+}
+.adm-user-row:hover, .adm-user-row.active { background: var(--bg-2); }
+.adm-user-row-main { display: grid; min-width: 0; flex: 1; }
+.adm-user-row-nick { font-weight: 600; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-user-card { min-width: 0; }
+.adm-user-actions { display: grid; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.adm-tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.adm-recovery-closed { opacity: 0.6; }
+@media (max-width: 760px) {
+  .adm-users { grid-template-columns: 1fr; }
+  .adm-users-list { max-height: none; }
+  .adm-tiles-3 { grid-template-columns: 1fr; }
+}

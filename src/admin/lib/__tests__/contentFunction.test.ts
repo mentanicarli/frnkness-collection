@@ -65,6 +65,7 @@ function createFakeGitHub(state: FakeState): typeof fetch {
 
 const ADMIN: AuthUser = { id: 'u1', email: 'me@example.com', app_metadata: { role: 'admin' } }
 const USER: AuthUser = { id: 'u2', email: 'x@example.com', app_metadata: {} }
+const OWNER: AuthUser = { id: 'u3', email: 'o@example.com', app_metadata: { role: 'owner' } }
 
 let state: FakeState
 let staging: Map<string, { bytes: Uint8Array; created_at: string }>
@@ -96,6 +97,9 @@ function setup() {
         async getUser(jwt) {
             if (jwt === 'admin-jwt') return ADMIN
             if (jwt === 'user-jwt') return USER
+            if (jwt === 'owner-jwt') return OWNER
+            if (jwt === 'banned-admin-jwt') return { ...ADMIN, banned_until: '2126-01-01T00:00:00Z' }
+            if (jwt === 'fake-role-jwt') return { ...USER, app_metadata: { role: 'superadmin' } }
             return null
         },
         staging: {
@@ -160,7 +164,13 @@ describe('admin-content: доступ', () => {
         const forbidden = await call({ action: 'head' }, { jwt: 'user-jwt' })
         expect(forbidden.status).toBe(403)
         expect(await forbidden.json()).toMatchObject({ error: 'forbidden' })
+        expect((await call({ action: 'head' }, { jwt: 'banned-admin-jwt' })).status).toBe(403)
+        expect((await call({ action: 'head' }, { jwt: 'fake-role-jwt' })).status).toBe(403)
         expect(state.calls).toHaveLength(0)
+    })
+
+    it('владелец проходит так же, как админ', async () => {
+        expect((await call({ action: 'ping' }, { jwt: 'owner-jwt' })).status).toBe(200)
     })
 
     it('недействительный токен GitHub — понятная ошибка', async () => {

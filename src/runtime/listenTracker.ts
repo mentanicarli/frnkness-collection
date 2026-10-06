@@ -172,17 +172,19 @@ export function setupListenTracker(deps: ListenTrackerDeps) {
 
 /**
  * Отправка в Supabase: fetch с keepalive (доходит и при закрытии страницы),
- * только заголовок apikey. Ошибки — тихо: если миграция ещё не применена,
- * сайт не должен ломаться.
+ * от имени вошедшего (access-токен). Без входа сессии не пишутся — база
+ * их и не примет. Ошибки — тихо: сайт не должен ломаться.
  */
-export function createListenSender(supabaseUrl: string, apiKey: string) {
+export function createListenSender(supabaseUrl: string, apiKey: string, getToken: () => string | null) {
     const url = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/record_listen_session`
     return (payload: ListenPayload) => {
         if (typeof fetch !== 'function') return
+        const token = getToken()
+        if (!token) return
         fetch(url, {
             method: 'POST',
             keepalive: true,
-            headers: { apikey: apiKey, 'Content-Type': 'application/json' },
+            headers: { apikey: apiKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         }).catch(() => undefined)
     }

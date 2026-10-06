@@ -27,7 +27,9 @@ const handler = createHandler({
     async getUser(jwt) {
         const { data, error } = await supabase.auth.getUser(jwt)
         if (error || !data.user) return null
-        return data.user
+        // Правки подписываются ником: адрес аккаунта технический.
+        const { data: profile } = await supabase.from('profiles').select('nick').eq('id', data.user.id).maybeSingle()
+        return { ...data.user, nick: (profile as { nick?: string } | null)?.nick ?? null }
     },
     staging: {
         async download(path) {

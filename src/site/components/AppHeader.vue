@@ -78,6 +78,7 @@
           </svg>
           <span>Чарт</span>
         </button>
+        <UserMenu />
       </nav>
     </div>
 
@@ -95,6 +96,7 @@ import { goChart, goHome, goRelease, goTrack } from '@/site/router'
 import { focusLyricLine } from '@/site/services/lyricFocus'
 import type { SearchHit } from '@/site/services/searchIndex'
 import { runSearch, search, setSearchOpen, toggleSearch } from '@/site/stores/search'
+import UserMenu from './UserMenu.vue'
 
 const BADGES: Record<SearchHit['type'], string> = { release: 'Релиз', track: 'Трек', lyric: 'Строка' }
 

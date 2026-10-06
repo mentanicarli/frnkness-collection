@@ -1,17 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/supabaseConfig'
-
-// Своё хранилище сессии: у сайта и админки общий origin, и без отдельного
-// ключа сайт подхватил бы сессию админа и ходил бы в базу от его имени.
-export const ADMIN_STORAGE_KEY = 'frnk-admin-auth'
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-        storageKey: ADMIN_STORAGE_KEY,
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false
-    }
-})
-
-export { SUPABASE_URL, SUPABASE_ANON_KEY }
+// Клиент Supabase у админки общий с сайтом (одна сессия на origin): вошёл
+// на сайте с ролью admin/owner — админка открывается без повторного входа.
+export { supabase } from '@/supabaseClient'
+export { AUTH_STORAGE_KEY, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/supabaseConfig'
