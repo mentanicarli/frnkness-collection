@@ -1,42 +1,22 @@
 import { ref } from 'vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { SUPABASE_ANON_KEY, SUPABASE_URL, releases } from '@/config'
+import { supabase } from '@/supabaseClient'
 import { parseTrackKey } from '@/utils/lyrics'
 import type { ChartTrack } from '@/types'
 
 /**
  * Счётчики прослушиваний и чарт (таблица play_counts в Supabase).
+ * Читать и засчитывать могут только вошедшие: запросы идут через общий
+ * клиент с сессией (src/supabaseClient.ts).
  *
  * Ключ трека в статистике — «<releaseId>-<индекс трека>» (в самых старых
  * записях «<releaseId>--<номер с 1>»), см. src/utils/trackIds.ts.
  */
 
-// Supabase-клиент нужен только чарту и счётчикам, а весит заметно больше
-// остального кода. Поэтому он не входит в основной бандл: чанк подтягивается
-// при первом реальном обращении к статистике.
-let client: SupabaseClient | null = null
-let clientPromise: Promise<SupabaseClient | null> | null = null
-let clientUnavailable = false
-
-// Промис кэшируется, чтобы параллельные вызовы не создали два клиента;
-// после неудачи повторные попытки не делаются — иначе таймер плеера
-// дёргал бы загрузку чанка на каждом тике.
 export function getDb(): Promise<SupabaseClient | null> {
-    if (client) return Promise.resolve(client)
-    if (clientUnavailable || !SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve(null)
-    if (!clientPromise) {
-        clientPromise = import('@supabase/supabase-js')
-            .then(({ createClient }) => {
-                client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-                return client
-            })
-            .catch((e) => {
-                console.warn('Supabase init failed:', e)
-                clientUnavailable = true
-                return null
-            })
-    }
-    return clientPromise
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve(null)
+    return Promise.resolve(supabase)
 }
 
 /**

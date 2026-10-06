@@ -64,6 +64,12 @@ function buildTrackNotes() {
     return JSON.stringify(notes)
 }
 
+// Модуль админки: src/admin/ и код функций, кроме общих правил аккаунтов.
+function isAdminModule(id: string): boolean {
+    if (/\/supabase\/functions\/_shared\/accounts\.ts$/.test(id)) return false
+    return /\/(src\/admin|supabase\/functions)\//.test(id)
+}
+
 function lyricsIndexPlugin() {
     return {
         name: 'frnkness-lyrics-index',
@@ -104,8 +110,9 @@ export default defineConfig(() => ({
             manifest: false,
             injectManifest: {
                 // Админка не кэшируется service worker'ом сайта: её чанки
-                // называются admin-* (см. chunkFileNames ниже).
-                globIgnores: ['**/supabase-*.js', 'admin.html', '**/admin-*']
+                // называются admin-* (см. chunkFileNames ниже). Чанк supabase
+                // кэшируется: без него сайт не проверит вход и не откроется.
+                globIgnores: ['admin.html', '**/admin-*']
             },
             devOptions: { enabled: false }
         }),
@@ -132,8 +139,10 @@ export default defineConfig(() => ({
                 // Всё, что содержит код src/admin/ или общие правила функции
                 // (supabase/functions/), получает префикс admin-: по нему админку
                 // исключает service worker и проверяет scripts/check-dist.mjs.
+                // Исключение — правила аккаунтов (_shared/accounts.ts): ими
+                // пользуется и сайт (вход по нику, проверка ника и пароля).
                 chunkFileNames: (chunk) =>
-                    chunk.moduleIds.some((id) => /\/(src\/admin|supabase\/functions)\//.test(id.split(path.sep).join('/')))
+                    chunk.moduleIds.some((id) => isAdminModule(id.split(path.sep).join('/')))
                         ? 'assets/admin-[name]-[hash].js'
                         : 'assets/[name]-[hash].js',
                 manualChunks: {

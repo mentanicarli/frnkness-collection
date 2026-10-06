@@ -12,7 +12,7 @@ const errors = []
 const read = (rel) => fs.readFileSync(path.join(dist, rel), 'utf8')
 
 // Строки, которые есть только в коде админки.
-const ADMIN_MARKERS = ['frnk-admin-auth', 'functions/v1/admin-content']
+const ADMIN_MARKERS = ['admin-content', 'admin-users', 'admin_users_list', 'owner_recovery_list']
 
 function collectGraph(entryHtml) {
     const html = read(entryHtml)
@@ -63,8 +63,6 @@ for (const url of precache) {
     if (url.startsWith('assets/') && !mainGraph.has(url)) errors.push(`в precache файл не из основного сайта: ${url}`)
 }
 for (const rel of mainGraph) {
-    // Чанк supabase намеренно не кэшируется заранее (globIgnores).
-    if (/supabase-/.test(rel)) continue
     if (!precache.includes(rel)) errors.push(`файл сайта не попал в precache: ${rel}`)
 }
 
