@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import './assets/app.css'
 import './assets/account.css'
+import './assets/social.css'
 
 import { normalizeInitialHash, router } from './site/router'
 import { initSession } from './site/session'

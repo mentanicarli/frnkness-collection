@@ -61,6 +61,24 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
             </button>
           </div>
+          <div class="fs-extra">
+            <FavoriteButton :track-id="player.currentTrackId" :size="20" />
+            <button
+              class="fav-btn"
+              :class="{ on: shuffleOn }"
+              type="button"
+              :disabled="Boolean(player.queue?.endless)"
+              :aria-pressed="shuffleOn ? 'true' : 'false'"
+              :aria-label="player.queue?.endless ? 'Поток — и так в случайном порядке' : 'Перемешать'"
+              :title="player.queue?.endless ? 'Поток — и так в случайном порядке' : 'Перемешать'"
+              data-testid="shuffle-btn"
+              @click="toggleShuffle"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>
+            </button>
+            <AddToPlaylistButton :track-id="player.currentTrackId" :size="20" />
+          </div>
+          <p v-if="queueLabel" class="fs-queue-label">{{ queueLabel }}</p>
         </div>
       </div>
       <div ref="lyricsPanel" class="fs-lyrics-panel">
@@ -106,8 +124,10 @@ import { formatTime } from '@/utils/helpers'
 import { isSectionLabel } from '@/utils/trackNotes'
 import { karaoke, player } from '../player/state'
 import { closeFsPlayer, setLyricsMode, toggleFsLyrics } from '../player/karaoke'
-import { nextTrack, prevTrack, seekTo, seekToFraction, setVolume, togglePlay } from '../player/engine'
+import { nextTrack, prevTrack, seekTo, seekToFraction, setVolume, togglePlay, toggleShuffle } from '../player/engine'
 import { volumeWavesFor } from '../player/volume'
+import FavoriteButton from './FavoriteButton.vue'
+import AddToPlaylistButton from './AddToPlaylistButton.vue'
 
 const coverA = ref<HTMLImageElement | null>(null)
 const coverB = ref<HTMLImageElement | null>(null)
@@ -116,6 +136,18 @@ const lyricsBody = ref<HTMLElement | null>(null)
 const lyricsToggle = ref<HTMLButtonElement | null>(null)
 
 const currentTrack = computed(() => player.currentRelease?.tracks[player.currentTrackIndex] ?? null)
+const shuffleOn = computed(() => Boolean(player.queue?.endless || player.queue?.shuffle))
+// Откуда играет: плейлист, избранное, Поток (у релиза — без подписи).
+const queueLabel = computed(() => {
+  const source = player.queue?.source
+  switch (source?.kind) {
+    case 'playlist': return `Плейлист «${source.title}»`
+    case 'favorites': return 'Избранное'
+    case 'flow': return 'Поток'
+    case 'favorites-flow': return 'Поток по избранному'
+    default: return ''
+  }
+})
 const karaokeOpen = computed(() => karaoke.fsLyricsOpen && karaoke.mode === 'karaoke')
 const lyricsVisible = computed(() => karaoke.fsOpen && karaoke.fsLyricsOpen)
 const volumeWaves = computed(() => volumeWavesFor(player.sliderValue, player.muted))

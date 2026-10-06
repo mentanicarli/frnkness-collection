@@ -40,6 +40,7 @@
               </svg>
               <span>Текст</span>
             </button>
+            <FavoriteButton v-if="player.currentTrackId" class="mini-fav" :track-id="player.currentTrackId" :size="18" />
           </div>
         </div>
         <div class="flex items-center flex-shrink-0" style="gap: clamp(0.375rem, 1.2vw, 0.75rem);">
@@ -95,6 +96,7 @@ import { player } from '../player/state'
 import { openFsPlayer } from '../player/karaoke'
 import { attachAudio, closeMiniPlayer, nextTrack, prevTrack, seekToFraction, setVolume, toggleMute, togglePlay } from '../player/engine'
 import { volumeWavesFor } from '../player/volume'
+import FavoriteButton from './FavoriteButton.vue'
 
 const audioEl = ref<HTMLAudioElement | null>(null)
 onMounted(() => {

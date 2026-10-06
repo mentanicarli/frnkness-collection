@@ -5,15 +5,22 @@
       type="button"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="menu"
-      aria-label="Меню профиля"
+      :aria-label="friendRequests.incoming ? `Меню профиля, новых заявок в друзья: ${friendRequests.incoming}` : 'Меню профиля'"
       data-testid="user-menu"
       @click.stop="open = !open"
     >
       <UserAvatar :avatar="session.user.avatar" :nick="session.user.nick" :user-id="session.user.id" :size="2.25" :cover-of="coverOf" />
+      <span v-if="friendRequests.incoming" class="user-menu-badge" data-testid="friend-requests-badge">{{ friendRequests.incoming > 9 ? '9+' : friendRequests.incoming }}</span>
     </button>
     <div v-if="open" class="user-menu-list" role="menu" @click="open = false">
       <p class="nick">{{ session.user.nick || 'Профиль' }}</p>
-      <RouterLink role="menuitem" :to="{ name: 'me' }">Профиль и настройки</RouterLink>
+      <RouterLink v-if="session.user.nick" role="menuitem" :to="{ name: 'user', params: { nick: session.user.nick } }">Мой профиль</RouterLink>
+      <RouterLink role="menuitem" :to="{ name: 'favorites' }">Избранное</RouterLink>
+      <RouterLink role="menuitem" :to="{ name: 'playlists' }">Мои плейлисты</RouterLink>
+      <RouterLink role="menuitem" :to="{ name: 'friends' }">
+        Друзья<span v-if="friendRequests.incoming" class="badge" style="margin-left: 0.5rem;">{{ friendRequests.incoming }}</span>
+      </RouterLink>
+      <RouterLink role="menuitem" :to="{ name: 'me' }">Настройки</RouterLink>
       <a v-if="isAdminRole(session.user.role)" role="menuitem" href="./admin.html">Админка</a>
       <button role="menuitem" type="button" @click="logout">Выйти</button>
     </div>
@@ -25,6 +32,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { session, signOut } from '@/site/session'
+import { friendRequests } from '@/site/social/friends'
 import UserAvatar from './UserAvatar.vue'
 import { isAdminRole } from '../../../supabase/functions/_shared/accounts.ts'
 

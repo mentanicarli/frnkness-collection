@@ -1,6 +1,6 @@
 import { shallowReactive } from 'vue'
 import { supabase } from '@/supabaseClient'
-import { api, errorText, type PlaylistSummary } from './api'
+import { SocialError, api, errorText, type PlaylistSummary } from './api'
 import { showNotice } from './notice'
 
 /**
@@ -86,7 +86,7 @@ export const coverPath = (p: { owner_id: string; id: string }): string => `${p.o
 /** Загрузить свою обложку (уже обрезанную и сжатую) и записать версию. */
 export async function uploadPlaylistCover(p: PlaylistSummary, blob: Blob): Promise<PlaylistSummary> {
     const { error } = await supabase.storage.from(COVERS_BUCKET).upload(coverPath(p), blob, { upsert: true, contentType: blob.type, cacheControl: '3600' })
-    if (error) throw new Error('Не удалось загрузить картинку — попробуй ещё раз')
+    if (error) throw new SocialError('Не удалось загрузить картинку — попробуй ещё раз', 'storage')
     const updated = await api.playlistSetCover(p.id, Date.now())
     signedCache.delete(coverPath(p))
     rememberPlaylist(updated)

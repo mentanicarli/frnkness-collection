@@ -1,0 +1,106 @@
+/* Музыка и друзья: сердечки, плейлисты, друзья, уведомления.
+   Токены — из app.css, кнопки и поля — из account.css. */
+
+.fav-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 2rem; height: 2rem; border-radius: var(--r-sm); border: 0; background: transparent;
+  color: var(--fg-faint); font-size: 0.875rem; line-height: 1; transition: color var(--fast), background var(--fast);
+}
+.fav-btn:hover:not(:disabled) { color: var(--fg); background: var(--bg-2); }
+.fav-btn.on { color: #ff5c7a; }
+.fav-btn:disabled { opacity: 0.35; cursor: default; }
+.fav-btn:focus-visible { outline: 2px solid var(--fg-muted); outline-offset: 1px; }
+.track-row-actions { display: inline-flex; align-items: center; gap: 0.25rem; justify-self: end; }
+.track-hero-icon { width: 2.75rem; height: 2.75rem; border: 1px solid var(--line-2); }
+.mini-fav { margin-left: 0.25rem; }
+.fs-extra { display: flex; align-items: center; justify-content: center; gap: 1.25rem; margin-top: 0.875rem; }
+.fs-extra .fav-btn { width: 2.5rem; height: 2.5rem; color: color-mix(in srgb, var(--fs-on) 55%, transparent); }
+.fs-extra .fav-btn.on { color: #ff5c7a; }
+.fs-extra .fav-btn[data-testid="shuffle-btn"].on { color: var(--fs-on); }
+.fs-queue-label { margin-top: 0.5rem; font-size: 0.75rem; color: color-mix(in srgb, var(--fs-on) 50%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: none) { .track-hover-action { opacity: 1 !important; } }
+
+.notice-toast {
+  position: fixed; left: 50%; bottom: calc(6.5rem + var(--safe-bottom)); z-index: 120; max-width: calc(100vw - 2rem);
+  transform: translate(-50%, 1rem); opacity: 0; pointer-events: none;
+  background: var(--bg-3); color: var(--fg); border: 1px solid var(--line-2); border-radius: var(--r-md);
+  padding: 0.625rem 1rem; font-size: 0.8125rem; box-shadow: var(--shadow-pop);
+  transition: opacity var(--med), transform var(--med);
+}
+.notice-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.notice-toast.error { border-color: rgba(229, 72, 77, 0.5); color: #ffb3b5; }
+
+.badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.25rem; height: 1.25rem;
+  padding: 0 0.375rem; border-radius: 999px; background: #e5484d; color: #fff; font-size: 0.6875rem; font-weight: 700; vertical-align: middle;
+}
+.user-menu-btn { position: relative; }
+.user-menu-badge {
+  position: absolute; top: -0.25rem; right: -0.25rem; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem;
+  border-radius: 999px; background: #e5484d; color: #fff; font-size: 0.625rem; font-weight: 700; line-height: 0.875rem;
+  border: 2px solid var(--bg);
+}
+
+.social-page { padding: clamp(1.75rem, 5vw, 4rem) var(--frame) 8rem; }
+.social-h1 { font-family: 'Unbounded'; font-weight: 700; font-size: clamp(1.5rem, 4vw, 2.25rem); letter-spacing: -0.03em; word-break: break-word; }
+.social-kicker { font-family: 'JetBrains Mono', monospace; font-size: 0.625rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-faint); margin-bottom: 0.375rem; }
+.social-meta { color: var(--fg-faint); font-size: 0.8125rem; margin: 0.375rem 0 1.25rem; }
+.social-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+.social-create { display: flex; gap: 0.5rem; max-width: 32rem; margin-bottom: 1.75rem; }
+.social-tabs { display: inline-flex; gap: 0.25rem; padding: 0.25rem; border-radius: var(--r-md); background: var(--bg-2); margin-bottom: 1rem; }
+.social-tab { border: 0; background: transparent; color: var(--fg-muted); font-size: 0.8125rem; font-weight: 600; padding: 0.375rem 0.75rem; border-radius: var(--r-sm); }
+.social-tab[aria-selected="true"] { background: var(--bg-3); color: var(--fg); }
+
+/* Список треков по id */
+.tl { list-style: none; padding: 0; margin: 0; }
+.tl-row { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; align-items: center; gap: 0.625rem; padding: 0.375rem 0.5rem; border-radius: var(--r-sm); }
+.tl-row + .tl-row { border-top: 1px solid var(--line); }
+.tl-row:hover, .tl-row.playing { background: var(--bg-2); }
+.tl-row.playing .tl-title { color: var(--page-accent); }
+.tl-row.unavailable { opacity: 0.55; }
+.tl-row.drag-over { box-shadow: inset 0 2px 0 var(--fg-muted); }
+.tl-row[draggable="true"] { cursor: grab; }
+.tl-num { color: var(--fg-faint); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-align: center; }
+.tl-handle { color: var(--fg-faint); text-align: center; letter-spacing: -0.2em; user-select: none; }
+.tl-main { display: flex; align-items: center; gap: 0.75rem; min-width: 0; background: none; border: 0; padding: 0; text-align: left; color: inherit; }
+.tl-main:disabled { cursor: default; }
+.tl-cover { width: 2.5rem; height: 2.5rem; flex-shrink: 0; border-radius: var(--r-xs); overflow: hidden; background: var(--bg-3); }
+.tl-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tl-text { display: flex; flex-direction: column; min-width: 0; }
+.tl-title { font-weight: 600; font-size: 0.9375rem; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-sub { font-size: 0.75rem; color: var(--fg-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-actions { display: inline-flex; align-items: center; gap: 0.125rem; }
+@media (max-width: 640px) {
+  .tl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tl-num, .tl-handle { display: none; }
+}
+
+/* Плейлисты */
+.pl-cover { display: grid; place-items: center; aspect-ratio: 1; width: 100%; overflow: hidden; border-radius: var(--r-md); background: var(--bg-3); color: var(--fg-faint); }
+.pl-cover.grid { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; place-items: stretch; }
+.pl-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-grid { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 1.25rem; }
+.pl-card { display: flex; flex-direction: column; gap: 0.375rem; color: var(--fg); text-decoration: none; }
+.pl-card:hover .pl-cover { outline: 1px solid var(--fg-muted); }
+.pl-card-title { font-weight: 700; font-size: 0.9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0.25rem; }
+.pl-card-meta { font-size: 0.75rem; color: var(--fg-faint); }
+.pl-head { display: grid; grid-template-columns: clamp(7rem, 22vw, 12rem) minmax(0, 1fr); gap: clamp(1rem, 3vw, 2rem); align-items: end; margin-bottom: 2rem; }
+@media (max-width: 520px) {
+  .pl-head { grid-template-columns: 1fr; }
+  .pl-head-cover { max-width: 12rem; }
+}
+.pl-pick-list { list-style: none; padding: 0; max-height: 16rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
+.pl-pick { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.625rem 0.75rem; border-radius: var(--r-sm); border: 1px solid var(--line-2); background: transparent; color: var(--fg); text-align: left; }
+.pl-pick:hover:not(:disabled) { background: var(--bg-2); }
+.pl-pick-title { font-weight: 600; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cropper-view.square::after { border-radius: 0; }
+
+/* Друзья */
+.user-list { list-style: none; padding: 0; margin-top: 0.75rem; }
+.user-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; }
+.user-row + .user-row { border-top: 1px solid var(--line); }
+.user-row-main { display: flex; align-items: center; gap: 0.75rem; min-width: 0; color: var(--fg); text-decoration: none; }
+.user-row-main > span { display: flex; flex-direction: column; }
+.user-row-nick { font-weight: 700; font-size: 0.9375rem; word-break: break-word; }
+.user-row-sub { font-size: 0.75rem; color: var(--fg-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.375rem; }

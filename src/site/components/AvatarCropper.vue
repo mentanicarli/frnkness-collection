@@ -1,10 +1,11 @@
 <template>
-  <div class="cropper-backdrop" role="dialog" aria-modal="true" aria-label="Обрезка аватара" @keydown.esc="$emit('cancel')">
+  <div class="cropper-backdrop" role="dialog" aria-modal="true" :aria-label="`Обрезка: ${title}`" @keydown.esc="$emit('cancel')">
     <div class="cropper-box">
-      <p class="acc-title" style="font-size: 1.125rem;">Аватар</p>
-      <p class="acc-sub" style="margin-bottom: 0.875rem;">Перетащи картинку и выбери масштаб — в аватар попадёт круг.</p>
+      <p class="acc-title" style="font-size: 1.125rem;">{{ title }}</p>
+      <p class="acc-sub" style="margin-bottom: 0.875rem;">{{ round ? 'Перетащи картинку и выбери масштаб — в аватар попадёт круг.' : 'Перетащи картинку и выбери масштаб — попадёт квадрат.' }}</p>
       <div
         class="cropper-view"
+        :class="{ square: !round }"
         @pointerdown="onDown"
         @pointermove="onMove"
         @pointerup="onUp"
@@ -27,12 +28,16 @@
 </template>
 
 <script setup lang="ts">
-// Обрезка в квадрат и сжатие в браузере: на сервер уходит 256×256
-// (webp, если браузер умеет, иначе jpeg) — десятки килобайт.
+// Обрезка в квадрат и сжатие в браузере: на сервер уходит size×size
+// (аватар — 256, обложка плейлиста — 512; webp, если браузер умеет,
+// иначе jpeg) — десятки килобайт.
 import { onMounted, ref, watch } from 'vue'
 import { AVATAR_SIZE, cropRect } from '@/site/auth/avatars'
 
-const props = defineProps<{ image: HTMLImageElement; busy?: boolean; error?: string }>()
+const props = withDefaults(
+  defineProps<{ image: HTMLImageElement; busy?: boolean; error?: string; size?: number; title?: string; round?: boolean }>(),
+  { busy: false, error: '', size: AVATAR_SIZE, title: 'Аватар', round: true }
+)
 const emit = defineEmits<{ cancel: []; save: [blob: Blob] }>()
 
 const PREVIEW = 512
@@ -86,9 +91,9 @@ function toBlob(c: HTMLCanvasElement, type: string, quality: number): Promise<Bl
 
 async function save() {
   const out = document.createElement('canvas')
-  out.width = AVATAR_SIZE
-  out.height = AVATAR_SIZE
-  draw(out, AVATAR_SIZE)
+  out.width = props.size
+  out.height = props.size
+  draw(out, props.size)
   let blob = await toBlob(out, 'image/webp', 0.85)
   // Старый Safari вместо webp отдаёт png — тогда jpeg.
   if (!blob || blob.type !== 'image/webp') blob = await toBlob(out, 'image/jpeg', 0.88)
