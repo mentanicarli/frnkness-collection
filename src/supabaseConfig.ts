@@ -6,7 +6,7 @@ const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-
 // Публичный ключ (Site Key) виджета Cloudflare Turnstile — капча при
 // регистрации и в заявке «Забыли пароль?». Секретный ключ хранится только
 // в секретах Edge Functions (TURNSTILE_SECRET_KEY). См. docs/accounts-setup.md.
-const DEFAULT_TURNSTILE_SITE_KEY = ''
+const DEFAULT_TURNSTILE_SITE_KEY = '0x4AAAAAAFPFOS1W3XFaMh_t'
 
 // Fallback-значения нужны для локального запуска, если env не задан.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL
