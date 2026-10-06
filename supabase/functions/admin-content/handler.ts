@@ -21,6 +21,7 @@ import {
     validateTrackNotes
 } from '../_shared/rules.ts'
 import { parseTokenExpiration } from '../_shared/tokenExpiry.ts'
+import { isAdminRole, roleOf } from '../_shared/accounts.ts'
 import {
     RELEASES_PATH,
     SITE_PATH,
@@ -62,6 +63,7 @@ export interface AuthUser {
     id: string
     email?: string
     app_metadata?: Record<string, unknown>
+    banned_until?: string | null
 }
 
 export interface StagingObject {
@@ -756,7 +758,9 @@ export function createHandler(deps: HandlerDeps) {
             if (!jwt) throw new HttpError(401, 'unauthorized', 'Нужно войти')
             const user = await deps.getUser(jwt).catch(() => null)
             if (!user) throw new HttpError(401, 'unauthorized', 'Сессия истекла — войди заново')
-            if (user.app_metadata?.role !== 'admin') throw new HttpError(403, 'forbidden', 'Нет доступа')
+            // admin и owner; забаненный админ — без доступа сразу.
+            if (!isAdminRole(roleOf(user.app_metadata))) throw new HttpError(403, 'forbidden', 'Нет доступа')
+            if (user.banned_until && Date.parse(user.banned_until) > deps.now()) throw new HttpError(403, 'forbidden', 'Нет доступа')
 
             let body: Record<string, unknown>
             try {
