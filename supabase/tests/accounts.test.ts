@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
 import { ADMIN, ANON, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { nickKey, techEmail } from '../functions/_shared/accounts.ts'
 
 const TECH = (c: string) => `u-${c.repeat(32)}@id.frnkness.ru`
 
@@ -315,10 +316,87 @@ describe('аккаунты: права', () => {
         })
     })
 
+    describe('SQL-помощники для SQL Editor', () => {
+        it.each(['frnkness', 'Ян_Ёлкин', 'ДPУГ', 'B0T.x-y', 'Мой'.normalize('NFD'), '  Hello  '])('ключ ника и адрес совпадают с TypeScript: %s', async (nick) => {
+            const row = await one('select public.account_nick_key($1) k, public.account_tech_email($1) e', [nick])
+            expect(row.k).toBe(nickKey(nick))
+            expect(row.e).toBe(await techEmail(nick))
+        })
+
+        it('недоступны сайту', async () => {
+            await expect(as(db, 'authenticated', USER, "select public.account_tech_email('x')")).rejects.toThrow(/permission denied/)
+        })
+    })
+
     describe('лимиты', () => {
+        it('rate_limit_hit недоступен вошедшим', async () => {
+            await expect(as(db, 'authenticated', USER, "select public.rate_limit_hit('x', 'y', 1, interval '1 day')")).rejects.toThrow(/permission denied/)
+        })
+    })
+
+    describe('лимиты: service role', () => {
         it('rate_limit_hit: разрешает до лимита, потом отказывает', async () => {
             const hit = async () => (await as(db, 'service_role', { role: 'service_role' }, "select public.rate_limit_hit('register', 'ip1', 2, interval '1 day') v")).rows[0].v
             expect([await hit(), await hit(), await hit()]).toEqual([true, true, false])
         })
+    })
+})
+
+describe('SQL из инструкции (supabase/setup)', () => {
+    let db: PGlite
+    const read = (name: string) => fs.readFileSync(path.join(REPO, 'supabase/setup', name), 'utf8')
+    const one = async (sql: string, params?: unknown[]) => (await db.query<any>(sql, params)).rows[0]
+
+    beforeAll(async () => {
+        db = await createDb()
+        // До этапа: у админов настоящие email и роль admin, владельца нет.
+        await db.exec(`update auth.users set raw_app_meta_data = '{"provider":"email","role":"admin"}' where id = '${OWNER.sub}';
+            insert into auth.identities (user_id, provider, identity_data) values ('${OWNER.sub}', 'email', '{"email":"owner@example.com"}');`)
+        await applyMigrations(db)
+    }, 60_000)
+
+    const ownerSql = (rows: string) => read('accounts_owner.sql').replace(/\('ТВОЙ_EMAIL@example\.com'[\s\S]*?'admin'\)/, rows)
+
+    // Ошибка в середине скрипта — вся транзакция откатывается (как в SQL Editor).
+    const fails = async (sql: string, re: RegExp) => {
+        await expect(db.exec(sql)).rejects.toThrow(re)
+        await db.exec('rollback')
+    }
+
+    it('проверяет ник и находит аккаунт до любых изменений', async () => {
+        await fails(ownerSql("('owner@example.com', 'ab', 'owner')"), /не подходит/)
+        await fails(ownerSql("('nobody@example.com', 'frnkness', 'owner')"), /Не найден аккаунт/)
+        await fails(ownerSql("('owner@example.com', 'frnk.ness', 'owner'), ('admin@example.com', 'FRNK_NESS', 'admin')"), /совпадают/)
+        expect((await one(`select email from auth.users where id = '${OWNER.sub}'`)).email).toBe('owner@example.com')
+    })
+
+    it('выдаёт ники, роли owner/admin и технические адреса; повтор безопасен', async () => {
+        const sql = ownerSql("('owner@example.com', 'frnkness', 'owner'), ('Admin@Example.com', 'Друг', 'admin')")
+        await db.exec(sql)
+        await db.exec(sql)
+        const rows = (await db.query<any>(`select p.nick, p.nick_key, u.email, u.raw_app_meta_data ->> 'role' r from auth.users u join public.profiles p on p.id = u.id order by 1`)).rows
+        expect(rows).toEqual([
+            { nick: 'frnkness', nick_key: nickKey('frnkness'), email: await techEmail('frnkness'), r: 'owner' },
+            { nick: 'Друг', nick_key: nickKey('Друг'), email: await techEmail('друг'), r: 'admin' }
+        ])
+        expect((await one(`select identity_data ->> 'email' e from auth.identities where user_id = '${OWNER.sub}'`)).e).toBe(await techEmail('frnkness'))
+        expect((await one(`select count(*)::int n from public.account_private`)).n).toBe(2)
+    })
+
+    it('аварийный выход: роль владельца и новый пароль возвращаются по нику', async () => {
+        const blocks = read('accounts_emergency.sql').split(/^-- ── /m)
+        const block = (n: number) => '-- ' + blocks.find((b) => b.startsWith(`${n}.`))!.replace(/ТвойНик/g, 'frnkness')
+        await db.exec(`begin; set local app.owner_override = 'on';
+            update auth.users set raw_app_meta_data = '{"role":"user"}', banned_until = now() + interval '1 year' where id = '${OWNER.sub}'; commit;`)
+        await db.exec(`insert into auth.sessions (user_id) values ('${OWNER.sub}')`)
+        expect((await db.query(block(0))).rows.length).toBeGreaterThan(0)
+        await db.exec(block(1))
+        await db.exec(block(2))
+        expect(await one(`select raw_app_meta_data ->> 'role' r, banned_until, encrypted_password p from auth.users where id = '${OWNER.sub}'`)).toEqual({
+            r: 'owner',
+            banned_until: null,
+            p: expect.stringMatching(/^crypt:/)
+        })
+        expect((await one(`select count(*)::int n from auth.sessions where user_id = '${OWNER.sub}'`)).n).toBe(0)
     })
 })

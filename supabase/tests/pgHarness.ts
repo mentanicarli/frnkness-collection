@@ -72,6 +72,17 @@ export async function createDb(normalizeSql: string = NORMALIZE_OK): Promise<PGl
             user_id uuid not null references auth.users (id) on delete cascade,
             created_at timestamptz not null default now()
         );
+        create table auth.identities (
+            id uuid primary key default gen_random_uuid(),
+            user_id uuid not null references auth.users (id) on delete cascade,
+            provider text not null,
+            identity_data jsonb not null default '{}'
+        );
+        -- pgcrypto в Supabase лежит в схеме extensions; здесь — заглушки.
+        create schema extensions;
+        create function extensions.gen_salt(t text) returns text language sql as $$ select '$2a$06$stubstubstubstubstubst' $$;
+        create function extensions.crypt(p text, salt text) returns text language sql as $$ select 'crypt:' || md5(p) $$;
+        alter table auth.users add column encrypted_password text;
         create table auth.refresh_tokens (
             id bigserial primary key,
             user_id varchar(255),
