@@ -23,7 +23,9 @@ export default defineConfig({
         timeout: 120_000,
         env: {
             VITE_SUPABASE_URL: 'https://mock.supabase.test',
-            VITE_SUPABASE_ANON_KEY: 'test-anon-key'
+            VITE_SUPABASE_ANON_KEY: 'test-anon-key',
+            // Виджет Turnstile в тестах поддельный (e2e/mocks.ts).
+            VITE_TURNSTILE_SITE_KEY: 'e2e-site-key'
         }
     }
 })

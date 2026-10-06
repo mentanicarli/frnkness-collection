@@ -73,6 +73,7 @@ async function applySession(s: Session | null): Promise<void> {
     accessToken = s?.access_token ?? null
     if (!s) {
         loadSeq++
+        loading = null
         if (state.user && !manualSignOut) state.expired = true
         manualSignOut = false
         state.user = null
@@ -86,11 +87,22 @@ async function applySession(s: Session | null): Promise<void> {
         state.user.role = roleOf(s.user.app_metadata)
         return
     }
-    await loadAccount(s).catch(() => {
-        // Профиль не прочитался (нет сети) — пускаем с тем, что есть в токене.
-        state.user = { id: s.user.id, nick: '', role: roleOf(s.user.app_metadata), avatar: 'initials:0', bio: '', createdAt: s.user.created_at }
-    })
+    // При запуске сессию приносят и getSession(), и событие INITIAL_SESSION:
+    // второй вызов ждёт ту же загрузку, а не начинает новую.
+    if (loading?.id === s.user.id) return loading.promise
+    const promise = loadAccount(s)
+        .catch(() => {
+            // Профиль не прочитался (нет сети) — пускаем с тем, что есть в токене.
+            state.user = { id: s.user.id, nick: '', role: roleOf(s.user.app_metadata), avatar: 'initials:0', bio: '', createdAt: s.user.created_at }
+        })
+        .finally(() => {
+            if (loading?.promise === promise) loading = null
+        })
+    loading = { id: s.user.id, promise }
+    return promise
 }
+
+let loading: { id: string; promise: Promise<void> } | null = null
 
 export function initSession(): Promise<void> {
     if (!initialized) {

@@ -6,11 +6,11 @@
       <p class="acc-sub">Ты вошёл с временным паролем. Чтобы продолжить, задай свой — временный больше не подойдёт.</p>
       <form class="acc-form" novalidate @submit.prevent="submit">
         <input class="sr-only" type="text" name="username" autocomplete="username" :value="session.user?.nick ?? ''" readonly tabindex="-1" aria-hidden="true">
-        <label class="acc-field">
-          <span class="acc-label">Новый пароль</span>
-          <input v-model="password" class="acc-input" type="password" name="new-password" autocomplete="new-password" required>
-          <span class="acc-hint">Минимум 8 символов, не совпадает с ником</span>
-        </label>
+        <div class="acc-field">
+          <label class="acc-label" for="cp-pass">Новый пароль</label>
+          <input id="cp-pass" v-model="password" class="acc-input" type="password" name="new-password" autocomplete="new-password" aria-describedby="cp-pass-hint" required>
+          <span id="cp-pass-hint" class="acc-hint">Минимум 8 символов, не совпадает с ником</span>
+        </div>
         <label class="acc-field">
           <span class="acc-label">Повтор пароля</span>
           <input v-model="password2" class="acc-input" type="password" name="new-password-repeat" autocomplete="new-password" required>

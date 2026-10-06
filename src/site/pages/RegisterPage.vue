@@ -5,9 +5,10 @@
       <h1 class="acc-title">Регистрация</h1>
       <p class="acc-sub">Почта не нужна. Запомни ник и пароль: восстановить доступ можно только заявкой владельцу сайта.</p>
       <form class="acc-form" novalidate @submit.prevent="submit">
-        <label class="acc-field">
-          <span class="acc-label">Ник</span>
+        <div class="acc-field">
+          <label class="acc-label" for="reg-nick">Ник</label>
           <input
+            id="reg-nick"
             v-model="nick"
             class="acc-input"
             name="username"
@@ -15,22 +16,23 @@
             autocapitalize="off"
             spellcheck="false"
             maxlength="20"
+            aria-describedby="reg-nick-hint"
             :aria-invalid="nickTouched && nickError ? 'true' : 'false'"
             required
             @blur="nickTouched = true"
           >
-          <span v-if="nickTouched && nickError" class="acc-hint" style="color: #ffb3b5;">{{ nickError }}</span>
-          <span v-else class="acc-hint">3–20 символов: русские и латинские буквы, цифры, «_», «.», «-»</span>
-        </label>
-        <label class="acc-field">
-          <span class="acc-label">Пароль</span>
-          <input v-model="password" class="acc-input" type="password" name="new-password" autocomplete="new-password" required>
-          <span class="acc-hint">Минимум 8 символов, не совпадает с ником</span>
-        </label>
-        <label class="acc-field">
-          <span class="acc-label">Повтор пароля</span>
-          <input v-model="password2" class="acc-input" type="password" name="new-password-repeat" autocomplete="new-password" required>
-        </label>
+          <span v-if="nickTouched && nickError" id="reg-nick-hint" class="acc-hint" style="color: #ffb3b5;">{{ nickError }}</span>
+          <span v-else id="reg-nick-hint" class="acc-hint">3–20 символов: русские и латинские буквы, цифры, «_», «.», «-»</span>
+        </div>
+        <div class="acc-field">
+          <label class="acc-label" for="reg-pass">Пароль</label>
+          <input id="reg-pass" v-model="password" class="acc-input" type="password" name="new-password" autocomplete="new-password" aria-describedby="reg-pass-hint" required>
+          <span id="reg-pass-hint" class="acc-hint">Минимум 8 символов, не совпадает с ником</span>
+        </div>
+        <div class="acc-field">
+          <label class="acc-label" for="reg-pass2">Повтор пароля</label>
+          <input id="reg-pass2" v-model="password2" class="acc-input" type="password" name="new-password-repeat" autocomplete="new-password" required>
+        </div>
         <label class="acc-check">
           <input v-model="agree" type="checkbox" name="agree">
           <span>Согласен с тем, <RouterLink class="acc-link" :to="{ name: 'privacy' }" target="_blank">какие данные хранятся</RouterLink></span>

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { installMocks } from './mocks'
+import { installMocks, signInSite } from './mocks'
 
 // Основной сайт в настоящем Chromium: настоящее воспроизведение mp3 и
 // отправка сессии в /rest/v1/rpc/record_listen_session (замокано).
@@ -16,6 +16,7 @@ async function openRelease(page: import('@playwright/test').Page, status = 204) 
             return { status, body: status === 404 ? { code: 'PGRST202', message: 'Could not find the function' } : null }
         }
     })
+    await signInSite(page)
     page.on('request', (req) => {
         if (req.url().includes('/rest/v1/rpc/record_listen_session') && req.method() === 'POST') {
             sessions.push({ body: JSON.parse(req.postData() || '{}'), apikey: req.headers()['apikey'] ?? null })

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
-import { ADMIN_USER, FIXTURE_UPLOADS, installMocks, loginAs, repoFile, type ContentCall } from './mocks'
+import { ADMIN_USER, FIXTURE_UPLOADS, installMocks, loginAs, repoFile, signInSite, type ContentCall } from './mocks'
 
 const COVER = { name: 'announce.jpg', mimeType: 'image/jpeg', buffer: fs.readFileSync(path.join(FIXTURE_UPLOADS, 'square.jpg')) }
 // «Сейчас» в браузере — 2 октября 2026, 12:00 МСК.
@@ -176,6 +176,7 @@ test('анонс истёк — подсказка на «Промо» и «Об
 async function openSiteWithAnnounce(page: Page, announce: object | null, promoEnabled = true) {
     await page.clock.install({ time: NOW })
     await installMocks(page)
+    await signInSite(page)
     // Dev-сервер отдаёт site.json как JS-модуль — подменяем его для теста.
     await page.route(/\/src\/content\/site\.json/, (route) =>
         route.fulfill({

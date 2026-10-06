@@ -173,7 +173,7 @@ test('конфликт: тот же файл изменили — кто и чт
     // Перезагрузка: работа не потеряна — черновик предлагается восстановить.
     conflict = false
     await page.reload()
-    await expect(page.getByTestId('draft-offer')).toContainText('Есть несохранённый черновик (admin@example.com)')
+    await expect(page.getByTestId('draft-offer')).toContainText(`Есть несохранённый черновик (${ADMIN_USER.nick})`)
     await expect(lyricsInput(page)).not.toHaveValue('Новый текст')
     await page.getByRole('button', { name: 'Восстановить черновик' }).click()
     await expect(lyricsInput(page)).toHaveValue('Новый текст')

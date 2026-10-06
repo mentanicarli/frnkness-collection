@@ -18,11 +18,11 @@
             <span class="acc-label">Ник</span>
             <input v-model="nick" class="acc-input" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="40" required>
           </label>
-          <label class="acc-field">
-            <span class="acc-label">Как с тобой связаться</span>
-            <input v-model="contact" class="acc-input" name="contact" maxlength="200" placeholder="Например, Telegram: @nick" required>
-            <span class="acc-hint">Контакт удаляется, как только заявку закроют</span>
-          </label>
+          <div class="acc-field">
+            <label class="acc-label" for="rec-contact">Как с тобой связаться</label>
+            <input id="rec-contact" v-model="contact" class="acc-input" name="contact" maxlength="200" placeholder="Например, Telegram: @nick" aria-describedby="rec-contact-hint" required>
+            <span id="rec-contact-hint" class="acc-hint">Контакт удаляется, как только заявку закроют</span>
+          </div>
           <label class="acc-field">
             <span class="acc-label">Комментарий (по желанию)</span>
             <textarea v-model="comment" class="acc-textarea" name="comment" maxlength="500"></textarea>

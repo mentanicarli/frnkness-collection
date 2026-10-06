@@ -183,7 +183,19 @@ test('нет прав на RPC — понятная ошибка, а не пус
     await installMocks(page, { rpc: statsRpc(mock) })
     await loginAs(page, ADMIN_USER)
     await page.getByRole('link', { name: 'Статистика' }).click()
-    await expect(page.getByRole('alert')).toHaveText('Нет доступа к статистике')
+    await expect(page.getByRole('alert').first()).toHaveText('Нет доступа к статистике')
+    // Блок пользователей тоже говорит понятно, а не показывает нули.
+    await expect(page.getByTestId('users-stats').getByRole('alert')).toHaveText('Нет доступа')
+})
+
+test('пользователи: число, активные, регистрации по дням', async ({ page }) => {
+    const mock: StatsMock = { rpcCalls: [] }
+    await installMocks(page, { rpc: statsRpc(mock) })
+    await loginAs(page, ADMIN_USER)
+    await page.getByRole('link', { name: 'Статистика' }).click()
+    const card = page.getByTestId('users-stats')
+    await expect(card.locator('.adm-tile-value').first()).toHaveText('4')
+    await expect(card.locator('.adm-chart-table tbody tr')).toHaveCount(30)
 })
 
 test('телефон: дашборд без горизонтальной прокрутки', async ({ page }) => {
