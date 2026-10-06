@@ -49,6 +49,7 @@ beforeEach(() => {
     audio.pause = vi.fn()
     setAudio(audio)
     Object.assign(player, {
+        queue: null, shuffle: false, currentTrackId: null,
         currentRelease: null, currentReleaseId: null, currentTrackIndex: -1, playSession: 0, isPlaying: false,
         visible: false, flowModeActive: false, trackCounted: false, trackCountPending: false
     })
@@ -155,6 +156,102 @@ describe('открытый и играющий релиз', () => {
         expect(isTrackHighlighted('a', 1)).toBe(true)
         engine.closeMiniPlayer()
         expect(isTrackHighlighted('a', 1)).toBe(false)
+    })
+})
+
+describe('очередь: источники', () => {
+    const ended = () => engine.nextTrack()
+
+    it('плейлист: треки разных релизов по порядку, недоступный пропускается, по кругу', () => {
+        engine.playList({ kind: 'playlist', playlistId: 'p', title: 'Мой' }, ['b/t2', 'gone/x', 'a/t1', 'a/t3'])
+        expect(player.currentTrackId).toBe('b/t2')
+        expect(player.currentReleaseId).toBe('b')
+        ended()
+        expect(player.currentTrackId).toBe('a/t1')
+        expect(player.currentReleaseId).toBe('a')
+        expect(player.currentTrackIndex).toBe(0)
+        ended()
+        ended()
+        expect(player.currentTrackId).toBe('b/t2')
+        engine.prevTrack()
+        expect(player.currentTrackId).toBe('a/t3')
+        expect(player.queue?.source).toEqual({ kind: 'playlist', playlistId: 'p', title: 'Мой' })
+    })
+
+    it('избранное с выбранного трека; открытие релиза не меняет очередь', () => {
+        engine.playList({ kind: 'favorites', ownerId: 'u' }, ['a/t2', 'b/t1'], 1)
+        view.viewedReleaseId = 'a'
+        engine.nextTrack()
+        expect(player.currentTrackId).toBe('a/t2')
+    })
+
+    it('Поток: включается кнопкой, «вперёд» — случайный трек каталога, не тот же', () => {
+        engine.startFlowMode()
+        expect(player.flowModeActive).toBe(true)
+        const seen = new Set<string>()
+        let prev = player.currentTrackId
+        for (let i = 0; i < 30; i++) {
+            engine.nextTrack()
+            expect(player.currentTrackId).not.toBe(prev)
+            prev = player.currentTrackId
+            seen.add(prev!)
+        }
+        expect(seen.size).toBeGreaterThan(2)
+    })
+
+    it('Поток: трек из треклиста не выключает Поток; выключение — дальше по релизу', () => {
+        engine.startFlowMode()
+        engine.playTrackByRef('a', 1)
+        expect(player.flowModeActive).toBe(true)
+        expect(player.currentTrackId).toBe('a/t2')
+        engine.stopFlowMode()
+        expect(player.flowModeActive).toBe(false)
+        expect(player.currentTrackId).toBe('a/t2')
+        engine.nextTrack()
+        expect(player.currentTrackId).toBe('a/t3')
+    })
+
+    it('Поток по избранному — только из избранного', () => {
+        engine.startFavoritesFlow('u', ['a/t1', 'b/t2'])
+        expect(player.flowModeActive).toBe(false)
+        for (let i = 0; i < 10; i++) {
+            expect(['a/t1', 'b/t2']).toContain(player.currentTrackId)
+            engine.nextTrack()
+        }
+    })
+
+    it('перемешивание: включается посреди релиза, все треки за круг, выключение — обычный порядок', () => {
+        engine.playTrackByRef('a', 0)
+        engine.toggleShuffle()
+        expect(player.shuffle).toBe(true)
+        const lap = [player.currentTrackId]
+        for (let i = 0; i < 2; i++) {
+            engine.nextTrack()
+            lap.push(player.currentTrackId)
+        }
+        expect([...lap].sort()).toEqual(['a/t1', 'a/t2', 'a/t3'])
+        engine.toggleShuffle()
+        engine.playTrackByRef('a', 0)
+        engine.nextTrack()
+        expect(player.currentTrackId).toBe('a/t2')
+    })
+
+    it('«Перемешать» в плейлисте — случайный старт и включённое перемешивание', () => {
+        engine.playListShuffled({ kind: 'playlist', playlistId: 'p', title: 'x' }, ['a/t1', 'a/t2', 'b/t1'])
+        expect(player.shuffle).toBe(true)
+        expect(player.queue?.shuffle).toBe(true)
+        expect(['a/t1', 'a/t2', 'b/t1']).toContain(player.currentTrackId)
+    })
+
+    it('очередь хозяина комнаты (remote): кнопки гостя её не двигают', async () => {
+        const { createListQueue } = await import('../player/queue')
+        const q = createListQueue({ kind: 'playlist', playlistId: 'room', title: 'Комната' }, ['a/t1', 'a/t2'], 0, () => true)!
+        engine.replaceQueue({ ...q, controller: 'remote' })
+        engine.nextTrack()
+        engine.prevTrack()
+        engine.toggleShuffle()
+        expect(player.currentTrackId).toBe('a/t1')
+        expect(player.shuffle).toBe(false)
     })
 })
 

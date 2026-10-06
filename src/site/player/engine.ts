@@ -1,7 +1,6 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL, releases } from '@/config'
-import type { TrackRef } from '@/types'
 import { buildAssetUrl } from '@/utils/helpers'
-import { getAllTrackRefs, isSameTrackRef } from '@/utils/lyrics'
+import { findTrackById } from '@/utils/trackIds'
 import { setupMediaSession } from '@/runtime/mediaSession'
 import { createListenSender, setupListenTracker } from '@/runtime/listenTracker'
 import { currentAccessToken } from '../session'
@@ -10,34 +9,103 @@ import { incrementPlayCount } from '../services/stats'
 import { view } from '../stores/view'
 import { getAudio, setAudio } from './audio'
 import { loadLyrics, updateKaraoke } from './karaoke'
+import {
+    type Queue,
+    type QueueSource,
+    createEndlessQueue,
+    createListQueue,
+    currentTrackId,
+    jumpTo,
+    nextInQueue,
+    prevInQueue,
+    setQueueShuffle
+} from './queue'
 import { karaoke, player } from './state'
 
 /**
- * Движок плеера: запуск треков, пауза, перемотка, Поток, громкость,
- * засчёт прослушиваний. Отрисовку делают MiniPlayer.vue и
- * FullscreenPlayer.vue по состоянию из ./state.
+ * Движок плеера: очередь (./queue.ts), запуск треков, пауза, перемотка,
+ * Поток, перемешивание, громкость, засчёт прослушиваний. Отрисовку делают
+ * MiniPlayer.vue и FullscreenPlayer.vue по состоянию из ./state.
  */
 
 type Direction = 'next' | 'prev' | 'fade' | null
 
 const COUNT_AFTER_SEC = 10
 
+/** Трек есть в каталоге (иначе — «недоступен», очередь его пропускает). */
+export const isTrackAvailable = (trackId: string): boolean => findTrackById(releases, trackId) !== null
+
+const releaseTrackIds = (releaseId: string): string[] => releases[releaseId]?.tracks.map((t) => t.id) ?? []
+const catalogTrackIds = (): string[] => Object.values(releases).flatMap((r) => r.tracks.map((t) => t.id))
+
+// ── Очередь ─────────────────────────────────────────────────────────────
+
+function setQueue(queue: Queue | null) {
+    player.queue = queue
+    player.flowModeActive = queue?.source.kind === 'flow'
+}
+
+/** Сделать очередь текущей и запустить её текущий трек. */
+function playFromQueue(queue: Queue, direction: Direction): void {
+    const ref = findTrackById(releases, currentTrackId(queue) ?? '')
+    if (!ref) return
+    setQueue(queue)
+    player.currentRelease = releases[ref.releaseId]
+    player.currentReleaseId = ref.releaseId
+    startTrack(ref.trackIndex, direction)
+}
+
+/**
+ * Очередь целиком извне. Этап 4: очередь комнаты присылает хозяин —
+ * с controller 'remote' кнопки «вперёд/назад» гостя её не двигают.
+ */
+export function replaceQueue(queue: Queue, direction: Direction = 'fade'): void {
+    playFromQueue(queue, direction)
+}
+
+/**
+ * Список треков (плейлист, избранное) с трека startIndex. С
+ * перемешиванием — если оно включено или передано явно.
+ */
+export function playList(source: QueueSource, trackIds: readonly string[], startIndex = 0, options: { shuffle?: boolean } = {}): void {
+    const shuffle = options.shuffle ?? player.shuffle
+    if (options.shuffle !== undefined) player.shuffle = options.shuffle
+    const queue = createListQueue(source, trackIds, startIndex, isTrackAvailable, { shuffle })
+    if (queue) playFromQueue(queue, 'fade')
+}
+
+/** Перемешать список и начать со случайного трека. */
+export function playListShuffled(source: QueueSource, trackIds: readonly string[]): void {
+    const available = trackIds.map((id, i) => (isTrackAvailable(id) ? i : -1)).filter((i) => i >= 0)
+    if (!available.length) return
+    playList(source, trackIds, available[Math.floor(Math.random() * available.length)], { shuffle: true })
+}
+
 // ── Поток ───────────────────────────────────────────────────────────────
 
-function pickRandomTrackRef(exclude: TrackRef | null = null): TrackRef | null {
-    const refs = getAllTrackRefs(releases).filter((ref) => !exclude || !isSameTrackRef(ref, exclude))
-    return refs.length ? refs[Math.floor(Math.random() * refs.length)] : null
+/** Бесконечный случайный порядок по пулу: весь каталог или избранное. */
+function startEndless(source: QueueSource, pool: readonly string[]): void {
+    const queue = createEndlessQueue(source, pool, isTrackAvailable)
+    if (queue) playFromQueue(queue, 'fade')
 }
 
 export function startFlowMode(): void {
-    const next = pickRandomTrackRef()
-    if (!next) return
-    player.flowModeActive = true
-    playTrackByRef(next.releaseId, next.trackIndex, 'fade')
+    startEndless({ kind: 'flow' }, catalogTrackIds())
 }
 
+/** Поток по избранному (своему или друга). */
+export function startFavoritesFlow(ownerId: string, trackIds: readonly string[]): void {
+    startEndless({ kind: 'favorites-flow', ownerId }, trackIds)
+}
+
+/** Выключить Поток: трек доигрывает, дальше — по его релизу. */
 export function stopFlowMode(): void {
-    player.flowModeActive = false
+    const queue = player.queue
+    if (!queue?.endless || !player.currentReleaseId) {
+        player.flowModeActive = false
+        return
+    }
+    setQueue(createListQueue({ kind: 'release', releaseId: player.currentReleaseId }, releaseTrackIds(player.currentReleaseId), player.currentTrackIndex, isTrackAvailable, { shuffle: player.shuffle }))
 }
 
 export function toggleFlowMode(): void {
@@ -45,12 +113,11 @@ export function toggleFlowMode(): void {
     else startFlowMode()
 }
 
-function playFlowNext(direction: Direction = 'next') {
-    const current = player.currentReleaseId !== null
-        ? { releaseId: player.currentReleaseId, trackIndex: player.currentTrackIndex }
-        : null
-    const next = pickRandomTrackRef(current)
-    if (next) playTrackByRef(next.releaseId, next.trackIndex, direction)
+/** Перемешивание: для списков — сразу, для Потока смысла нет (и так случайно). */
+export function toggleShuffle(): void {
+    if (player.queue?.controller === 'remote') return
+    player.shuffle = !player.shuffle
+    if (player.queue && !player.queue.endless) player.queue = setQueueShuffle(player.queue, player.shuffle)
 }
 
 // ── Предзагрузка ────────────────────────────────────────────────────────
@@ -80,26 +147,44 @@ export function runWhenIdle(fn: () => void): void {
 
 // ── Воспроизведение ─────────────────────────────────────────────────────
 
-// Единственная точка запуска трека из другого релиза: явно задаёт
-// играющий релиз. Треклист, поиск, чарт, страница трека и Поток идут сюда.
+// Трек релиза: треклист, поиск, чарт, страница трека. Очередь — этот
+// релиз; если играет Поток по каталогу — он продолжается с этого трека.
 export function playTrackByRef(releaseId: string, trackIndex: number, direction: Direction = 'fade'): void {
     const release = releases[releaseId]
-    if (!release || !release.tracks[trackIndex]) return
-    player.currentRelease = release
-    player.currentReleaseId = releaseId
-    playTrack(trackIndex, direction)
+    const track = release?.tracks[trackIndex]
+    if (!release || !track) return
+    const queue = player.queue
+    if (queue?.source.kind === 'flow' && queue.controller === 'local') {
+        const jumped = jumpTo(queue, queue.trackIds.indexOf(track.id))
+        if (jumped) return playFromQueue(jumped, direction)
+    }
+    const next = createListQueue({ kind: 'release', releaseId }, releaseTrackIds(releaseId), trackIndex, () => true, { shuffle: player.shuffle })
+    if (next) playFromQueue(next, direction)
+}
+
+// Трек index ИГРАЮЩЕГО релиза — в той же очереди, если это очередь релиза.
+export function playTrack(index: number, direction: Direction = null): void {
+    const releaseId = player.currentReleaseId
+    const queue = player.queue
+    if (!releaseId) return
+    if (queue?.source.kind === 'release' && queue.source.releaseId === releaseId) {
+        const jumped = jumpTo(queue, index)
+        if (jumped) return playFromQueue(jumped, direction)
+    }
+    playTrackByRef(releaseId, index, direction)
 }
 
 let trackStartSeq = 0
 
-// Запуск трека index ИГРАЮЩЕГО релиза (next/prev/ended). Чтобы сменить
-// релиз, используйте playTrackByRef.
-export function playTrack(index: number, direction: Direction = null): void {
+// Запуск трека index играющего релиза (player.currentRelease уже выставлен
+// очередью).
+function startTrack(index: number, direction: Direction): void {
     const release = player.currentRelease
     const audio = getAudio()
     const track = release?.tracks[index]
     if (!release || !track || !audio) return
 
+    player.currentTrackId = track.id
     player.currentTrackIndex = index
     player.playSession += 1
     player.trackCounted = false
@@ -117,9 +202,10 @@ export function playTrack(index: number, direction: Direction = null): void {
         void updatePageAccent(release.cover)
     }
 
-    if (player.currentReleaseId) {
-        preloadTrackMetadata(player.currentReleaseId, (index + 1) % release.tracks.length)
-    }
+    // Следующий по списку — заранее (в Потоке следующий заранее неизвестен).
+    const upcoming = player.queue && !player.queue.endless ? nextInQueue(player.queue, isTrackAvailable) : null
+    const upcomingRef = upcoming ? findTrackById(releases, currentTrackId(upcoming) ?? '') : null
+    if (upcomingRef) preloadTrackMetadata(upcomingRef.releaseId, upcomingRef.trackIndex)
 
     const playPromise = audio.play()
     if (playPromise && typeof playPromise.then === 'function') {
@@ -149,20 +235,21 @@ export function togglePlay(): void {
     }
 }
 
+// «Вперёд/назад», конец трека, экран блокировки — по очереди любого
+// источника. Очередь хозяина комнаты (controller 'remote') гость не двигает.
 export function nextTrack(): void {
-    if (player.flowModeActive) {
-        playFlowNext('next')
-        return
-    }
-    const release = player.currentRelease
-    if (release) playTrack((player.currentTrackIndex + 1) % release.tracks.length, 'next')
+    const queue = player.queue
+    if (!queue || queue.controller === 'remote') return
+    const next = nextInQueue(queue, isTrackAvailable)
+    if (next) playFromQueue(next, 'next')
 }
 
 export function prevTrack(): void {
-    const release = player.currentRelease
-    if (release) {
-        playTrack(player.currentTrackIndex === 0 ? release.tracks.length - 1 : player.currentTrackIndex - 1, 'prev')
-    }
+    const queue = player.queue
+    if (!queue || queue.controller === 'remote') return
+    const prev = prevInQueue(queue, isTrackAvailable)
+    if (prev) playFromQueue(prev, 'prev')
+    else seekTo(0)
 }
 
 /** Перемотка по клику на полосе прогресса: fraction — доля от 0 до 1. */
