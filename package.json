@@ -13,15 +13,15 @@
     "check:function": "cd supabase/functions && npx -y deno@2 check admin-content/index.ts admin-users/index.ts account/index.ts register/index.ts recovery-request/index.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.103.3",
+    "@supabase/supabase-js": "^2.117.2",
     "colorthief": "^2.4.0",
-    "vue": "^3.3.0",
+    "vue": "^3.5.43",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
-    "@tailwindcss/vite": "^4.0.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "jsdom": "^29.1.1",
