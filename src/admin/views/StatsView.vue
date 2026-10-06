@@ -225,12 +225,15 @@
         </section>
     </template>
     <div v-else-if="loadingBase && !error" class="adm-empty"><span class="adm-spinner"></span></div>
+
+    <UsersStatsCard style="margin-top: 1rem" />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { Releases } from '@/types'
 import BarChart, { type BarPoint } from '../components/BarChart.vue'
+import UsersStatsCard from '../components/UsersStatsCard.vue'
 import { useRepo } from '../composables/useRepo'
 import { AdminApiError } from '../api/content'
 import {

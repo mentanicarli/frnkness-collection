@@ -64,7 +64,11 @@ export interface AuthUser {
     email?: string
     app_metadata?: Record<string, unknown>
     banned_until?: string | null
+    /** Ник из профиля — им подписываются правки (адрес аккаунта технический). */
+    nick?: string | null
 }
+
+const userLabel = (user: AuthUser) => user.nick || user.email || null
 
 export interface StagingObject {
     name: string
@@ -252,7 +256,7 @@ export function createHandler(deps: HandlerDeps) {
         const res = await gh(repoPath())
         const repo = (await res.json()) as { full_name: string; default_branch: string }
         return {
-            user: { email: user.email ?? null },
+            user: { email: userLabel(user) },
             repo: repo.full_name,
             branch: env.branch,
             // Срок fine-grained токена; null — токен без срока.
@@ -449,7 +453,7 @@ export function createHandler(deps: HandlerDeps) {
             return [...treeEntries, ...removals]
         }
 
-        const fullMessage = withCommitUser(message, user.email)
+        const fullMessage = withCommitUser(message, userLabel(user))
         const touched = [...seen]
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
             if (attempt > 0) await (deps.sleep ?? sleep)(RETRY_DELAYS_MS[attempt - 1] ?? 1500)
@@ -719,7 +723,7 @@ export function createHandler(deps: HandlerDeps) {
             throw new HttpError(422, 'revert_blocked', 'Откат невозможен', details.length ? details : ['Откатывать нечего'])
         }
         const message = revertMessage(commit.commit.message)
-        const result = await writeCommit(head, withCommitUser(message, user.email), plan.entries as TreeEntry[])
+        const result = await writeCommit(head, withCommitUser(message, userLabel(user)), plan.entries as TreeEntry[])
         if (result === 'race') throw new HttpError(409, 'conflict', 'Данные на сайте изменились, пока ты смотрел историю. Обнови страницу и повтори откат.')
         return { ...result, message }
     }

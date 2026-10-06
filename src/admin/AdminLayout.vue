@@ -3,11 +3,12 @@
         <div class="adm-top-inner">
             <a class="adm-brand" href="#/">frnk ness<small>админка</small></a>
             <nav class="adm-nav" aria-label="Разделы">
-                <a v-for="item in NAV" :key="item.id" :href="item.id === 'home' ? '#/' : '#/' + item.id"
+                <a v-for="item in nav" :key="item.id" :href="item.id === 'home' ? '#/' : '#/' + item.id"
                    :class="{ active: route.section.value === item.id }">{{ item.label }}</a>
             </nav>
             <div class="adm-user">
-                <span class="adm-user-email">{{ auth.email.value }}</span>
+                <a class="adm-small adm-faint" href="./">На сайт</a>
+                <span class="adm-user-email" data-testid="admin-nick">{{ auth.name.value }}</span>
                 <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click="auth.signOut()">Выйти</button>
             </div>
         </div>
@@ -30,6 +31,8 @@ const route = useRoute()
 
 const NAV = [
     { id: 'home', label: 'Обзор' },
+    { id: 'users', label: 'Пользователи' },
+    { id: 'recovery', label: 'Заявки', ownerOnly: true },
     { id: 'stats', label: 'Статистика' },
     { id: 'lyrics', label: 'Тексты' },
     { id: 'lrc', label: 'Караоке' },
@@ -38,13 +41,18 @@ const NAV = [
     { id: 'releases', label: 'Релизы' },
     { id: 'history', label: 'История' },
     { id: 'new-release', label: 'Новый релиз' }
-] as const
+] as { id: string; label: string; ownerOnly?: boolean }[]
+
+// «Заявки на восстановление» — только владельцу (база тоже не отдаст их админу).
+const nav = computed(() => NAV.filter((item) => !item.ownerOnly || auth.isOwner.value))
 
 const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.vue'))
 
 // Разделы грузятся по требованию: каждый — отдельный чанк admin-*.
 const VIEWS: Record<string, Component> = {
     home: HomeView,
+    users: defineAsyncComponent(() => import('./views/UsersView.vue')),
+    recovery: defineAsyncComponent(() => import('./views/RecoveryView.vue')),
     stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
     lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
     lrc: defineAsyncComponent(() => import('./views/LrcView.vue')),

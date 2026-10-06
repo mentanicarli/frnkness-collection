@@ -4,7 +4,7 @@
             <h1 class="adm-h1">Обзор</h1>
             <p class="adm-sub">Состояние подключений админки.</p>
         </div>
-        <button class="adm-btn" type="button" :disabled="loading" @click="check">Проверить снова</button>
+        <button class="adm-btn" type="button" :disabled="loading" @click="check(); checkRecovery()">Проверить снова</button>
     </div>
 
     <section class="adm-card">
@@ -12,7 +12,14 @@
         <div class="adm-status-list" data-testid="status">
             <div class="adm-status-item">
                 <span class="adm-dot adm-dot-ok"></span>
-                <span>Вход: {{ auth.email.value }}, роль admin</span>
+                <span>Вход: {{ auth.name.value }}, {{ auth.isOwner.value ? 'владелец' : 'админ' }}</span>
+            </div>
+            <div v-if="auth.isOwner.value" class="adm-status-item" data-testid="status-recovery">
+                <span class="adm-dot" :class="recoveryNew > 0 ? 'adm-dot-warn' : 'adm-dot-ok'"></span>
+                <span v-if="recoveryNew === null">Заявки на восстановление: проверяем…</span>
+                <span v-else-if="recoveryNew < 0">Заявки на восстановление: не удалось проверить</span>
+                <span v-else-if="recoveryNew === 0">Новых заявок на восстановление нет</span>
+                <span v-else>Новых заявок на восстановление: <b>{{ recoveryNew }}</b> — <a href="#/recovery">открыть</a></span>
             </div>
             <div class="adm-status-item" data-testid="status-github">
                 <span class="adm-dot" :class="dot(github.state)"></span>
@@ -52,6 +59,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { deployStatus, fetchHead, ping, AdminApiError } from '../api/content'
+import { fetchRecoveryNewCount } from '../api/users'
 import { TOKEN_DOCS_URL, pluralDays, tokenStatus } from '../lib/token'
 import { useRepo } from '../composables/useRepo'
 import { isAnnounceExpired } from '@/utils/announceCard'
@@ -113,5 +121,16 @@ async function check() {
     }
 }
 
-onMounted(check)
+// Счётчик новых заявок на восстановление — только владельцу.
+const recoveryNew = ref<number | null>(null)
+async function checkRecovery() {
+    if (!auth.isOwner.value) return
+    recoveryNew.value = null
+    recoveryNew.value = await fetchRecoveryNewCount().catch(() => -1)
+}
+
+onMounted(() => {
+    void check()
+    void checkRecovery()
+})
 </script>
