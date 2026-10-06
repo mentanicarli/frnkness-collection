@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
-import { ADMIN, ANON, NORMALIZE_BAD, REPO, USER, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, NORMALIZE_BAD, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const isStage1 = (m: { name: string }) => m.name.startsWith('20261001')
 
@@ -50,12 +50,15 @@ describe('миграции админки', () => {
     const count = async (sql: string) => Number((await db.query<{ n: number }>(sql)).rows[0].n)
 
     describe('этап 1', () => {
-        it('is_admin() — только app_metadata.role = admin', async () => {
+        it('is_admin() — admin и owner по auth.users, не по токену', async () => {
             const isAdmin = async (claims: object) => (await as(db, 'authenticated', claims, 'select public.is_admin() as v')).rows[0].v
             expect(await isAdmin(ADMIN)).toBe(true)
+            expect(await isAdmin(OWNER)).toBe(true)
             expect(await isAdmin(USER)).toBe(false)
             expect(await isAdmin({ role: 'authenticated', user_metadata: { role: 'admin' } })).toBe(false)
-            expect((await as(db, 'anon', ANON, 'select public.is_admin() as v')).rows[0].v).toBe(false)
+            // Роль в токене без роли в базе ничего не даёт.
+            expect(await isAdmin({ ...USER, app_metadata: { role: 'admin' } })).toBe(false)
+            await expect(as(db, 'anon', ANON, 'select public.is_admin() as v')).rejects.toThrow(/permission denied/)
         })
 
         it('play_events закрыта для всех ролей, даже для админа напрямую', async () => {
@@ -84,7 +87,7 @@ describe('миграции админки', () => {
         it('прежнее поведение плюс событие с нормализованным ключом', async () => {
             await db.exec('delete from public.play_events')
             const before = await count("select plays n from public.play_counts where track_key = 'faaa-0'")
-            await as(db, 'anon', ANON, "select public.increment_play_count('faaa-0')")
+            await as(db, 'authenticated', USER2, "select public.increment_play_count('faaa-0')")
             await as(db, 'authenticated', USER, "select public.increment_play_count('disinvolto--1')")
             expect(await count("select plays n from public.play_counts where track_key = 'faaa-0'")).toBe(before + 1)
             expect(await count("select plays n from public.play_counts where track_key = 'disinvolto-0'")).toBe(1)
@@ -94,7 +97,7 @@ describe('миграции админки', () => {
 
         it('неверный ключ — прежняя ошибка 22023, событие не пишется', async () => {
             const n = await count('select count(*) n from public.play_events')
-            await expect(as(db, 'anon', ANON, "select public.increment_play_count('мусор')")).rejects.toThrow(/Invalid track_key format/)
+            await expect(as(db, 'authenticated', USER, "select public.increment_play_count('мусор')")).rejects.toThrow(/Invalid track_key format/)
             expect(await count('select count(*) n from public.play_events')).toBe(n)
         })
 
@@ -106,9 +109,10 @@ describe('миграции админки', () => {
     })
 
     describe('play_counts закрыта на запись', () => {
-        it('чтение для сайта работает (чарт и счётчик релиза)', async () => {
-            expect((await as(db, 'anon', ANON, 'select track_key, plays from public.play_counts order by plays desc limit 50')).rows.length).toBeGreaterThan(0)
-            expect((await as(db, 'anon', ANON, "select track_key, plays from public.play_counts where track_key like 'faaa-%'")).rows).toHaveLength(1)
+        it('чтение для вошедших работает (чарт и счётчик релиза), аноним не читает', async () => {
+            expect((await as(db, 'authenticated', USER, 'select track_key, plays from public.play_counts order by plays desc limit 50')).rows.length).toBeGreaterThan(0)
+            expect((await as(db, 'authenticated', USER, "select track_key, plays from public.play_counts where track_key like 'faaa-%'")).rows).toHaveLength(1)
+            await expect(as(db, 'anon', ANON, 'select * from public.play_counts')).rejects.toThrow(/permission denied/)
         })
 
         it.each([
@@ -217,17 +221,22 @@ describe('сессии прослушивания (дослушивают или
         }
     })
 
-    it('аноним пишет сессию через RPC; ключ нормализуется', async () => {
-        await rec('anon', ANON, [S1, 'faaa--1', 50.123, 60, 120, false])
+    it('аноним не пишет сессию', async () => {
+        await expect(rec('anon', ANON, [S1, 'faaa-0', 50, 60, 120, false])).rejects.toThrow(/permission denied/)
+    })
+
+    it('вошедший пишет сессию через RPC; ключ нормализуется, user_id проставляется', async () => {
+        await rec('authenticated', USER, [S1, 'faaa--1', 50.123, 60, 120, false])
         const row = (await db.query<any>('select * from public.listen_sessions where session_id = $1', [S1])).rows[0]
         expect(row.track_key).toBe('faaa-0')
+        expect(row.user_id).toBe(USER.sub)
         expect(Number(row.listened_seconds)).toBe(50.12)
         expect(row.completed).toBe(false)
     })
 
     it('повторная отправка той же сессии — одна строка, значения только растут', async () => {
-        await rec('anon', ANON, [S1, 'faaa-0', 30, 40, 120, false]) // старый снимок не уменьшает
-        await rec('anon', ANON, [S1, 'faaa-0', 118, 120, 120, true])
+        await rec('authenticated', USER, [S1, 'faaa-0', 30, 40, 120, false]) // старый снимок не уменьшает
+        await rec('authenticated', USER, [S1, 'faaa-0', 118, 120, 120, true])
         const rows = (await db.query<any>('select * from public.listen_sessions where session_id = $1', [S1])).rows
         expect(rows).toHaveLength(1)
         expect(Number(rows[0].listened_seconds)).toBe(118)
@@ -236,7 +245,7 @@ describe('сессии прослушивания (дослушивают или
     })
 
     it('сессия не переезжает на другой трек', async () => {
-        await rec('anon', ANON, [S1, 'boxik-0', 119, 120, 120, true])
+        await rec('authenticated', USER, [S1, 'boxik-0', 119, 120, 120, true])
         const row = (await db.query<any>('select track_key from public.listen_sessions where session_id = $1', [S1])).rows[0]
         expect(row.track_key).toBe('faaa-0')
         expect(Number((await db.query<any>('select count(*) n from public.listen_sessions')).rows[0].n)).toBe(1)
@@ -251,12 +260,12 @@ describe('сессии прослушивания (дослушивают или
         [['faaa-0', 10, 150, 100, false], /Позиция/],
         [['faaa-0', 10, -1, 100, false], /Позиция/]
     ])('границы: %j', async (args, re) => {
-        await expect(rec('anon', ANON, [S2, ...(args as unknown[])])).rejects.toThrow(re)
+        await expect(rec('authenticated', USER, [S2, ...(args as unknown[])])).rejects.toThrow(re)
     })
 
     it('счётчик прослушиваний не затронут', async () => {
         const before = Number((await db.query<any>("select coalesce(sum(plays),0) n from public.play_counts")).rows[0].n)
-        await rec('anon', ANON, [S3, 'boxik-0', 20, 25, 200, false])
+        await rec('authenticated', USER, [S3, 'boxik-0', 20, 25, 200, false])
         expect(Number((await db.query<any>("select coalesce(sum(plays),0) n from public.play_counts")).rows[0].n)).toBe(before)
     })
 
