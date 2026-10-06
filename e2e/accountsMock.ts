@@ -13,6 +13,15 @@ import {
 
 export type Role = 'user' | 'admin' | 'owner'
 
+/** То, что функции аккаунтов делают с плейлистами (модерация, удаление). */
+export interface SocialHooks {
+    playlistById(id: string): Promise<{ id: string; owner_id: string; title: string; cover_version: number | null } | null>
+    updatePlaylist(id: string, patch: { title?: string; cover_version?: null }): Promise<void>
+    deletePlaylist(id: string): Promise<void>
+    /** Удалить файл обложки или все файлы в папке (имя на «/»). */
+    removeCover(nameOrPrefix: string): void
+}
+
 export interface MockUser {
     id: string
     nick: string
@@ -78,7 +87,10 @@ export class AccountsBackend {
     limits = new Map<string, number>()
     avatarUploads: string[] = []
     avatarRemovals: string[] = []
+    coverRemovals: string[] = []
     signedOut: string[] = []
+    /** «База» этапа «Музыка и друзья» (e2e/socialMock.ts), если тест её подключил. */
+    social: SocialHooks | null = null
     private nextId = 1000
     private nextRecovery = 1
     readonly handlers: Record<string, (req: Request) => Promise<Response>>
@@ -242,11 +254,26 @@ export class AccountsBackend {
                 },
                 signOutUser: async (id) => {
                     this.signedOut.push(id)
+                },
+                playlistById: async (id) => (await this.social?.playlistById(id)) ?? null,
+                updatePlaylist: async (id, patch) => {
+                    await this.social?.updatePlaylist(id, patch)
+                },
+                deletePlaylist: async (id) => {
+                    await this.social?.deletePlaylist(id)
                 }
             },
             storage: {
                 removeAvatar: async (id) => {
                     this.avatarRemovals.push(id)
+                },
+                removePlaylistCover: async (ownerId, playlistId) => {
+                    this.coverRemovals.push(`${ownerId}/${playlistId}`)
+                    this.social?.removeCover(`${ownerId}/${playlistId}`)
+                },
+                removePlaylistCovers: async (userId) => {
+                    this.coverRemovals.push(`${userId}/`)
+                    this.social?.removeCover(`${userId}/`)
                 }
             }
         }

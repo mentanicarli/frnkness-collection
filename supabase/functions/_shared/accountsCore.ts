@@ -4,7 +4,8 @@
  *   recovery-request  — заявка на восстановление (капча, лимиты, одинаковый ответ)
  *   account           — сам пользователь: смена пароля и ника, удаление аккаунта
  *   admin-users       — админка: сброс пароля, ник, аватар, бан, сеансы,
- *                       удаление, роли (роли — только владелец)
+ *                       удаление, роли (роли — только владелец),
+ *                       модерация плейлистов
  *
  * Все внешние зависимости приходят в AccountsDeps: index.ts каждой функции
  * подставляет настоящие (supabase-js с service role), тесты — фейковые.
@@ -14,12 +15,14 @@ import {
     NICK_CHANGE_INTERVAL_DAYS,
     cleanBio,
     cleanNick,
+    cleanPlaylistTitle,
     nickKey,
     roleOf,
     techEmail,
     validateBio,
     validateNick,
-    validatePassword
+    validatePassword,
+    validatePlaylistTitle
 } from './accounts.ts'
 import { HttpError, bearer, clientIp, keyHash, serveJson, str, verifyTurnstile } from './http.ts'
 
@@ -41,6 +44,13 @@ export interface Profile {
 export interface AccountPrivate {
     must_change_password: boolean
     nick_changed_at: string | null
+}
+
+export interface Playlist {
+    id: string
+    owner_id: string
+    title: string
+    cover_version: number | null
 }
 
 export interface UserUpdate {
@@ -81,9 +91,16 @@ export interface AccountsDeps {
         upsertPrivate(id: string, patch: Partial<AccountPrivate>): Promise<void>
         insertRecovery(r: { nick: string; nick_key: string; user_id: string | null; contact: string; comment: string }): Promise<void>
         signOutUser(id: string): Promise<void>
+        playlistById(id: string): Promise<Playlist | null>
+        updatePlaylist(id: string, patch: { title?: string; cover_version?: null }): Promise<void>
+        deletePlaylist(id: string): Promise<void>
     }
     storage: {
         removeAvatar(userId: string): Promise<void>
+        /** Своя обложка плейлиста: файл <ownerId>/<playlistId> в playlist-covers. */
+        removePlaylistCover(ownerId: string, playlistId: string): Promise<void>
+        /** Все обложки пользователя (папка <userId>/). */
+        removePlaylistCovers(userId: string): Promise<void>
     }
 }
 
@@ -152,8 +169,11 @@ async function setNick(deps: AccountsDeps, userId: string, rawNick: string): Pro
 
 async function deleteAccount(deps: AccountsDeps, userId: string): Promise<void> {
     await deps.storage.removeAvatar(userId).catch((e) => deps.log?.(`avatar remove failed: ${e}`))
+    // Файлы Storage база каскадом не удалит — только через API.
+    await deps.storage.removePlaylistCovers(userId).catch((e) => deps.log?.(`playlist covers remove failed: ${e}`))
     await deps.db.signOutUser(userId).catch(() => undefined)
-    // Профиль, флаги и сеансы удаляются каскадом, статистика — user_id = null.
+    // Профиль, флаги, сеансы, избранное, плейлисты, дружбы и заявки
+    // удаляются каскадом, статистика — user_id = null.
     await deps.auth.deleteUser(userId)
 }
 
@@ -255,7 +275,21 @@ export function createAccountHandler(deps: AccountsDeps) {
 }
 
 // ── admin-users ─────────────────────────────────────────────────────────
-export const ADMIN_ACTIONS = ['reset-password', 'rename', 'set-bio', 'remove-avatar', 'ban', 'unban', 'sign-out', 'delete', 'set-role'] as const
+export const ADMIN_ACTIONS = [
+    'reset-password',
+    'rename',
+    'set-bio',
+    'remove-avatar',
+    'ban',
+    'unban',
+    'sign-out',
+    'delete',
+    'set-role',
+    // Модерация плейлистов пользователя userId (плейлист — playlistId).
+    'playlist-rename',
+    'playlist-delete',
+    'playlist-cover-remove'
+] as const
 export type AdminAction = (typeof ADMIN_ACTIONS)[number]
 
 const OWNER_PROTECTED: AdminAction[] = ['ban', 'delete', 'set-role', 'sign-out', 'reset-password']
@@ -293,6 +327,31 @@ export function createAdminUsersHandler(deps: AccountsDeps) {
 
         const denied = adminPermission(actor, target, action)
         if (denied) throw new HttpError(403, 'forbidden', denied)
+
+        if (action.startsWith('playlist-')) {
+            const playlistId = str(body, 'playlistId', 64)
+            if (!/^[0-9a-f-]{36}$/i.test(playlistId)) throw new HttpError(400, 'bad_request', 'Неверный плейлист')
+            const playlist = await deps.db.playlistById(playlistId)
+            if (!playlist || playlist.owner_id !== userId) throw new HttpError(404, 'not_found', 'Плейлист не найден')
+            switch (action) {
+                case 'playlist-rename': {
+                    const title = cleanPlaylistTitle(str(body, 'title', 1000))
+                    requireValid(validatePlaylistTitle(title))
+                    await deps.db.updatePlaylist(playlistId, { title })
+                    return { ok: true, title }
+                }
+                case 'playlist-cover-remove':
+                    await deps.storage.removePlaylistCover(userId, playlistId)
+                    await deps.db.updatePlaylist(playlistId, { cover_version: null })
+                    break
+                case 'playlist-delete':
+                    // Сначала файл: строка без файла — норма, файл без строки — мусор.
+                    await deps.storage.removePlaylistCover(userId, playlistId)
+                    await deps.db.deletePlaylist(playlistId)
+                    break
+            }
+            return { ok: true }
+        }
 
         switch (action) {
             case 'reset-password': {

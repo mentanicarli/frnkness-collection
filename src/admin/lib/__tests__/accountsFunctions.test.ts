@@ -8,6 +8,7 @@ import {
     type AccountsDeps,
     type AccountPrivate,
     type AuthUser,
+    type Playlist,
     type Profile,
     LIMITS,
     adminPermission,
@@ -29,6 +30,8 @@ let recovery: { nick: string; nick_key: string; user_id: string | null; contact:
 let limits: Map<string, number>
 let signedOut: string[]
 let avatarsRemoved: string[]
+let playlists: Map<string, Playlist>
+let coversRemoved: string[]
 let captchaCalls: URLSearchParams[]
 let now: number
 let nextId: number
@@ -52,6 +55,8 @@ function setup() {
     limits = new Map()
     signedOut = []
     avatarsRemoved = []
+    playlists = new Map()
+    coversRemoved = []
     captchaCalls = []
     now = Date.parse('2026-10-06T12:00:00Z')
     nextId = 1
@@ -135,11 +140,26 @@ function setup() {
             },
             async signOutUser(id) {
                 signedOut.push(id)
+            },
+            async playlistById(id) {
+                return playlists.get(id) ?? null
+            },
+            async updatePlaylist(id, patch) {
+                playlists.set(id, { ...playlists.get(id)!, ...patch })
+            },
+            async deletePlaylist(id) {
+                playlists.delete(id)
             }
         },
         storage: {
             async removeAvatar(id) {
                 avatarsRemoved.push(id)
+            },
+            async removePlaylistCover(ownerId, playlistId) {
+                coversRemoved.push(`${ownerId}/${playlistId}`)
+            },
+            async removePlaylistCovers(userId) {
+                coversRemoved.push(`${userId}/`)
             }
         }
     }
@@ -335,6 +355,8 @@ describe('account', () => {
         expect(users.has(id)).toBe(false)
         expect(profiles.has(id)).toBe(false)
         expect(avatarsRemoved).toEqual([id])
+        // Обложки плейлистов — из Storage; строки базы удаляет каскад.
+        expect(coversRemoved).toEqual([`${id}/`])
         expect(signedOut).toEqual([id])
     })
 
@@ -416,9 +438,53 @@ describe('admin-users', () => {
         expect(profiles.get(user)!.bio).toBe('ок')
     })
 
-    it('удаление аккаунта админом', async () => {
+    it('удаление аккаунта админом — вместе с обложками плейлистов', async () => {
         expect((await adminCall(admin, { action: 'delete', userId: user })).status).toBe(200)
         expect(users.has(user)).toBe(false)
+        expect(coversRemoved).toEqual([`${user}/`])
+    })
+
+    describe('модерация плейлистов', () => {
+        const PL = '11111111-1111-4111-8111-111111111111'
+        beforeEach(() => {
+            playlists.set(PL, { id: PL, owner_id: user, title: 'Плохое название', cover_version: 5 })
+        })
+
+        it('переименовать: название чистится и проверяется', async () => {
+            const res = await adminCall(admin, { action: 'playlist-rename', userId: user, playlistId: PL, title: '  Нормальное\u0007 ' })
+            expect(res.status).toBe(200)
+            expect(playlists.get(PL)!.title).toBe('Нормальное')
+            expect((await adminCall(admin, { action: 'playlist-rename', userId: user, playlistId: PL, title: '   ' })).status).toBe(400)
+            expect((await adminCall(admin, { action: 'playlist-rename', userId: user, playlistId: PL, title: 'я'.repeat(81) })).status).toBe(400)
+        })
+
+        it('удалить обложку: файл из Storage, плейлист — снова коллаж', async () => {
+            expect((await adminCall(admin, { action: 'playlist-cover-remove', userId: user, playlistId: PL })).status).toBe(200)
+            expect(coversRemoved).toEqual([`${user}/${PL}`])
+            expect(playlists.get(PL)!.cover_version).toBeNull()
+        })
+
+        it('удалить плейлист — вместе с обложкой', async () => {
+            expect((await adminCall(admin, { action: 'playlist-delete', userId: user, playlistId: PL })).status).toBe(200)
+            expect(playlists.has(PL)).toBe(false)
+            expect(coversRemoved).toEqual([`${user}/${PL}`])
+        })
+
+        it('плейлист другого пользователя под чужим userId — 404', async () => {
+            expect((await adminCall(admin, { action: 'playlist-delete', userId: admin2, playlistId: PL })).status).toBe(403)
+            const other = await addUser('другой2', 'password1')
+            expect((await adminCall(admin, { action: 'playlist-delete', userId: other, playlistId: PL })).status).toBe(404)
+            expect((await adminCall(admin, { action: 'playlist-delete', userId: user, playlistId: 'bad' })).status).toBe(400)
+            expect(playlists.has(PL)).toBe(true)
+        })
+
+        it('права как у остальных действий: пользователь — нет, плейлист владельца — только он сам', async () => {
+            expect((await adminCall(user, { action: 'playlist-delete', userId: user, playlistId: PL })).status).toBe(403)
+            const OPL = '22222222-2222-4222-8222-222222222222'
+            playlists.set(OPL, { id: OPL, owner_id: owner, title: 'Владельца', cover_version: null })
+            expect((await adminCall(admin, { action: 'playlist-rename', userId: owner, playlistId: OPL, title: 'x' })).status).toBe(403)
+            expect((await adminCall(owner, { action: 'playlist-rename', userId: owner, playlistId: OPL, title: 'x' })).status).toBe(200)
+        })
     })
 
     it('админ не может выдавать роли и трогать других админов и владельца', async () => {

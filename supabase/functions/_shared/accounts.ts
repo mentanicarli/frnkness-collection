@@ -106,6 +106,20 @@ export function validateBio(bio: string): string | null {
     return [...cleanBio(bio)].length > BIO_MAX ? `«О себе» — до ${BIO_MAX} символов` : null
 }
 
+/** Название плейлиста: одна строка без управляющих символов (как clean_user_text в базе). */
+export const PLAYLIST_TITLE_MAX = 80
+export const PLAYLIST_DESCRIPTION_MAX = 300
+
+export function cleanPlaylistTitle(title: string): string {
+    // eslint-disable-next-line no-control-regex
+    return String(title ?? '').normalize('NFC').replace(/[\u0001-\u001F\u007F]/g, ' ').trim()
+}
+
+export function validatePlaylistTitle(title: string): string | null {
+    const length = [...cleanPlaylistTitle(title)].length
+    return length < 1 || length > PLAYLIST_TITLE_MAX ? `Название — от 1 до ${PLAYLIST_TITLE_MAX} символов` : null
+}
+
 /** Как часто пользователь может менять ник сам (админ — в любой момент). */
 export const NICK_CHANGE_INTERVAL_DAYS = 30
 
