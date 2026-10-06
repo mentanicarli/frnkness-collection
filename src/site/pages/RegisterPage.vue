@@ -15,7 +15,7 @@
             autocapitalize="off"
             spellcheck="false"
             maxlength="20"
-            :aria-invalid="nickError ? 'true' : 'false'"
+            :aria-invalid="nickTouched && nickError ? 'true' : 'false'"
             required
             @blur="nickTouched = true"
           >

@@ -1,11 +1,23 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 import fs from 'fs'
+import { injectCsp } from './scripts/csp'
+
+// Адрес Supabase для CSP: из env сборки или значение по умолчанию из
+// src/supabaseConfig.ts (один источник — сам файл конфига).
+function supabaseUrlFor(mode: string): string {
+    const env = loadEnv(mode, __dirname, 'VITE_')
+    if (env.VITE_SUPABASE_URL) return env.VITE_SUPABASE_URL
+    const config = fs.readFileSync(path.resolve(__dirname, 'src/supabaseConfig.ts'), 'utf-8')
+    const m = config.match(/DEFAULT_SUPABASE_URL = '([^']+)'/)
+    if (!m) throw new Error('vite.config: не найден DEFAULT_SUPABASE_URL в src/supabaseConfig.ts')
+    return m[1]
+}
 
 // Склеивает тексты в один JSON, чтобы поиску по строкам не приходилось
 // делать отдельный запрос на каждый трек: .lrc (строки со временем), а для
@@ -64,6 +76,18 @@ function buildTrackNotes() {
     return JSON.stringify(notes)
 }
 
+// CSP только в продакшен-сборке: dev-сервер Vite вставляет свои скрипты.
+function cspPlugin(supabaseUrl: string) {
+    return {
+        name: 'frnkness-csp',
+        apply: 'build' as const,
+        transformIndexHtml: {
+            order: 'post' as const,
+            handler: (html: string) => injectCsp(html, supabaseUrl)
+        }
+    }
+}
+
 // Модуль админки: src/admin/ и код функций, кроме общих правил аккаунтов.
 function isAdminModule(id: string): boolean {
     if (/\/supabase\/functions\/_shared\/accounts\.ts$/.test(id)) return false
@@ -96,9 +120,10 @@ function lyricsIndexPlugin() {
     }
 }
 
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
     plugins: [
         vue(),
+        cspPlugin(supabaseUrlFor(mode)),
         lyricsIndexPlugin(),
         tailwindcss(),
         VitePWA({

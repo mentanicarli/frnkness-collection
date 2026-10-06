@@ -66,6 +66,18 @@ for (const rel of mainGraph) {
     if (!precache.includes(rel)) errors.push(`файл сайта не попал в precache: ${rel}`)
 }
 
+// CSP: тег есть в обеих страницах, встроенные скрипты разрешены только хешем.
+for (const page of ['index.html', 'admin.html']) {
+    if (!fs.existsSync(path.join(dist, page))) continue
+    const csp = read(page).match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)?.[1]
+    if (!csp) errors.push(`${page}: нет Content-Security-Policy`)
+    else {
+        if (!/script-src [^;]*https:\/\/challenges\.cloudflare\.com/.test(csp)) errors.push(`${page}: CSP без Turnstile`)
+        if (!/img-src [^;]*https:\/\/[^ ;]+\.supabase\.co/.test(csp)) errors.push(`${page}: CSP без хранилища Supabase в img-src`)
+        if (/script-src [^;]*'unsafe-inline'/.test(csp)) errors.push(`${page}: CSP разрешает любые встроенные скрипты`)
+    }
+}
+
 if (!fs.existsSync(path.join(dist, 'admin.html'))) errors.push('нет dist/admin.html')
 else {
     const adminHtml = read('admin.html')
