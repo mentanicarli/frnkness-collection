@@ -29,6 +29,10 @@
           {{ error || 'Не удалось получить код' }}
           <button class="acc-link" type="button" style="margin-left: 0.5rem;" @click="mint">Повторить</button>
         </div>
+        <!-- Если сервер не отвечает, из экрана можно выйти из аккаунта (код появится при следующем входе). -->
+        <div class="acc-links">
+          <button class="acc-link" type="button" data-testid="recovery-logout" @click="logout">Выйти из аккаунта</button>
+        </div>
       </template>
     </div>
   </div>
@@ -41,13 +45,14 @@
 //  — после входа по коду (?offer=1) — необязательное предложение создать новый
 //    код, с кнопкой «Позже».
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { clearRecoveryHandoff, recoveryHandoff } from '@/site/auth/recovery'
-import { confirmRecoveryCode, createRecoveryCode, session } from '@/site/session'
+import { confirmRecoveryCode, createRecoveryCode, session, signOut } from '@/site/session'
 import { goAfterLogin } from '@/site/router'
 import RecoveryCodeBox from '../components/RecoveryCodeBox.vue'
 
 const route = useRoute()
+const router = useRouter()
 const mode = computed(() => (session.recoveryPending ? 'gate' : 'offer'))
 const code = ref<string | null>(null)
 const password = ref('')
@@ -97,6 +102,12 @@ async function saved() {
   }
   clearRecoveryHandoff()
   goAfterLogin(route.query.next)
+}
+
+async function logout() {
+  clearRecoveryHandoff()
+  await signOut()
+  void router.replace({ name: 'welcome' })
 }
 
 function later() {

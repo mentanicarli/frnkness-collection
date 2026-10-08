@@ -41,7 +41,7 @@
 // Админка → «Теги» (группа «Люди», только владелец): создать, переименовать,
 // перекрасить, удалить. Название — до 20 символов, цвет — любой через выбор цвета
 // (#RRGGBB; формат проверяет и база). Названия выводятся только текстом.
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { AdminApiError } from '../api/content'
 import { createTag, deleteTag, fetchTagsPayload, updateTag } from '../api/tags'
 import { useAuth } from '../composables/useAuth'
@@ -70,6 +70,9 @@ function syncDrafts() {
     for (const t of tags.value) if (!drafts[t.id]) drafts[t.id] = { name: t.name, color: t.color }
     for (const id of Object.keys(drafts)) if (!tagsStore.tags.has(Number(id))) delete drafts[Number(id)]
 }
+
+// Справочник уже мог быть загружен другим разделом: черновики нужны до первого показа строк.
+watch(tags, syncDrafts, { immediate: true })
 
 const changed = (t: Tag) => drafts[t.id]?.name.trim() !== t.name || drafts[t.id]?.color.toLowerCase() !== t.color
 

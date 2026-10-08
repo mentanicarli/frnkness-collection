@@ -66,6 +66,9 @@ test('после регистрации код нельзя пропустить
     expect(mocks.accounts.codes.size).toBe(1)
     expect(code).not.toBe(minted)
 
+    // Из экрана можно выйти из аккаунта (если сервер не отвечает, человек не заперт).
+    await expect(page.getByTestId('recovery-logout')).toBeVisible()
+
     await page.getByTestId('recovery-copy').click()
     await expect(page.getByTestId('recovery-copy')).toHaveText('Скопировано')
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(minted)
