@@ -49,13 +49,15 @@ async function submit() {
   error.value = ''
   busy.value = true
   try {
+    // Адрес возврата запоминаем до входа: пока идёт вход, экран может смениться.
+    const next = route.query.next
     const message = await signIn(nick.value, password.value)
     if (message) {
       error.value = message
       return
     }
     password.value = ''
-    goAfterLogin(route.query.next)
+    goAfterLogin(next)
   } finally {
     busy.value = false
   }

@@ -7,6 +7,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 import fs from 'fs'
 import { injectCsp } from './scripts/csp'
+import { COVER_WIDTHS } from './src/utils/cover'
 import { buildPreviewPages, homeMetaTags, normalizeSiteUrl } from './scripts/previews'
 
 // Адрес Supabase для CSP: из env сборки или значение по умолчанию из
@@ -114,6 +115,55 @@ function cspPlugin(supabaseUrl: string) {
     }
 }
 
+// Уменьшенные webp-копии обложек: images/<имя>-<ширина>.webp для каждой
+// картинки images/*.jpg|png. Делаются при КАЖДОЙ сборке (в том числе при
+// публикации одного контента из админки), поэтому новому релизу ничего
+// вручную готовить не нужно. Те же файлы dev-сервер отдаёт на лету.
+// Ширины — в src/utils/cover.ts (используют сайт и эта сборка).
+const COVER_SOURCE = /\.(jpe?g|png)$/i
+
+async function resizeCover(file: string, width: number): Promise<Buffer> {
+    const sharp = (await import('sharp')).default
+    // withoutEnlargement: маленький оригинал не раздуваем — копия получает его размер.
+    return sharp(fs.readFileSync(file)).resize({ width, withoutEnlargement: true }).webp({ quality: 78 }).toBuffer()
+}
+
+function coverVariantsPlugin() {
+    const dir = path.resolve(__dirname, 'images')
+    const cache = new Map<string, Buffer>()
+    return {
+        name: 'frnkness-cover-variants',
+        async generateBundle(this: any) {
+            if (!fs.existsSync(dir)) return
+            for (const name of fs.readdirSync(dir)) {
+                if (!COVER_SOURCE.test(name)) continue
+                const base = name.replace(COVER_SOURCE, '')
+                for (const width of COVER_WIDTHS) {
+                    const source = await resizeCover(path.join(dir, name), width)
+                    this.emitFile({ type: 'asset', fileName: `images/${base}-${width}.webp`, source })
+                }
+            }
+        },
+        configureServer(server: any) {
+            server.middlewares.use(async (req: any, res: any, next: any) => {
+                const m = /\/images\/([^/?]+)-(\d+)\.webp$/.exec((req.url || '').split('?')[0])
+                if (!m) return next()
+                const width = Number(m[2])
+                const original = fs.existsSync(dir) && fs.readdirSync(dir).find((n) => COVER_SOURCE.test(n) && n.replace(COVER_SOURCE, '') === decodeURIComponent(m[1]))
+                if (!original || !(COVER_WIDTHS as readonly number[]).includes(width)) return next()
+                try {
+                    const key = `${original}@${width}`
+                    if (!cache.has(key)) cache.set(key, await resizeCover(path.join(dir, original), width))
+                    res.setHeader('Content-Type', 'image/webp')
+                    res.end(cache.get(key))
+                } catch {
+                    next()
+                }
+            })
+        }
+    }
+}
+
 // Модуль админки: src/admin/ и код функций, кроме общих правил аккаунтов.
 function isAdminModule(id: string): boolean {
     if (/\/supabase\/functions\/_shared\/accounts\.ts$/.test(id)) return false
@@ -159,6 +209,7 @@ export default defineConfig(({ mode }) => ({
         previewsPlugin(normalizeSiteUrl(loadEnv(mode, __dirname, 'VITE_').VITE_SITE_URL)),
         cspPlugin(supabaseUrlFor(mode)),
         lyricsIndexPlugin(),
+        coverVariantsPlugin(),
         tailwindcss(),
         VitePWA({
             strategies: 'injectManifest',

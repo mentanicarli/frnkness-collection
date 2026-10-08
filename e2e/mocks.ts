@@ -166,9 +166,15 @@ async function routeFixtureCatalog(page: Page) {
     )
     await page.route(/^https?:\/\/localhost:\d+\/(audio|images|lyrics|lyrics-books)\//, (route) => {
         const rel = decodeURIComponent(new URL(route.request().url()).pathname.slice(1))
-        const full = path.join(FIXTURE_ROOT, rel)
+        let full = path.join(FIXTURE_ROOT, rel)
+        // Уменьшенные webp-копии обложек делает сборка (vite.config.ts); в фикстуре их нет — отдаём оригинал.
+        const variant = /^(.*)-\d+\.webp$/.exec(rel)
+        if (variant && !fs.existsSync(full)) {
+            const original = ['.jpg', '.jpeg', '.png'].map((ext) => path.join(FIXTURE_ROOT, variant[1] + ext)).find((f) => fs.existsSync(f))
+            if (original) full = original
+        }
         if (!fs.existsSync(full)) return route.fulfill({ status: 404, body: 'not in fixture: ' + rel })
-        const type = CONTENT_TYPES[path.extname(rel).toLowerCase()] ?? 'application/octet-stream'
+        const type = CONTENT_TYPES[path.extname(full).toLowerCase()] ?? 'application/octet-stream'
         const body = fs.readFileSync(full)
         // Без ответов на Range браузер не даёт перематывать <audio>.
         const range = route.request().headers()['range']?.match(/^bytes=(\d+)-(\d*)$/)
@@ -221,7 +227,6 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         unexpected.push(route.request().url())
         return route.abort()
     })
-    await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort())
     await page.route('https://challenges.cloudflare.com/**', (route) =>
         route.request().url().includes('/turnstile/v0/api.js')
             ? route.fulfill({ contentType: 'application/javascript', body: TURNSTILE_STUB })

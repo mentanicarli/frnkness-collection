@@ -13,6 +13,7 @@
     </div>
     <template v-if="session.user">
       <AddToPlaylistDialog />
+      <TrackMenuSheet />
       <CreateRoomDialog />
       <FeedbackDialog />
       <LogoutDialog />
@@ -31,11 +32,11 @@ import { session } from '@/site/session'
 import { welcomeLocation } from '@/site/auth/redirect'
 import { closeMiniPlayer } from '@/site/player/engine'
 import { goAfterLogin } from '@/site/router'
-import { releases } from '@/config'
 import AppHeader from '@/site/components/AppHeader.vue'
 import FullscreenPlayer from '@/site/components/FullscreenPlayer.vue'
 import MiniPlayer from '@/site/components/MiniPlayer.vue'
 import AddToPlaylistDialog from '@/site/components/AddToPlaylistDialog.vue'
+import TrackMenuSheet from '@/site/components/TrackMenuSheet.vue'
 import CreateRoomDialog from '@/site/components/CreateRoomDialog.vue'
 import FeedbackDialog from '@/site/components/FeedbackDialog.vue'
 import LogoutDialog from '@/site/components/LogoutDialog.vue'
@@ -48,7 +49,7 @@ import { runSearch, search, setSearchOpen } from '@/site/stores/search'
 import { view } from '@/site/stores/view'
 import { karaoke } from '@/site/player/state'
 import { closeFsPlayer } from '@/site/player/karaoke'
-import { runWhenIdle, togglePlay } from '@/site/player/engine'
+import { togglePlay } from '@/site/player/engine'
 
 const route = useRoute()
 const router = useRouter()
@@ -68,14 +69,23 @@ watch(
   (id, prev) => {
     if (id) {
       playerMounted.value = true
-      // Вошли в другой вкладке, пока здесь открыт экран входа.
-      if (route.meta.guestOnly) goAfterLogin(route.query.next)
       return
     }
     if (prev === undefined) return
     if (karaoke.fsOpen) closeFsPlayer()
     closeMiniPlayer(true)
     if (!route.meta.public) void router.replace(welcomeLocation(route.fullPath))
+  },
+  { immediate: true }
+)
+
+// Вошли в другой вкладке, пока здесь открыт экран входа: уходим с него, как только
+// профиль загружен (флаги «сменить пароль» и «код восстановления» уже точные).
+// Сам вход/регистрация в этой вкладке уходят с экрана сами (LoginPage, RegisterPage).
+watch(
+  () => (session.user && session.accountLoaded ? session.user.id : null),
+  (id) => {
+    if (id && route.meta.guestOnly) goAfterLogin(route.query.next)
   },
   { immediate: true }
 )
@@ -118,14 +128,8 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
-  // Прогрев первых обложек, когда браузер свободен.
-  runWhenIdle(() => {
-    Object.values(releases).slice(0, 5).forEach((release) => {
-      const img = new Image()
-      img.decoding = 'async'
-      img.src = release.cover
-    })
-  })
+  // Обложки не «прогреваем» заранее: раньше здесь грузились 5 оригиналов (до 0,5 МБ каждый),
+  // в том числе гостю на заставке, и занимали канал, пока рисуется первый экран.
 })
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 </script>

@@ -8,7 +8,7 @@ vi.mock('@/config', async () => {
 })
 
 const { router, normalizeInitialHash, nextTarget } = await import('../router')
-const { __setSessionForTests } = await import('../session')
+const { __setSessionForTests, __finishAccountLoadForTests } = await import('../session')
 
 const USER = { id: 'u1', nick: 'Ян', role: 'user' as const, avatar: 'initials:0', bio: '', createdAt: '2026-10-01T00:00:00Z' }
 __setSessionForTests(USER)
@@ -99,6 +99,34 @@ describe('стена: без входа — только заставка и э�
         expect(r.name).toBe('change-password')
         expect(router.currentRoute.value.query.next).toBe('/release/zlaya-nostalgia')
         expect((await open('#/privacy')).name).toBe('privacy')
+    })
+})
+
+describe('профиль догружается в фоне', () => {
+    it('экран открывается сразу; навязанная смена пароля включается, когда профиль пришёл', async () => {
+        __setSessionForTests(USER, { accountLoaded: false })
+        expect((await open('#/release/zlaya-nostalgia')).name).toBe('release')
+        __finishAccountLoadForTests({ mustChangePassword: true })
+        await new Promise((r) => setTimeout(r, 0))
+        expect(router.currentRoute.value.name).toBe('change-password')
+        expect(router.currentRoute.value.query.next).toBe('/release/zlaya-nostalgia')
+        __setSessionForTests(USER)
+    })
+
+    it('код восстановления: пока профиль не пришёл, экран кода не выбрасывает на главную', async () => {
+        __setSessionForTests(USER, { accountLoaded: false })
+        expect((await open('#/recovery-code')).name).toBe('recovery-code')
+        __finishAccountLoadForTests({ recoveryPending: true })
+        await new Promise((r) => setTimeout(r, 0))
+        expect(router.currentRoute.value.name).toBe('recovery-code')
+        __setSessionForTests(USER)
+    })
+
+    it('невошедший по-прежнему видит только заставку', async () => {
+        __setSessionForTests(null)
+        expect((await open('#/chart')).name).toBe('welcome')
+        expect((await open('#/privacy')).name).toBe('privacy')
+        __setSessionForTests(USER)
     })
 })
 
