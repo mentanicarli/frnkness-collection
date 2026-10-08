@@ -20,8 +20,9 @@ select '3 table policies (ожидается пусто)' as section, tablename 
 from pg_policies
 where schemaname = 'public' and tablename in ('rooms', 'room_members', 'room_kicks', 'room_invites');
 
--- 4. Политики Realtime на realtime.messages (ожидается ровно три: слушают участники,
--- команды — хозяин, присутствие — участники; никаких «using (true)»).
+-- 4. Политики Realtime на realtime.messages (ожидается ровно пять: слушают участники,
+-- команды — хозяин, присутствие — участники, реакции — слушают и шлют участники
+-- на отдельном топике roomfx:…; никаких «using (true)»).
 select '4 realtime policies' as section, policyname as item, cmd || ' to ' || array_to_string(roles, ',') || ' :: ' || coalesce(qual, '') || coalesce(with_check, '') as value
 from pg_policies
 where schemaname = 'realtime' and tablename = 'messages'
