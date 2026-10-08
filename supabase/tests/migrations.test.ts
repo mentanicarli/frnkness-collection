@@ -27,7 +27,7 @@ describe('миграции админки', () => {
     beforeAll(async () => {
         db = await createDb()
         await applyMigrations(db, isStage1)
-        // Прослушивания до миграций этапа 2.
+        // Прослушивания, записанные до миграций журнала (старый счётчик).
         await as(db, 'anon', ANON, "select public.increment_play_count('faaa-0')")
         await as(db, 'anon', ANON, "select public.increment_play_count('most-venture-poopsicks--1')")
         await applyMigrations(db, (m) => !isStage1(m))

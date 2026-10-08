@@ -84,7 +84,7 @@ test('топ-4: выбрать, переставить, убрать; все в�
     await stranger.goto(profileUrl(PLAIN_USER))
     await expect(slotTitles(stranger)).toHaveText(['Macan-Walker', 'какой тебе боксик?', 'FAAA', 'Disinvolto: Danilovsky'])
     await expect(stranger.getByTestId('top4-edit')).toHaveCount(0)
-    // Закрытое (избранное и топ по прослушиваниям) по-прежнему только друзьям.
+    // Закрытое (избранное и топ по прослушиваниям) видно только друзьям.
     await expect(stranger.getByText('видят только друзья')).toBeVisible()
     // Нажатие на обложку — трек играет.
     await stranger.getByTestId('top4-slot').nth(2).getByRole('button').click()

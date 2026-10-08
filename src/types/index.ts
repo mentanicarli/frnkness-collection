@@ -73,6 +73,6 @@ export interface SiteSettings {
         enabled: boolean
         releaseId: string
     }
-    /** Необязательный блок: в старых site.json его нет. */
+    /** Необязательный блок. */
     announce?: Announce
 }

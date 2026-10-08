@@ -106,7 +106,7 @@ export async function fetchUserSocial(id: string): Promise<UserSocial> {
     }
 }
 
-// ── Комнаты (этап 4) ───────────────────────────────────────────────────
+// ── Комнаты ────────────────────────────────────────────────────────────
 
 export interface UserRoom {
     id: string

@@ -514,7 +514,7 @@ watch([releaseId, listenTrackIndex], ([id], [prevId]) => {
 async function loadBase() {
     loadingBase.value = true
     error.value = ''
-    // Сессии — отдельно: без миграции остальной дашборд работает как раньше.
+    // Сессии грузятся отдельно: если их данных нет, остальной дашборд работает.
     loadListenMeta()
     try {
         const [o, all] = await Promise.all([fetchOverview(), fetchAllTime(), repo.load()])

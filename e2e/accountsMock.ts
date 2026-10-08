@@ -89,7 +89,7 @@ export class AccountsBackend {
     avatarRemovals: string[] = []
     coverRemovals: string[] = []
     signedOut: string[] = []
-    /** «База» этапа «Музыка и друзья» (e2e/socialMock.ts), если тест её подключил. */
+    /** «База» музыки и друзей (e2e/socialMock.ts), если тест её подключил. */
     social: SocialHooks | null = null
     /** Коды восстановления: в «базе» только хеш, как в recovery_codes. */
     readonly codes = new Map<string, { hash: string; confirmed: boolean; createdAt: string }>()

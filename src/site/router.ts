@@ -9,7 +9,7 @@ import ReleasePage from './pages/ReleasePage.vue'
 import TrackPage from './pages/TrackPage.vue'
 
 /**
- * Адреса сайта (hash-режим, как и раньше):
+ * Адреса сайта (hash-режим):
  *   #/                                 главная
  *   #/chart                            чарт
  *   #/release/<releaseId>              страница релиза
@@ -26,7 +26,7 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/recap/<год>                      итоги года (только когда открыты этому пользователю)
  *   #/recovery-code                    код восстановления: после регистрации (блокирующий)
  *                                      и предложение создать новый после входа по коду
- * Без входа («мягкая стена», раздел 2 плана):
+ * Без входа («мягкая стена»):
  *   #/welcome  #/login  #/register  #/forgot  #/privacy
  *
  * Гость с любого закрытого адреса попадает на заставку, адрес запоминается
@@ -178,8 +178,8 @@ export function goAfterLogin(rawNext: unknown): void {
 }
 
 /**
- * Адрес без «/» после «#» («#chart») vue-router понял бы иначе, чем раньше
- * сайт: приводим к «#/chart» до старта роутера, без записи в истории.
+ * Адрес без «/» после «#» («#chart») vue-router понял бы иначе: приводим
+ * к «#/chart» до старта роутера, без записи в истории.
  */
 export function normalizeInitialHash(): void {
     const { hash, pathname, search } = window.location

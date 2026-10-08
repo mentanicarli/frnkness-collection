@@ -12,7 +12,7 @@ export const siteSettings: SiteSettings = siteData as SiteSettings
 
 export const SHOW_NEW_RELEASE_PROMO = siteSettings.promo.enabled
 export const PROMO_RELEASE_ID = siteSettings.promo.releaseId
-// Анонс будущего релиза; в старых site.json блока нет.
+// Анонс будущего релиза; блок в site.json необязательный.
 export const ANNOUNCE = siteSettings.announce ?? null
 
 // Единый источник данных по дискографии, трекам и путям к медиа/текстам —

@@ -46,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-// Админка → «Заявки на восстановление» (только владелец, раздел 9 плана).
+// Админка → «Заявки на восстановление» (только владелец).
 import { onMounted, reactive, ref } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { AdminApiError } from '../api/content'

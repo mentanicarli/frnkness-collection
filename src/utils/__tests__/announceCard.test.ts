@@ -57,7 +57,7 @@ describe('анонс без даты', () => {
         expect(isAnnounceActive(noDate, Date.parse('2099-01-01T00:00:00Z'))).toBe(true)
         expect(isAnnounceActive({ ...noDate, enabled: false })).toBe(false)
         expect(isAnnounceExpired(noDate, Date.parse('2099-01-01T00:00:00Z'))).toBe(false)
-        // Старый формат с датой — как раньше.
+        // Анонс с датой истекает в назначенное время.
         expect(isAnnounceExpired(base, AT)).toBe(true)
         expect(isAnnounceExpired(base, AT - 1)).toBe(false)
     })

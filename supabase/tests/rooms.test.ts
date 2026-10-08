@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Права и лимиты этапа «Комнаты» на настоящем Postgres (PGlite): одна открытая
+ * Права и лимиты комнат на настоящем Postgres (PGlite): одна открытая
  * комната у хозяина, одна комната на человека, до 20 участников, выгнанный не
  * возвращается; чужой не читает и не управляет комнатой; состояние пишет
  * только хозяин, а seq и время выдаёт база; идле-закрытие через 30 минут;
@@ -612,7 +612,7 @@ describe('комнаты: права и лимиты', () => {
 
         it('других политик на realtime.messages нет', async () => {
             const rows = (await db.query<{ policyname: string }>(`select policyname from pg_policies where schemaname = 'realtime' and tablename = 'messages' order by 1`)).rows
-            // Три политики этапа 4 + две для реакций (этап 5, тесты — top4Feed.test.ts).
+            // Три политики комнат + две для реакций (тесты реакций — top4Feed.test.ts).
             expect(rows.map((r) => r.policyname)).toEqual([
                 'rooms: members announce presence',
                 'rooms: members hear reactions',
