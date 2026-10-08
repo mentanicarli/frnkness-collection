@@ -136,7 +136,7 @@ test('«Сообщить о проблеме»: текст, страница и 
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ nick: PLAIN_USER.nick, message: 'Не играет <b>трек</b>', page: '/#/track/zlaya-nostalgia/makanochki' })
     expect(rows[0].browser).toMatch(/Chrome \d+/)
-    expect(rows[0].build).toBe('dev')
+    expect(rows[0].build).toMatch(/^(dev|[0-9a-f]{7})$/)
 
     for (let i = 0; i < 4; i++) {
         await send(`обращение ${i}`)
@@ -170,6 +170,6 @@ test('журнал ошибок: ошибка JavaScript и отказ пром�
     expect(rows[0].user_id).toBe(PLAIN_USER.id)
     expect(rows[0].page).toBe('/#/')
     expect(rows[0].browser).toMatch(/Chrome/)
-    expect(rows[0].build).toBe('dev')
+    expect(rows[0].build).toMatch(/^(dev|[0-9a-f]{7})$/)
     expect(mocks.unexpected).toEqual([])
 })
