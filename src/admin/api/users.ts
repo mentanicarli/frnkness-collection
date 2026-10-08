@@ -19,7 +19,7 @@ export async function rpc<T>(name: string, args?: Record<string, unknown>): Prom
         if (error.code === '42501' || status === 403) throw new AdminApiError('forbidden', 403, 'Нет доступа')
         if (error.code === 'P0002') throw new AdminApiError('not_found', 404, error.message)
         if (error.code === 'PGRST202' || status === 404) {
-            throw new AdminApiError('missing', 404, 'Функции не найдены — примени миграции этапа «Аккаунты» (supabase db push)')
+            throw new AdminApiError('missing', 404, 'Функции не найдены в базе — примени миграции (см. docs/operations.md)')
         }
         throw new AdminApiError('db', status, `Ошибка базы: ${error.message}`)
     }

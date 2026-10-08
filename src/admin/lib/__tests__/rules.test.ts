@@ -306,7 +306,7 @@ describe('checkRegistryChange — постоянные id треков', () => {
         expect(checkRegistryChange(current, { ...clone(current), singl: foreign }).join()).toContain('id должен быть «singl/singl»')
     })
 
-    describe('переходный период: в текущем реестре id ещё нет', () => {
+    describe('реестр без id треков', () => {
         const before = withoutIds(current)
 
         it('правка названия, обложки и PDF проходит', () => {

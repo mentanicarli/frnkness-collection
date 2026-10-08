@@ -17,7 +17,7 @@ async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> 
         }
         if (error.code === '42501' || status === 403) throw new AdminApiError('forbidden', 403, 'Нет доступа к статистике')
         if (error.code === 'PGRST202' || status === 404) {
-            throw new AdminApiError('missing', 404, 'Функции статистики не найдены — примени миграции этапа 2 (supabase db push)')
+            throw new AdminApiError('missing', 404, 'Функции статистики не найдены в базе — примени миграции (см. docs/operations.md)')
         }
         throw new AdminApiError('db', status, `Ошибка базы: ${error.message}`)
     }
