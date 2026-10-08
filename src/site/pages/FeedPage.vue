@@ -9,10 +9,12 @@
       Не удалось загрузить ленту.
       <button class="acc-link" type="button" style="margin-left: 0.5rem;" @click="reload">Повторить</button>
     </div>
-    <p v-else-if="!state.events.length && !state.hasMore" class="acc-alert acc-alert-info" data-testid="feed-empty">
-      Пока тихо. Здесь появятся прослушивания, избранное, новые плейлисты, топ-4 и комнаты твоих друзей.
-      <RouterLink :to="{ name: 'friends' }">Найти друзей</RouterLink>
-    </p>
+    <div v-else-if="!state.events.length && !state.hasMore" data-testid="feed-empty">
+      <EmptyHint title="Пока тихо" text="Здесь появятся прослушивания, избранное, новые плейлисты, топ-4 и комнаты твоих друзей. Добавь друзей — и лента оживёт.">
+        <RouterLink class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'friends' }" data-testid="hint-find-friends">Найти друзей</RouterLink>
+        <button class="acc-btn acc-btn-sm" type="button" @click="startFlowMode()">Слушать Поток</button>
+      </EmptyHint>
+    </div>
 
     <ul v-if="state.events.length" class="feed-list" aria-label="События друзей">
       <li v-for="e in state.events" :key="e.key" class="feed-item" :data-kind="e.kind" data-testid="feed-item">
@@ -63,7 +65,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { releases } from '@/config'
 import UserAvatar from '../components/UserAvatar.vue'
-import { playTrackByRef } from '../player/engine'
+import { playTrackByRef, startFlowMode } from '../player/engine'
+import EmptyHint from '../components/EmptyHint.vue'
 import { FEED_MIN_POLL_MS, formatAgo } from '../social/feed'
 import { feed } from '../social/feedStore'
 import { trackInfo } from '../social/tracks'

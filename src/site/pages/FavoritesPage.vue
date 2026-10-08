@@ -8,7 +8,10 @@
       <button class="acc-btn acc-btn-sm" type="button" data-testid="favorites-flow" @click="flow">Поток по избранному</button>
     </div>
     <p v-if="!favorites.loaded && !ids.length" class="acc-hint">Загрузка…</p>
-    <p v-else-if="!ids.length" class="acc-alert acc-alert-info">Пока пусто. Нажимай ♡ у треков — они появятся здесь.</p>
+    <EmptyHint v-else-if="!ids.length" title="Здесь будут твои любимые треки" text="Нажимай ♡ у трека — он сохранится здесь, а из избранного можно включить свой Поток. Для начала включи общий Поток и отмечай то, что нравится.">
+      <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-flow" @click="startFlowMode()">Слушать Поток</button>
+      <RouterLink class="acc-btn acc-btn-sm" :to="{ name: 'home' }">Выбрать треки</RouterLink>
+    </EmptyHint>
     <TrackList v-else :track-ids="ids" :source="source" label="Избранное" @play="play" />
   </div>
 </template>
@@ -19,9 +22,11 @@
 import { computed, onMounted } from 'vue'
 import { session } from '@/site/session'
 import { favorites, loadFavorites } from '../social/favorites'
-import { playList, playListShuffled, startFavoritesFlow } from '../player/engine'
+import { playList, playListShuffled, startFavoritesFlow, startFlowMode } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import { plural } from '../social/format'
+import { RouterLink } from 'vue-router'
+import EmptyHint from '../components/EmptyHint.vue'
 import TrackList from '../components/TrackList.vue'
 
 const ids = computed(() => favorites.items.map((f) => f.track_id))

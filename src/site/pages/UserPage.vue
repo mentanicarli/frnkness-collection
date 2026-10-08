@@ -35,6 +35,9 @@
       <section class="settings-section" aria-labelledby="u-pl">
         <h2 id="u-pl">Плейлисты</h2>
         <p v-if="playlists === null" class="acc-hint">Загрузка…</p>
+        <EmptyHint v-else-if="!playlists.length && profile.relation === 'self'" title="Плейлистов пока нет" text="Собери подборку треков: плейлисты можно сделать публичными, и их увидят все.">
+          <RouterLink class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'playlists' }" data-testid="hint-playlists">Создать плейлист</RouterLink>
+        </EmptyHint>
         <p v-else-if="!playlists.length" class="acc-hint">{{ canSee ? 'Плейлистов пока нет.' : 'Публичных плейлистов нет.' }}</p>
         <PlaylistGrid v-else :playlists="playlists" />
       </section>
@@ -43,6 +46,9 @@
         <section class="settings-section" aria-labelledby="u-fav">
           <h2 id="u-fav">Избранное</h2>
           <p v-if="favoriteIds === null" class="acc-hint">Загрузка…</p>
+          <EmptyHint v-else-if="!favoriteIds.length && profile.relation === 'self'" title="Избранное пока пусто" text="Нажимай ♡ у треков — они появятся здесь. Начни с Потока: он включит случайные треки.">
+            <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-flow" @click="startFlowMode()">Слушать Поток</button>
+          </EmptyHint>
           <p v-else-if="!favoriteIds.length" class="acc-hint">Пока пусто.</p>
           <template v-else>
             <div class="social-actions">
@@ -87,10 +93,11 @@ import { showNotice } from '../social/notice'
 import { formatDate, plural } from '../social/format'
 import { TOP_PERIODS, buildTop, type TopItem, type TopPeriod } from '../social/top'
 import { trackInfo } from '../social/tracks'
-import { playList, playTrackByRef, startFavoritesFlow } from '../player/engine'
+import { playList, playTrackByRef, startFavoritesFlow, startFlowMode } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
 import PlaylistGrid from '../components/PlaylistGrid.vue'
+import EmptyHint from '../components/EmptyHint.vue'
 import Top4Block from '../components/Top4Block.vue'
 import Top4Editor from '../components/Top4Editor.vue'
 

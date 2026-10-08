@@ -24,6 +24,10 @@
           <p class="text-[var(--page-accent)] text-sm mb-3 tracking-wide lowercase">frnk ness</p>
           <p id="release-meta" class="text-sm text-[var(--fg-muted)] font-mono">{{ meta }}</p>
           <p id="release-plays" class="text-sm text-[var(--fg-muted)] font-mono mt-1.5" :class="{ hidden: !release || release.upcoming }">{{ playsText }}</p>
+          <div class="mt-6 flex flex-wrap gap-2" data-testid="release-share-row">
+            <button v-if="canShare" type="button" class="track-share-btn" data-testid="release-share" @click="shareRelease">Поделиться</button>
+            <button type="button" class="track-share-btn" data-testid="release-copy-link" @click="copyReleaseLink">{{ copied ? 'Ссылка скопирована' : 'Скопировать ссылку' }}</button>
+          </div>
           <div id="download-container" class="mt-6" :class="{ hidden: !lyricsBook }">
             <a
               id="download-lyrics-btn"
@@ -108,6 +112,8 @@ import { handleTrackClick, handleTrackPointer } from '../player/engine'
 import { updatePageAccent } from '../services/colors'
 import { getReleasePlayCount, lastChangedReleaseId, statsVersion } from '../services/stats'
 import { goTrack } from '../router'
+import { releaseShareUrl } from '@/utils/share'
+import { canNativeShare, copyToClipboard, nativeShare } from '../share'
 import BackButton from '../components/BackButton.vue'
 import FavoriteButton from '../components/FavoriteButton.vue'
 import AddToPlaylistButton from '../components/AddToPlaylistButton.vue'
@@ -118,6 +124,17 @@ const route = useRoute()
 const releaseId = ref<string | null>(null)
 const release = computed(() => (releaseId.value ? releases[releaseId.value] ?? null : null))
 const coverBroken = ref(false)
+const copied = ref(false)
+const canShare = canNativeShare()
+
+/** Ссылка для мессенджеров: страница с превью, а не «#/…» (его они не читают). */
+const shareUrl = () => (releaseId.value ? releaseShareUrl(releaseId.value) : window.location.href)
+const shareRelease = () => nativeShare(`${release.value?.title ?? 'frnk ness'} — frnk ness`, shareUrl())
+async function copyReleaseLink() {
+  if (!(await copyToClipboard(shareUrl()))) return
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 1600)
+}
 const playsText = ref('')
 const videoSrc = ref('')
 let videoTimer: ReturnType<typeof setTimeout> | null = null

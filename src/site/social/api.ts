@@ -17,6 +17,12 @@ export interface NowPlaying {
     updated_at: string
 }
 
+export interface DiscoverPage {
+    users: (Profile & { relation: Relation })[]
+    has_more: boolean
+    next: string | null
+}
+
 export type Relation = 'self' | 'friend' | 'incoming' | 'outgoing' | 'none'
 
 export interface UserPage extends Profile {
@@ -152,6 +158,9 @@ export const api = {
     friendRemove: (userId: string) => rpc<null>('friend_remove', { p_user: userId }),
     friendsList: () => rpc<FriendsList>('friends_list'),
     friendRequestsCount: () => rpc<number>('friend_requests_count'),
+    /** Все активные пользователи (без меня) для «Друзей»: ник и аватар, страницами по курсору. */
+    discoverUsers: (query: string, after: string | null, limit = 30) =>
+        rpc<DiscoverPage>('list_discoverable_users', { p_query: query, p_after: after, p_limit: limit }),
     userSearch: (query: string) => rpc<(Profile & { relation: Relation })[]>('user_search', { p_query: query }),
     profileByNick: (nick: string) => rpc<UserPage | null>('profile_by_nick', { p_nick: nick })
 }

@@ -228,3 +228,12 @@ button.top4-card.playing .top4-cover { outline: 2px solid var(--page-accent); }
 .feed-covers { list-style: none; padding: 0; margin: 0.5rem 0 0; display: flex; gap: 0.375rem; }
 .feed-covers img { width: 2.5rem; height: 2.5rem; border-radius: var(--r-xs); object-fit: cover; display: block; background: var(--bg-3); }
 .feed-more-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1.25rem 0; }
+
+/* Подгрузка списка пользователей: метка в конце списка и запасная кнопка */
+.discover-more { margin-top: 0.75rem; text-align: center; }
+
+/* Подсказка вместо пустого раздела */
+.empty-hint { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; margin-top: 0.75rem; padding: 1rem 1.125rem; border: 1px dashed var(--line-2); border-radius: var(--r-md, 0.5rem); }
+.empty-hint-title { font-family: 'Golos Text'; font-weight: 600; color: var(--fg); }
+.empty-hint-text { color: var(--fg-muted); font-size: 0.875rem; line-height: 1.5; max-width: 52ch; }
+.empty-hint-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }

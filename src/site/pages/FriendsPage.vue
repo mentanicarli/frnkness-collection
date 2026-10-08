@@ -8,14 +8,28 @@
 
     <section class="settings-section" aria-labelledby="fr-search" style="border-top: 0; padding-top: 0.5rem;">
       <h2 id="fr-search">Найти по нику</h2>
-      <input v-model="query" class="acc-input" type="search" maxlength="20" placeholder="Ник" aria-label="Поиск по нику" autocomplete="off" data-testid="friend-search">
-      <ul v-if="results.length" class="user-list">
-        <UserRow v-for="u in results" :key="u.id" :user="u" :sub="RELATION_TEXT[u.relation]">
-          <button v-if="u.relation === 'none'" class="acc-btn acc-btn-sm" type="button" :disabled="busy" @click="request(u.id)">Добавить в друзья</button>
-          <button v-else-if="u.relation === 'incoming'" class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy" @click="respond(u.id, true)">Принять заявку</button>
-        </UserRow>
-      </ul>
-      <p v-else-if="query.trim() && searched" class="acc-hint" style="margin-top: 0.75rem;">Никого не нашли.</p>
+      <input v-model="query" class="acc-input" type="search" maxlength="20" placeholder="Ник" aria-label="Поиск по нику" autocomplete="off" data-testid="friend-search" ref="finderInput" @focus="openFinder" @click="openFinder">
+      <template v-if="finderOpen">
+        <ul v-if="discover.state.users.length" class="user-list" data-testid="discover-list">
+          <UserRow v-for="u in discover.state.users" :key="u.id" :user="u" :sub="RELATION_TEXT[u.relation]">
+            <button v-if="u.relation === 'none'" class="acc-btn acc-btn-sm" type="button" :disabled="busy" data-testid="discover-add" @click="request(u.id)">Добавить в друзья</button>
+            <button v-else-if="u.relation === 'incoming'" class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy" @click="respond(u.id, true)">Принять заявку</button>
+            <span v-else-if="u.relation === 'outgoing'" class="acc-hint" data-testid="discover-status">Заявка отправлена</span>
+            <span v-else-if="u.relation === 'friend'" class="acc-hint" data-testid="discover-status">Уже друзья</span>
+          </UserRow>
+        </ul>
+        <p v-else-if="discover.state.loaded && !discover.state.loading" class="acc-hint" style="margin-top: 0.75rem;" data-testid="discover-empty">
+          {{ discover.state.query ? 'Никого не нашли.' : 'Пока здесь больше никого нет.' }}
+        </p>
+        <p v-if="discover.state.loading" class="acc-hint" style="margin-top: 0.75rem;">Загрузка…</p>
+        <p v-if="discover.state.error" class="acc-hint" style="margin-top: 0.75rem;">
+          {{ discover.state.error }}
+          <button class="acc-btn acc-btn-sm" type="button" @click="discover.loadMore()">Повторить</button>
+        </p>
+        <div v-if="discover.state.hasMore && discover.state.users.length" ref="sentinel" class="discover-more" data-testid="discover-more">
+          <button class="acc-btn acc-btn-sm" type="button" :disabled="discover.state.loading" @click="discover.loadMore()">Показать ещё</button>
+        </div>
+      </template>
     </section>
 
     <p v-if="!list" class="acc-hint">Загрузка…</p>
@@ -42,7 +56,9 @@
 
       <section class="settings-section" aria-labelledby="fr-list">
         <h2 id="fr-list">Мои друзья · {{ list.friends.length }}</h2>
-        <p v-if="!list.friends.length" class="acc-hint">Пока никого. Найди друзей по нику выше.</p>
+        <EmptyHint v-if="!list.friends.length" title="Здесь будут твои друзья" text="Найди знакомых по нику и отправь заявку. Друзья видят, что ты слушаешь, и могут слушать вместе с тобой в комнате.">
+          <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-find-friends" @click="focusFinder">Найти друзей</button>
+        </EmptyHint>
         <ul v-else class="user-list">
           <UserRow v-for="u in list.friends" :key="u.id" :user="u" :sub="u.now_playing ? `слушает: ${nowPlayingTitle(u.now_playing.track_id)}` : ''">
             <button class="acc-btn acc-btn-sm" type="button" :disabled="busy" @click="unfriend(u)">Удалить</button>
@@ -65,9 +81,10 @@
 <script setup lang="ts">
 // Друзья: поиск по нику, заявки (принять / отклонить / отменить),
 // список друзей с «сейчас слушает», удаление из друзей.
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { api, errorText, type FriendsList, type Profile, type Relation } from '../social/api'
+import { createDiscover } from '../social/discover'
 import { roomApi, type RoomInvite } from '../rooms/api'
 import { openCreateRoom, room, rooms } from '../rooms'
 import { friendRequests, refreshFriendRequests, setFastFriendPolling } from '../social/friends'
@@ -75,18 +92,27 @@ import { showNotice } from '../social/notice'
 import { formatDate } from '../social/format'
 import { trackInfo } from '../social/tracks'
 import { debounce } from '@/utils/helpers'
+import EmptyHint from '../components/EmptyHint.vue'
 import UserRow from '../components/UserRow.vue'
 
-const RELATION_TEXT: Record<Relation, string> = { self: '', friend: 'в друзьях', incoming: 'прислал(а) заявку', outgoing: 'заявка отправлена', none: '' }
+// Статусы «Заявка отправлена» и «Уже друзья» стоят справа от ника; под ником — только входящая заявка.
+const RELATION_TEXT: Record<Relation, string> = { self: '', friend: '', incoming: 'прислал(а) заявку', outgoing: '', none: '' }
 
 const router = useRouter()
 const list = ref<FriendsList | null>(null)
 const invites = ref<RoomInvite[]>([])
 const busy = ref(false)
 const query = ref('')
-const results = ref<(Profile & { relation: Relation })[]>([])
-const searched = ref(false)
-let searchSeq = 0
+const discover = createDiscover()
+const finderOpen = ref(false)
+const sentinel = ref<HTMLElement | null>(null)
+const finderInput = ref<HTMLInputElement | null>(null)
+const focusFinder = () => {
+  openFinder()
+  finderInput.value?.focus()
+  finderInput.value?.scrollIntoView?.({ block: 'center' })
+}
+let observer: IntersectionObserver | null = null
 
 const nowPlayingTitle = (id: string) => trackInfo(id).title
 
@@ -136,24 +162,33 @@ async function dismiss(inv: RoomInvite) {
   }
 }
 
-const runSearch = debounce(async () => {
-  const q = query.value.trim()
-  const seq = ++searchSeq
-  if (!q) {
-    results.value = []
-    searched.value = false
-    return
-  }
-  try {
-    const rows = await api.userSearch(q)
-    if (seq !== searchSeq) return
-    results.value = rows ?? []
-    searched.value = true
-  } catch (e) {
-    if (seq === searchSeq) showNotice(errorText(e), true)
-  }
-}, 250)
-watch(query, () => runSearch())
+/** Нажали на «Найти по нику»: сразу показываем всех, дальше список листается и фильтруется. */
+function openFinder() {
+  if (finderOpen.value) return
+  finderOpen.value = true
+  void discover.search(query.value)
+}
+
+const runSearch = debounce(() => void discover.search(query.value), 250)
+watch(query, () => {
+  if (finderOpen.value) runSearch()
+})
+
+// Подгрузка при прокрутке: пока метка в конце списка видна, берём следующую часть.
+function watchSentinel() {
+  observer?.disconnect()
+  observer = null
+  if (!sentinel.value || typeof IntersectionObserver === 'undefined') return
+  observer = new IntersectionObserver((entries) => {
+    if (entries.some((e) => e.isIntersecting)) void discover.loadMore()
+  }, { rootMargin: '200px' })
+  observer.observe(sentinel.value)
+}
+watch(
+  () => [discover.state.users.length, discover.state.hasMore, finderOpen.value] as const,
+  () => void nextTick(watchSentinel)
+)
+onBeforeUnmount(() => observer?.disconnect())
 
 /** fn возвращает текст «готово». */
 async function act(fn: () => Promise<string>) {
@@ -161,7 +196,6 @@ async function act(fn: () => Promise<string>) {
   try {
     showNotice(await fn())
     await reload()
-    if (query.value.trim()) runSearch()
   } catch (e) {
     showNotice(errorText(e), true)
   } finally {
@@ -169,19 +203,26 @@ async function act(fn: () => Promise<string>) {
   }
 }
 
-const request = (id: string) => act(async () => ((await api.friendRequest(id)).status === 'accepted' ? 'Теперь вы друзья' : 'Заявка отправлена'))
+const request = (id: string) => act(async () => {
+  const accepted = (await api.friendRequest(id)).status === 'accepted'
+  discover.setRelation(id, accepted ? 'friend' : 'outgoing')
+  return accepted ? 'Теперь вы друзья' : 'Заявка отправлена'
+})
 const respond = (id: string, accept: boolean) => act(async () => {
   await api.friendRespond(id, accept)
+  discover.setRelation(id, accept ? 'friend' : 'none')
   return accept ? 'Теперь вы друзья' : 'Заявка отклонена'
 })
 const cancel = (id: string) => act(async () => {
   await api.friendCancel(id)
+  discover.setRelation(id, 'none')
   return 'Заявка отменена'
 })
 function unfriend(u: Profile) {
   if (!window.confirm(`Удалить ${u.nick} из друзей?`)) return
   void act(async () => {
     await api.friendRemove(u.id)
+    discover.setRelation(u.id, 'none')
     return 'Удалён(а) из друзей'
   })
 }

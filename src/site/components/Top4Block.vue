@@ -21,9 +21,12 @@
           </div>
         </li>
       </ol>
-      <p v-if="!hasAny" class="acc-hint" data-testid="top4-empty">
-        {{ own ? 'Выбери до четырёх самых важных для тебя треков — не по прослушиваниям, а по сердцу.' : 'Топ-4 пока не заполнен.' }}
-      </p>
+      <div v-if="!hasAny && own" data-testid="top4-empty">
+        <EmptyHint title="Твой топ-4 пока пуст" text="Выбери до четырёх самых важных для тебя треков — не по прослушиваниям, а по сердцу. Их увидят все, кто зайдёт в твой профиль, и друзья узнают об этом в ленте.">
+          <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-top4-pick" @click="emit('edit')">Выбрать треки</button>
+        </EmptyHint>
+      </div>
+      <p v-else-if="!hasAny" class="acc-hint" data-testid="top4-empty">Топ-4 пока не заполнен.</p>
     </template>
   </section>
 </template>
@@ -38,6 +41,7 @@ import { player } from '../player/state'
 import { playTrackByRef } from '../player/engine'
 import type { Top4Row } from '../social/api'
 import { top4Slots } from '../social/top4'
+import EmptyHint from './EmptyHint.vue'
 import { trackInfo } from '../social/tracks'
 
 const props = defineProps<{

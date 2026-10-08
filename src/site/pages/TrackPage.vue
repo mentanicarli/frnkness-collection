@@ -21,7 +21,11 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
               <span>Слушать</span>
             </button>
-            <button class="track-share-btn" @click="copyLink">
+            <button v-if="canShare" class="track-share-btn" data-testid="track-share" @click="shareTrack">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
+              <span>Поделиться</span>
+            </button>
+            <button class="track-share-btn" data-testid="track-copy-link" @click="copyLink">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
               <span>{{ copied ? 'Ссылка скопирована' : 'Скопировать ссылку' }}</span>
             </button>
@@ -68,6 +72,8 @@ import type { Release, Track } from '@/types'
 import { view as screen } from '../stores/view'
 import { playTrackByRef } from '../player/engine'
 import { findTrackRefBySlug } from '@/utils/slug'
+import { trackShareUrl } from '@/utils/share'
+import { canNativeShare, copyToClipboard, nativeShare } from '../share'
 import { normalizeForSearch } from '@/utils/search'
 import { buildNoteMap, type TrackNotes } from '@/utils/trackNotes'
 import { updatePageAccent } from '../services/colors'
@@ -175,24 +181,18 @@ async function applyPendingLineFocus() {
 }
 watch(pendingLineFocus, () => void applyPendingLineFocus())
 
+/** Ссылка для мессенджеров: страница с превью, а не «#/…» (его они не читают). */
+function shareUrl(): string {
+  const v = view.value
+  return v ? trackShareUrl(v.releaseId, v.track) : window.location.href
+}
+
+const canShare = canNativeShare()
+const shareTrack = () => nativeShare(`${view.value?.track.title ?? 'frnk ness'} — frnk ness`, shareUrl())
+
 async function copyLink() {
-  const url = window.location.href
-  const done = () => {
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 1600)
-  }
-  try {
-    await navigator.clipboard.writeText(url)
-    done()
-  } catch {
-    // Clipboard API недоступен (http или отказ в доступе) — выделяем
-    // адрес через временное поле, это работает везде.
-    const input = document.createElement('input')
-    input.value = url
-    document.body.appendChild(input)
-    input.select()
-    try { document.execCommand('copy'); done() } catch { /* молча */ }
-    document.body.removeChild(input)
-  }
+  if (!(await copyToClipboard(shareUrl()))) return
+  copied.value = true
+  setTimeout(() => { copied.value = false }, 1600)
 }
 </script>

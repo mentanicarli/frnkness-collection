@@ -7,6 +7,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 import fs from 'fs'
 import { injectCsp } from './scripts/csp'
+import { buildPreviewPages, homeMetaTags, normalizeSiteUrl } from './scripts/previews'
 
 // Адрес Supabase для CSP: из env сборки или значение по умолчанию из
 // src/supabaseConfig.ts (один источник — сам файл конфига).
@@ -76,6 +77,31 @@ function buildTrackNotes() {
     return JSON.stringify(notes)
 }
 
+// Превью ссылок (scripts/previews.ts): общие og-теги в index.html (вместо
+// маркера <!--OG_TAGS-->) и статические страницы /r/<релиз>/ и /t/<релиз>/<слаг>/
+// для каждого релиза и трека. Реестр читается при каждой сборке, поэтому
+// сборка «только контент» (правка из админки) и новый релиз сразу получают
+// свои страницы. Адрес сайта — VITE_SITE_URL, по умолчанию https://frnkness.ru.
+function previewsPlugin(siteUrl: string) {
+    return {
+        name: 'frnkness-previews',
+        transformIndexHtml: {
+            order: 'pre' as const,
+            handler: (html: string) => html.replace('<!--OG_TAGS-->', homeMetaTags(siteUrl))
+        },
+        generateBundle(this: any) {
+            const releases = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'src/content/releases.json'), 'utf-8'))
+            const fileExists = (rel: string) => {
+                // Обложки лежат в images/ (копируются в сборку как есть); общая картинка — в public/.
+                return fs.existsSync(path.resolve(__dirname, rel)) || fs.existsSync(path.resolve(__dirname, 'public', rel))
+            }
+            for (const page of buildPreviewPages(releases, { siteUrl, fileExists })) {
+                this.emitFile({ type: 'asset', fileName: page.file, source: page.html })
+            }
+        }
+    }
+}
+
 // CSP только в продакшен-сборке: dev-сервер Vite вставляет свои скрипты.
 function cspPlugin(supabaseUrl: string) {
     return {
@@ -120,9 +146,17 @@ function lyricsIndexPlugin() {
     }
 }
 
+// Версия сборки для журнала ошибок и обращений: короткий хеш коммита (в CI
+// его даёт GITHUB_SHA), локально — «dev».
+const BUILD_ID = (process.env.GITHUB_SHA || '').slice(0, 7) || 'dev'
+
 export default defineConfig(({ mode }) => ({
+    define: {
+        __BUILD_ID__: JSON.stringify(BUILD_ID)
+    },
     plugins: [
         vue(),
+        previewsPlugin(normalizeSiteUrl(loadEnv(mode, __dirname, 'VITE_').VITE_SITE_URL)),
         cspPlugin(supabaseUrlFor(mode)),
         lyricsIndexPlugin(),
         tailwindcss(),
@@ -137,7 +171,7 @@ export default defineConfig(({ mode }) => ({
                 // Админка не кэшируется service worker'ом сайта: её чанки
                 // называются admin-* (см. chunkFileNames ниже). Чанк supabase
                 // кэшируется: без него сайт не проверит вход и не откроется.
-                globIgnores: ['admin.html', '**/admin-*']
+                globIgnores: ['admin.html', '**/admin-*', 'r/**', 't/**', 'og-default.png']
             },
             devOptions: { enabled: false }
         }),

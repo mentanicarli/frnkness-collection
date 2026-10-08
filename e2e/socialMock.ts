@@ -60,7 +60,16 @@ export const SOCIAL_RPCS = [
     'year_recap',
     'admin_recap_overview',
     'admin_recap_status',
-    'admin_recap_set'
+    'admin_recap_set',
+    // Список пользователей, журнал ошибок, обращения
+    'list_discoverable_users',
+    'log_client_error',
+    'submit_feedback',
+    'admin_errors_list',
+    'admin_errors_resolve',
+    'admin_feedback_list',
+    'admin_feedback_set',
+    'admin_feedback_new_count'
 ] as const
 
 const COVERS = 'playlist-covers'
