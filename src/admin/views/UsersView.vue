@@ -109,7 +109,7 @@
                     </ul>
                 </div>
 
-                <!-- Комната (этап 4): открытая комната пользователя и кнопка «Закрыть комнату». -->
+                <!-- Комната: открытая комната пользователя и кнопка «Закрыть комнату». -->
                 <div v-if="userRoom" class="adm-user-room" data-testid="user-room">
                     <h3 class="adm-label" style="margin-top: 0.75rem">Открытая комната</h3>
                     <div class="adm-row" style="justify-content: space-between; align-items: center">
@@ -188,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-// Админка → «Пользователи» (раздел 9 плана): список, поиск, карточка,
+// Админка → «Пользователи»: список, поиск, карточка,
 // действия. Ник, «о себе» и контакты выводятся только текстом.
 import { computed, onMounted, ref, watch } from 'vue'
 import UserAvatar from '@/site/components/UserAvatar.vue'

@@ -151,7 +151,7 @@ describe('страницы превью (на фикстуре каталога)
         expect(html).not.toContain('<svg onload')
         expect(html).toContain('&lt;/title&gt;&lt;script&gt;alert(1)')
         expect(html).toContain('&quot;&gt;&lt;svg onload=alert(3)&gt; &amp; &#39;')
-        // Скрипт на странице по-прежнему один — собственный.
+        // Скрипт на странице один — собственный.
         for (const p of buildPreviewPages(evil, { siteUrl: SITE, fileExists })) expect(parse(p.html).scripts).toHaveLength(1)
     })
 

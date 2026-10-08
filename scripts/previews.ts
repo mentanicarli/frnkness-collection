@@ -61,8 +61,8 @@ function encodePath(rel: string): string {
 }
 
 /**
- * Картинка превью: обложка трека (необязательное поле track.cover, если оно
- * когда-нибудь появится), иначе обложка релиза, иначе общая картинка сайта.
+ * Картинка превью: обложка трека (необязательное поле track.cover), иначе
+ * обложка релиза, иначе общая картинка сайта.
  * Всегда абсолютный URL.
  */
 export function resolveImage(siteUrl: string, candidates: (string | undefined)[], fileExists: (rel: string) => boolean): string {

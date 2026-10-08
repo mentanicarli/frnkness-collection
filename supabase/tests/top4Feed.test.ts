@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Права и приватность этапа «Топ-4, лента, реакции» на настоящем Postgres
+ * Права и приватность топ-4, ленты и реакций на настоящем Postgres
  * (PGlite): топ-4 пишет только хозяин и только через RPC, видят все вошедшие;
  * лента показывает события ТОЛЬКО принятых друзей за 7 дней, не отдаёт
  * название и id комнаты не приглашённым, прячет прослушивания по
@@ -487,7 +487,7 @@ describe('топ-4, лента, реакции: права и приватнос
             await db.exec(`update auth.users set banned_until = now() + interval '1 day' where id = '${USER2.sub}'`)
             expect(await canSend(USER2, topic(other))).toBe(false)
             expect(await canListen(USER2, topic(other))).toBe(false)
-            // Бан закрывает комнату хозяина (этап 4): после снятия бана доступа к ней нет.
+            // Бан закрывает комнату хозяина: после снятия бана доступа к ней нет.
             await db.exec(`update auth.users set banned_until = null where id = '${USER2.sub}'`)
             expect(await canSend(USER2, topic(other))).toBe(false)
             await rpc(USER, 'public.room_close($1)', [id])

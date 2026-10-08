@@ -8,13 +8,13 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { ADMIN, ANON, NORMALIZE_BAD, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
-const isStage1 = (m: { name: string }) => m.name.startsWith('20261001')
+const isBaseMigration = (m: { name: string }) => m.name.startsWith('20261001')
 
 describe('самопроверка normalize_track_key', () => {
     it('опасная нормализация (зависит от search_path) — миграция откатывается целиком', async () => {
         const db = await createDb(NORMALIZE_BAD)
-        await applyMigrations(db, isStage1)
-        await expect(applyMigrations(db, (m) => !isStage1(m))).rejects.toThrow(/зависит от search_path/)
+        await applyMigrations(db, isBaseMigration)
+        await expect(applyMigrations(db, (m) => !isBaseMigration(m))).rejects.toThrow(/зависит от search_path/)
         const fn = (await db.query<{ proconfig: string[] }>("select proconfig from pg_proc where proname = 'increment_play_count'")).rows[0]
         expect(fn.proconfig).toEqual(['search_path=public'])
         expect((await db.query<{ t: string | null }>("select to_regclass('public.admin_settings') as t")).rows[0].t).toBeNull()
@@ -26,18 +26,18 @@ describe('миграции админки', () => {
 
     beforeAll(async () => {
         db = await createDb()
-        await applyMigrations(db, isStage1)
-        // Прослушивания до миграций этапа 2.
+        await applyMigrations(db, isBaseMigration)
+        // Прослушивания, записанные до миграций журнала (старый счётчик).
         await as(db, 'anon', ANON, "select public.increment_play_count('faaa-0')")
         await as(db, 'anon', ANON, "select public.increment_play_count('most-venture-poopsicks--1')")
-        await applyMigrations(db, (m) => !isStage1(m))
+        await applyMigrations(db, (m) => !isBaseMigration(m))
         // Повторный прогон всех миграций не падает.
         await applyMigrations(db)
     }, 60_000)
 
     const count = async (sql: string) => Number((await db.query<{ n: number }>(sql)).rows[0].n)
 
-    describe('этап 1', () => {
+    describe('права админа и хранилище загрузок', () => {
         it('is_admin() — admin и owner по auth.users, не по токену', async () => {
             const isAdmin = async (claims: object) => (await as(db, 'authenticated', claims, 'select public.is_admin() as v')).rows[0].v
             expect(await isAdmin(ADMIN)).toBe(true)
@@ -71,7 +71,7 @@ describe('миграции админки', () => {
         })
     })
 
-    describe('счётчик после этапа 2', () => {
+    describe('счётчик прослушиваний и журнал событий', () => {
         it('прежнее поведение плюс событие с нормализованным ключом', async () => {
             await db.exec('delete from public.play_events')
             const before = await count("select plays n from public.play_counts where track_key = 'faaa-0'")

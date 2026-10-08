@@ -7,7 +7,7 @@ import { applyMigrations, createDb } from '../supabase/tests/pgHarness'
 import { nickKey } from '../supabase/functions/_shared/accounts.ts'
 import type { MockUser, SocialHooks } from './accountsMock'
 
-/** RPC этапа, которые сайт и админка вызывают через PostgREST. */
+/** RPC, которые сайт и админка вызывают через PostgREST и которые здесь выполняет настоящая база (PGlite). */
 export const SOCIAL_RPCS = [
     'favorite_set',
     'user_favorites',
@@ -31,13 +31,13 @@ export const SOCIAL_RPCS = [
     'user_search',
     'profile_by_nick',
     'admin_user_social',
-    // Топ-4 и лента (этап 5)
+    // Топ-4 и лента
     'user_top4',
     'top4_set',
     'feed_prefs_get',
     'feed_prefs_set',
     'friends_feed',
-    // Комнаты (этап 4)
+    // Комнаты
     'server_now',
     'room_create',
     'room_join',
@@ -266,7 +266,7 @@ export class SocialBackend {
     }
 }
 
-/** Ответы без базы — для тестов, которые этап не проверяют. */
+/** Ответы без базы — для тестов, которым настоящая база не нужна. */
 export function socialStub(name: string): MockResponse | null {
     if (!(SOCIAL_RPCS as readonly string[]).includes(name)) return null
     switch (name) {

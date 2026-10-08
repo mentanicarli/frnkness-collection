@@ -29,7 +29,7 @@
         </section>
 
         <div v-if="!overview.tracking_since" class="adm-alert adm-alert-warn">
-            Журнал прослушиваний по дням ещё не запущен — примени миграцию этапа 2. Итог за всё время уже доступен.
+            Журнал прослушиваний по дням ещё не запущен — примени миграции (см. docs/operations.md). Итог за всё время уже доступен.
         </div>
 
         <!-- Фильтр периода: один на график и топы ниже -->
@@ -514,7 +514,7 @@ watch([releaseId, listenTrackIndex], ([id], [prevId]) => {
 async function loadBase() {
     loadingBase.value = true
     error.value = ''
-    // Сессии — отдельно: без миграции остальной дашборд работает как раньше.
+    // Сессии грузятся отдельно: если их данных нет, остальной дашборд работает.
     loadListenMeta()
     try {
         const [o, all] = await Promise.all([fetchOverview(), fetchAllTime(), repo.load()])

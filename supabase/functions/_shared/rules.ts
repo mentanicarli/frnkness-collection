@@ -111,9 +111,9 @@ export interface RegistryTrack {
     file: string
     lyricsFile: string
     /**
-     * Постоянный id трека «<releaseId>/<slug>». Необязателен только на
-     * переходный период: реестр, где у всех треков уже есть id, требует его
-     * и у треков нового релиза.
+     * Постоянный id трека «<releaseId>/<slug>». Если у всех треков реестра
+     * есть id, он обязателен и у треков нового релиза; если хотя бы у одного
+     * трека реестра его нет, новый релиз можно добавить и без id.
      */
     id?: string
 }
@@ -162,7 +162,7 @@ export function makeTrackId(releaseId: string, slug: string): string {
     return `${releaseId}/${slug}`
 }
 
-/** У всех треков реестра есть id — переход на постоянные id завершён. */
+/** У всех треков реестра есть постоянные id. */
 export function registryHasTrackIds(registry: unknown): boolean {
     if (!isPlainObject(registry)) return false
     const releases = Object.values(registry)
@@ -444,9 +444,9 @@ export function checkRegistryChange(before: unknown, after: unknown): string[] {
     const newIds = Object.keys(after).filter((id) => !(id in before))
     for (const id of newIds) errors.push(...validateNewRelease(id, after[id]))
 
-    // Постоянные id треков. Пока в реестре их нет (переходный период), новый
-    // релиз можно добавить и без них; после перехода id обязателен. id
-    // существующих треков менять нельзя — это уже запрещает проверка выше.
+    // Постоянные id треков. Если у всех треков реестра есть id, он обязателен и
+    // у нового релиза; иначе новый релиз можно добавить и без id. id существующих
+    // треков менять нельзя — это уже запрещает проверка выше.
     if (newIds.length) {
         const requireIds = registryHasTrackIds(before)
         const newOnly = Object.fromEntries(newIds.map((id) => [id, after[id]]))

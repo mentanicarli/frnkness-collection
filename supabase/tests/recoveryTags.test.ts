@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Права и инварианты этапа «Код восстановления и теги» на настоящем Postgres
+ * Права и инварианты кода восстановления и тегов на настоящем Postgres
  * (PGlite): код хранится только хешем и закрыт от сайта, сгорает одним
  * запросом, новый заменяет старый; теги пишет только владелец, цвет только
  * #RRGGBB, у человека не больше одного тега, удаление снимает тег со всех.
@@ -133,7 +133,7 @@ describe('код восстановления и теги: права и инв�
             }
             await expect(as(db, 'anon', ANON, `select public.owner_tag_create('x', '#112233')`)).rejects.toThrow(/permission denied/)
             expect(await n('select count(*) as n from public.user_tags')).toBe(1)
-            // Тег ничего не даёт в правах: роль по-прежнему из auth.users.
+            // Тег ничего не даёт в правах: роль берётся из auth.users.
             await rpc(OWNER, 'public.owner_user_set_tag($1, $2)', [USER.sub, tag.id])
             expect((await as(db, 'authenticated', USER, 'select public.is_admin() as r')).rows[0].r).toBe(false)
             await expect(rpc(USER, 'public.admin_users_list($1)', [''])).rejects.toThrow(/Нет доступа|42501|нет доступа/i)

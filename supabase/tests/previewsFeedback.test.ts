@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Права и лимиты этапа «Список пользователей, журнал ошибок, обращения»
+ * Права и лимиты списка пользователей, журнала ошибок и обращений
  * на настоящем Postgres (PGlite).
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'

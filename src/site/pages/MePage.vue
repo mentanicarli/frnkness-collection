@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-// Настройки профиля (раздел 5 плана). Избранное, плейлисты, топ и
+// Настройки профиля. Избранное, плейлисты, топ и
 // друзья — на странице пользователя (#/u/<ник>) и своих страницах.
 import { computed, reactive, ref, watch } from 'vue'
 import { api, errorText } from '@/site/social/api'

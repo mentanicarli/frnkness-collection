@@ -69,8 +69,8 @@ function playFromQueue(queue: Queue, direction: Direction): void {
 }
 
 /**
- * Очередь целиком извне. Этап 4: очередь комнаты присылает хозяин —
- * с controller 'remote' кнопки «вперёд/назад» гостя её не двигают.
+ * Очередь целиком извне. Очередь комнаты присылает хозяин: с controller
+ * 'remote' кнопки «вперёд/назад» гостя её не двигают.
  */
 export function replaceQueue(queue: Queue, direction: Direction = 'fade'): void {
     playFromQueue(queue, direction)

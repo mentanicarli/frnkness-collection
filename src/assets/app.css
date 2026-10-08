@@ -68,7 +68,7 @@ html { -webkit-text-size-adjust: 100%; }
 /* Масштаб интерфейса на широких мониторах задаёт inline-скрипт в <head>
    index.html: он пишет font-size на <html> от внешнего размера окна, чтобы
    зум браузера работал поверх. Поэтому все размеры в этом файле, в
-   Vue-шаблонах и HTML-строках в legacy/modules заданы в rem
+   Vue-шаблонах заданы в rem
    (кроме 1px-линий и условий @media). */
 
 /* Размеры SVG-иконок заданы атрибутами width/height, а они в rem не
@@ -376,7 +376,7 @@ section h2.text-xs { font-family: 'Unbounded'; font-weight: 600; font-size: clam
 .stagger-item.visible { opacity: 1; transform: none; transition: opacity 0.32s var(--ease), transform 0.32s var(--ease); }
 
 /* =====================================================================
-   Страница трека (#page-track) — рендерится в legacy/modules/track.js
+   Страница трека (TrackPage.vue)
    ===================================================================== */
 
 .track-page-inner { padding-top: 1.5rem; padding-bottom: 8.125rem; }
