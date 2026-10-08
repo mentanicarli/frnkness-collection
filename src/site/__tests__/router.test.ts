@@ -95,6 +95,8 @@ describe('стена: без входа — только заставка и э�
 
     it('после сброса пароля — только смена пароля, адрес запоминается', async () => {
         __setSessionForTests(USER, { mustChangePassword: true })
+        // Флаг включился на открытом экране: роутер сам уводит на смену пароля.
+        await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('change-password'))
         const r = await open('#/release/zlaya-nostalgia')
         expect(r.name).toBe('change-password')
         expect(router.currentRoute.value.query.next).toBe('/release/zlaya-nostalgia')
@@ -107,8 +109,8 @@ describe('профиль догружается в фоне', () => {
         __setSessionForTests(USER, { accountLoaded: false })
         expect((await open('#/release/zlaya-nostalgia')).name).toBe('release')
         __finishAccountLoadForTests({ mustChangePassword: true })
-        await new Promise((r) => setTimeout(r, 0))
-        expect(router.currentRoute.value.name).toBe('change-password')
+        // Экран смены пароля — отдельный чанк: ждём, пока он загрузится.
+        await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('change-password'))
         expect(router.currentRoute.value.query.next).toBe('/release/zlaya-nostalgia')
         __setSessionForTests(USER)
     })
