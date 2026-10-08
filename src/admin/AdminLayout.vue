@@ -87,6 +87,7 @@ const VIEWS: Record<string, Component> = {
     recap: defineAsyncComponent(() => import('./views/RecapView.vue')),
     errors: defineAsyncComponent(() => import('./views/ErrorsView.vue')),
     feedback: defineAsyncComponent(() => import('./views/FeedbackView.vue')),
+    tags: defineAsyncComponent(() => import('./views/TagsView.vue')),
     lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
     lrc: defineAsyncComponent(() => import('./views/LrcView.vue')),
     promo: defineAsyncComponent(() => import('./views/PromoView.vue')),

@@ -1,4 +1,5 @@
 import { supabase } from '@/supabaseClient'
+import type { TagsPayload } from './tags'
 
 /**
  * Обращения сайта к базе этапа «Музыка и друзья»
@@ -158,6 +159,8 @@ export const api = {
     friendRemove: (userId: string) => rpc<null>('friend_remove', { p_user: userId }),
     friendsList: () => rpc<FriendsList>('friends_list'),
     friendRequestsCount: () => rpc<number>('friend_requests_count'),
+    /** Справочник тегов и «у кого какой» (читают все вошедшие). */
+    tagsAll: () => rpc<TagsPayload>('tags_all'),
     submitFeedback: (message: string, page: string, browser: string, build: string) =>
         rpc<{ ok: boolean }>('submit_feedback', { p_message: message, p_page: page, p_browser: browser, p_build: build }),
     /** Все активные пользователи (без меня) для «Друзей»: ник и аватар, страницами по курсору. */

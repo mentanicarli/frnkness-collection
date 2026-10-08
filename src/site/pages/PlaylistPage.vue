@@ -10,7 +10,7 @@
           <h1 class="social-h1" data-testid="playlist-title">{{ pl.title }}</h1>
           <p v-if="pl.description" class="profile-bio">{{ pl.description }}</p>
           <p class="social-meta">
-            <RouterLink v-if="pl.owner" class="acc-link" :to="{ name: 'user', params: { nick: pl.owner.nick } }">{{ pl.owner.nick }}</RouterLink>
+            <RouterLink v-if="pl.owner" class="acc-link" :to="{ name: 'user', params: { nick: pl.owner.nick } }">{{ pl.owner.nick }}</RouterLink><UserTag :user-id="pl.owner.id" />
             · {{ pl.tracks.length }} {{ plural(pl.tracks.length, 'трек', 'трека', 'треков') }}
           </p>
           <div v-if="pl.tracks.length" class="social-actions">
@@ -78,6 +78,7 @@ import { playList, playListShuffled } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
 import PlaylistCover from '../components/PlaylistCover.vue'
+import UserTag from '../components/UserTag.vue'
 import AvatarCropper from '../components/AvatarCropper.vue'
 import { PLAYLIST_DESCRIPTION_MAX, PLAYLIST_TITLE_MAX, cleanPlaylistTitle, validatePlaylistTitle } from '../../../supabase/functions/_shared/accounts.ts'
 

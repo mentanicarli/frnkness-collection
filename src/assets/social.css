@@ -237,3 +237,10 @@ button.top4-card.playing .top4-cover { outline: 2px solid var(--page-accent); }
 .empty-hint-title { font-family: 'Golos Text'; font-weight: 600; color: var(--fg); }
 .empty-hint-text { color: var(--fg-muted); font-size: 0.875rem; line-height: 1.5; max-width: 52ch; }
 .empty-hint-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }
+
+/* Тег пользователя: значок рядом с ником, цвет текста подбирается по контрасту */
+.user-tag {
+  display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px;
+  font-family: 'Golos Text'; font-size: 0.6875rem; font-weight: 700; line-height: 1.4; letter-spacing: 0.02em;
+  vertical-align: middle; white-space: nowrap; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
+}

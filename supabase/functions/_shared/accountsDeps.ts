@@ -128,6 +128,24 @@ export function accountsDeps(): AccountsDeps {
                 const { error } = await admin.rpc('service_sign_out_user', { p_user: id })
                 if (error) fail('service_sign_out_user', error)
             },
+            async setRecoveryCode(userId, hash) {
+                const { error } = await admin.rpc('recovery_code_set', { p_user: userId, p_hash: hash })
+                if (error) fail('recovery_code_set', error)
+            },
+            async consumeRecoveryCode(userId, hash) {
+                const { data, error } = await admin.rpc('recovery_code_consume', { p_user: userId, p_hash: hash })
+                if (error) fail('recovery_code_consume', error)
+                return data === true
+            },
+            async confirmRecoveryCode(userId) {
+                const { error } = await admin.rpc('recovery_code_confirm', { p_user: userId })
+                if (error) fail('recovery_code_confirm', error)
+            },
+            async getRecoveryCodeState(userId) {
+                const { data, error } = await admin.from('recovery_codes').select('confirmed').eq('user_id', userId).maybeSingle()
+                if (error) fail('getRecoveryCodeState', error)
+                return (data as { confirmed: boolean } | null) ?? null
+            },
             async playlistById(id) {
                 const { data, error } = await admin.from('playlists').select('id, owner_id, title, cover_version').eq('id', id).maybeSingle()
                 if (error) fail('playlistById', error)

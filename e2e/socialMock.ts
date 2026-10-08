@@ -69,7 +69,13 @@ export const SOCIAL_RPCS = [
     'admin_errors_resolve',
     'admin_feedback_list',
     'admin_feedback_set',
-    'admin_feedback_new_count'
+    'admin_feedback_new_count',
+    // Код восстановления и теги
+    'tags_all',
+    'owner_tag_create',
+    'owner_tag_update',
+    'owner_tag_delete',
+    'owner_user_set_tag'
 ] as const
 
 const COVERS = 'playlist-covers'
@@ -287,6 +293,8 @@ export function socialStub(name: string): MockResponse | null {
             return { status: 200, body: [] }
         case 'log_client_error':
             return { status: 200, body: null }
+        case 'tags_all':
+            return { status: 200, body: { tags: [], assignments: [] } }
         case 'room_invites_list':
             return { status: 200, body: [] }
         case 'room_my':

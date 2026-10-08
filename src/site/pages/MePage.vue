@@ -3,7 +3,7 @@
     <div class="profile-head">
       <UserAvatar :avatar="me.avatar" :nick="me.nick" :user-id="me.id" :size="5.5" :cover-of="coverOf" />
       <div class="min-w-0">
-        <h1 class="profile-nick">{{ me.nick || 'Без ника' }}</h1>
+        <h1 class="profile-nick">{{ me.nick || 'Без ника' }}<UserTag :user-id="me.id" /></h1>
         <p class="profile-meta">С нами с {{ formatDate(me.createdAt) }}<template v-if="friendsCount !== null"> · {{ friendsCount }} {{ plural(friendsCount, 'друг', 'друга', 'друзей') }}</template><template v-if="me.role !== 'user'"> · {{ me.role === 'owner' ? 'владелец' : 'админ' }}</template></p>
         <RouterLink v-if="me.nick" class="acc-link" :to="{ name: 'user', params: { nick: me.nick } }">Мой профиль — как его видят другие</RouterLink>
         <RouterLink v-if="recapStore.state" class="acc-link" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="me-recap">Итоги {{ recapStore.state.year }}</RouterLink>
@@ -89,6 +89,23 @@
       </form>
     </section>
 
+    <!-- Код восстановления -->
+    <section class="settings-section" aria-labelledby="s-recovery">
+      <h2 id="s-recovery">Код восстановления</h2>
+      <p class="acc-hint" data-testid="recovery-state">{{ recoveryText }}</p>
+      <template v-if="recoveryCode">
+        <RecoveryCodeBox :code="recoveryCode" :busy="recoveryBusy" :error="recoveryMsg" @saved="recoverySaved" />
+      </template>
+      <form v-else class="acc-form" novalidate style="margin-top: 0.75rem;" @submit.prevent="makeRecoveryCode">
+        <label class="acc-field">
+          <span class="acc-label">Пароль, чтобы создать код</span>
+          <input v-model="recoveryPassword" class="acc-input" type="password" name="recovery-password" autocomplete="current-password" data-testid="recovery-password">
+        </label>
+        <div><button class="acc-btn acc-btn-sm" type="submit" :disabled="recoveryBusy" data-testid="recovery-create">{{ recoveryState?.exists ? 'Создать новый код' : 'Создать код восстановления' }}</button></div>
+        <p v-if="recoveryMsg" class="acc-alert acc-alert-error" role="alert" data-testid="recovery-create-error">{{ recoveryMsg }}</p>
+      </form>
+    </section>
+
     <!-- Лента друзей -->
     <section class="settings-section" aria-labelledby="s-feed">
       <h2 id="s-feed">Лента друзей</h2>
@@ -138,7 +155,9 @@ import { plural } from '@/site/social/format'
 import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
-import { callFunction, refreshAccount, session, signOut, updateOwnProfile } from '@/site/session'
+import { callFunction, confirmRecoveryCode, createRecoveryCode, refreshAccount, session, signOut, updateOwnProfile } from '@/site/session'
+import RecoveryCodeBox from '../components/RecoveryCodeBox.vue'
+import UserTag from '../components/UserTag.vue'
 import { EMOJIS, INITIALS_COLORS, checkAvatarSource } from '@/site/auth/avatars'
 import UserAvatar from '@/site/components/UserAvatar.vue'
 import { recapStore } from '@/site/recap/store'
@@ -342,6 +361,58 @@ async function savePassword() {
     passMsg.value = 'Пароль изменён'
   } finally {
     passBusy.value = false
+  }
+}
+
+// ── Код восстановления ──
+const recoveryState = ref<{ exists: boolean; created_at: string | null; confirmed: boolean } | null>(null)
+const recoveryCode = ref<string | null>(null)
+const recoveryPassword = ref('')
+const recoveryBusy = ref(false)
+const recoveryMsg = ref('')
+const recoveryText = computed(() => {
+  const s = recoveryState.value
+  if (!s) return 'Загрузка…'
+  if (!s.exists) return 'Кода нет. Создай его: по нему можно сменить пароль без помощи владельца. Код показывается один раз и подходит один раз.'
+  return `Код создан ${formatDate(s.created_at ?? '')}. Новый код отменит этот.`
+})
+
+async function loadRecoveryState() {
+  const { data } = await supabase.rpc('my_recovery_code_state')
+  recoveryState.value = (data as typeof recoveryState.value) ?? { exists: false, created_at: null, confirmed: false }
+}
+void loadRecoveryState()
+
+async function makeRecoveryCode() {
+  recoveryMsg.value = recoveryPassword.value ? '' : 'Введи пароль'
+  if (recoveryMsg.value) return
+  recoveryBusy.value = true
+  try {
+    const res = await createRecoveryCode(recoveryPassword.value)
+    if (res.error) {
+      recoveryMsg.value = res.error
+      return
+    }
+    recoveryPassword.value = ''
+    recoveryCode.value = res.code ?? null
+  } finally {
+    recoveryBusy.value = false
+  }
+}
+
+async function recoverySaved() {
+  recoveryBusy.value = true
+  recoveryMsg.value = ''
+  try {
+    const message = await confirmRecoveryCode()
+    if (message) {
+      recoveryMsg.value = message
+      return
+    }
+    recoveryCode.value = null
+    await loadRecoveryState()
+  } finally {
+    recoveryBusy.value = false
   }
 }
 

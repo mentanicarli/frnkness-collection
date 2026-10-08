@@ -91,6 +91,8 @@ export class AccountsBackend {
     signedOut: string[] = []
     /** «База» этапа «Музыка и друзья» (e2e/socialMock.ts), если тест её подключил. */
     social: SocialHooks | null = null
+    /** Коды восстановления: в «базе» только хеш, как в recovery_codes. */
+    readonly codes = new Map<string, { hash: string; confirmed: boolean; createdAt: string }>()
     private nextId = 1000
     private nextRecovery = 1
     readonly handlers: Record<string, (req: Request) => Promise<Response>>
@@ -255,6 +257,23 @@ export class AccountsBackend {
                 signOutUser: async (id) => {
                     this.signedOut.push(id)
                 },
+                setRecoveryCode: async (userId, hash) => {
+                    this.codes.set(userId, { hash, confirmed: false, createdAt: new Date().toISOString() })
+                },
+                consumeRecoveryCode: async (userId, hash) => {
+                    const c = this.codes.get(userId)
+                    if (!c || c.hash !== hash) return false
+                    this.codes.delete(userId)
+                    return true
+                },
+                confirmRecoveryCode: async (userId) => {
+                    const c = this.codes.get(userId)
+                    if (c) c.confirmed = true
+                },
+                getRecoveryCodeState: async (userId) => {
+                    const c = this.codes.get(userId)
+                    return c ? { confirmed: c.confirmed } : null
+                },
                 playlistById: async (id) => (await this.social?.playlistById(id)) ?? null,
                 updatePlaylist: async (id, patch) => {
                     await this.social?.updatePlaylist(id, patch)
@@ -308,6 +327,11 @@ export class AccountsBackend {
             has_profile: Boolean(a.nick)
         })
         switch (name) {
+            case 'my_recovery_code_state': {
+                if (!caller || this.isBanned(caller)) return { status: 403, body: { code: '42501', message: 'Нужно войти' } }
+                const c = this.codes.get(caller.id)
+                return { status: 200, body: c ? { exists: true, created_at: c.createdAt, confirmed: c.confirmed } : { exists: false, created_at: null, confirmed: false } }
+            }
             case 'admin_users_list': {
                 if (!isAdmin) return denied
                 const q = String(args.p_search ?? '').toLowerCase()

@@ -3,7 +3,7 @@
     <div class="acc-card">
       <RouterLink class="acc-brand" :to="{ name: 'welcome', query: nextQuery }"><b>frnk ness</b><small>collection</small></RouterLink>
       <h1 class="acc-title">Регистрация</h1>
-      <p class="acc-sub">Почта не нужна. Запомни ник и пароль: восстановить доступ можно только заявкой владельцу сайта.</p>
+      <p class="acc-sub">Почта не нужна. Запомни ник и пароль: после регистрации покажем код восстановления — по нему можно сменить пароль, если забудешь его.</p>
       <form class="acc-form" novalidate @submit.prevent="submit">
         <div class="acc-field">
           <label class="acc-label" for="reg-nick">Ник</label>
