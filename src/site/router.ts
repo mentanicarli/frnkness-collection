@@ -14,8 +14,13 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/chart                            чарт
  *   #/release/<releaseId>              страница релиза
  *   #/track/<releaseId>/<slug>         страница трека
- *   #/me                               мой профиль и настройки
- *   #/u/<id>                           профиль другого пользователя
+ *   #/me                               настройки профиля
+ *   #/u/<ник>                          страница пользователя (и своя);
+ *                                      старые #/u/<id> переводятся на ник
+ *   #/favorites                        моё избранное
+ *   #/playlists                        мои плейлисты
+ *   #/playlist/<id>                    плейлист
+ *   #/friends                          друзья и заявки
  * Без входа («мягкая стена», раздел 2 плана):
  *   #/welcome  #/login  #/register  #/forgot  #/privacy
  *
@@ -57,7 +62,11 @@ const routes: RouteRecordRaw[] = [
         redirect: (to) => ({ name: 'track', params: { releaseId: to.params.releaseId, slug: to.params.slug } })
     },
     { path: '/me', name: 'me', component: () => import('./pages/MePage.vue') },
-    { path: '/u/:id', name: 'user', component: () => import('./pages/UserPage.vue') },
+    { path: '/u/:nick', name: 'user', component: () => import('./pages/UserPage.vue') },
+    { path: '/favorites', name: 'favorites', component: () => import('./pages/FavoritesPage.vue') },
+    { path: '/playlists', name: 'playlists', component: () => import('./pages/PlaylistsPage.vue') },
+    { path: '/playlist/:id', name: 'playlist', component: () => import('./pages/PlaylistPage.vue') },
+    { path: '/friends', name: 'friends', component: () => import('./pages/FriendsPage.vue') },
     { path: '/change-password', name: 'change-password', component: () => import('./pages/ChangePasswordPage.vue'), meta: { bare: true } },
     { path: '/welcome', name: 'welcome', component: () => import('./pages/WelcomePage.vue'), meta: guest },
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: guest },

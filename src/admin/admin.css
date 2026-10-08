@@ -517,6 +517,10 @@ kbd { font-family: 'JetBrains Mono'; font-size: 0.625rem; padding: 0.0625rem 0.3
 .adm-user-row-nick { font-weight: 600; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-user-card { min-width: 0; }
 .adm-user-actions { display: grid; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.adm-user-social { margin: 0.5rem 0 1rem; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.adm-user-social summary { cursor: pointer; }
+.adm-pl-list { list-style: none; padding: 0; margin: 0.25rem 0 0; display: grid; gap: 0.5rem; }
+.adm-pl { border: 1px solid var(--line); border-radius: 0.5rem; padding: 0.5rem 0.625rem; }
 .adm-tiles-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .adm-recovery-closed { opacity: 0.6; }
 @media (max-width: 760px) {

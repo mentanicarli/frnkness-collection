@@ -74,6 +74,35 @@ export async function fetchUserCard(id: string): Promise<UserCard> {
     }
 }
 
+// ── Музыка и друзья в карточке ─────────────────────────────────────────
+
+export interface AdminPlaylist {
+    id: string
+    owner_id: string
+    title: string
+    description: string
+    is_public: boolean
+    cover_version: number | null
+    track_count: number
+    tracks: string[]
+    updated_at: string
+}
+
+export interface UserSocial {
+    favorites: { track_id: string; added_at: string }[]
+    playlists: AdminPlaylist[]
+    friends: { id: string; nick: string; avatar: string; status: 'pending' | 'accepted'; direction: 'both' | 'incoming' | 'outgoing'; since: string }[]
+}
+
+export async function fetchUserSocial(id: string): Promise<UserSocial> {
+    const s = await rpc<UserSocial>('admin_user_social', { p_user: id })
+    return {
+        favorites: s.favorites ?? [],
+        playlists: (s.playlists ?? []).map((p) => ({ ...p, track_count: num(p.track_count), tracks: p.tracks ?? [] })),
+        friends: s.friends ?? []
+    }
+}
+
 export interface UsersOverview {
     total: number
     active7: number
@@ -131,6 +160,9 @@ export type UserAction =
     | { action: 'sign-out' }
     | { action: 'delete' }
     | { action: 'set-role'; role: 'user' | 'admin' }
+    | { action: 'playlist-rename'; playlistId: string; title: string }
+    | { action: 'playlist-cover-remove'; playlistId: string }
+    | { action: 'playlist-delete'; playlistId: string }
 
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/admin-users`
 

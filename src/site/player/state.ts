@@ -1,5 +1,6 @@
 import { shallowReactive } from 'vue'
 import type { LyricLine, Release } from '@/types'
+import type { Queue } from './queue'
 
 /**
  * Состояние плеера сайта. shallowReactive: шаблоны читают поля напрямую, а
@@ -9,6 +10,15 @@ import type { LyricLine, Release } from '@/types'
  * (открытый на экране релиз — view.viewedReleaseId).
  */
 export const player = shallowReactive({
+    /**
+     * Очередь (./queue.ts): источник, порядок, позиция. Играющий релиз и
+     * индекс ниже — производные от её текущего трека.
+     */
+    queue: null as Queue | null,
+    /** Перемешивание — выбор слушателя, действует на следующие списки. */
+    shuffle: false,
+    /** id играющего трека. */
+    currentTrackId: null as string | null,
     currentRelease: null as Release | null,
     currentReleaseId: null as string | null,
     currentTrackIndex: -1,
@@ -18,6 +28,7 @@ export const player = shallowReactive({
     isPlaying: false,
     // Мини-плеер показан (после первого запуска, до нажатия «закрыть»).
     visible: false,
+    /** Играет Поток по всему каталогу (кнопка на главной). */
     flowModeActive: false,
     trackCounted: false,
     trackCountPending: false,

@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { FIXTURE_ROOT, FIXTURE_UPLOADS, fixtureText, fixtureTree } from '../tests/fixtures/catalog'
 import { AccountsBackend, E2E_CAPTCHA, mkUser, type AccountRecord, type MockUser } from './accountsMock'
+import { type SocialBackend, socialStub } from './socialMock'
 
 // Моки Supabase Auth, PostgREST, Storage и Edge Functions. Тесты никогда не
 // ходят в боевую базу и не делают реальных коммитов.
@@ -14,6 +15,7 @@ export const OWNER_USER = mkUser(1, 'frnkness', 'secret-owner', 'owner')
 export const ADMIN_USER = mkUser(2, 'Друг', 'secret-admin', 'admin')
 export const PLAIN_USER = mkUser(3, 'Слушатель', 'secret-user', null)
 export const SECOND_USER = mkUser(4, 'Второй', 'secret-second', 'user')
+export const DEFAULT_USERS = [OWNER_USER, ADMIN_USER, PLAIN_USER, SECOND_USER]
 export { E2E_CAPTCHA }
 
 export const HEAD_SHA = 'a'.repeat(40)
@@ -94,6 +96,12 @@ export interface MockOptions {
     /** Пользователи «базы» (по умолчанию — владелец, админ и два пользователя). */
     users?: MockUser[]
     rpc?: (name: string, body: unknown) => { status?: number; body: unknown } | undefined
+    /**
+     * База «Музыки и друзей» на PGlite (e2e/socialMock.ts). Одну и ту же
+     * можно отдать нескольким страницам — два пользователя в одном тесте.
+     * Без неё RPC этапа отвечают пустыми заглушками.
+     */
+    social?: SocialBackend
 }
 
 // «Репозиторий» в тестах — фикстура tests/fixtures/catalog, а не настоящий
@@ -192,9 +200,11 @@ export const defaultContent: ContentResponder = ({ action, body }) => {
 export async function installMocks(page: Page, options: MockOptions = {}) {
     const calls: ContentCall[] = []
     const uploads: { name: string; size: number; contentType: string }[] = []
+    const coverUploads: { name: string; size: number; contentType: string }[] = []
     const repoState = { sha: HEAD_SHA, files: {} as Record<string, string> }
     const unexpected: string[] = []
-    const accounts = new AccountsBackend(options.users ?? [OWNER_USER, ADMIN_USER, PLAIN_USER, SECOND_USER])
+    const accounts = new AccountsBackend(options.users ?? DEFAULT_USERS)
+    if (options.social) accounts.social = options.social.hooks()
 
     const json = (route: Route, status: number, body: unknown) =>
         route.fulfill({
@@ -339,9 +349,38 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
             return json(route, 200, { Key: 'admin-uploads/' + name, Id: name })
         }
 
+        // ── Storage: обложки плейлистов (права — в базе PGlite) ──
+        if (url.pathname.startsWith('/storage/v1/object/sign/playlist-covers')) {
+            if (!options.social) return json(route, 400, { message: 'social не подключён' })
+            if (method === 'POST') {
+                const res = await options.social.sign(caller?.id ?? null, (body.paths as string[]) ?? [])
+                return json(route, res.status, res.body)
+            }
+            const name = decodeURIComponent(url.pathname.slice('/storage/v1/object/sign/playlist-covers/'.length))
+            const file = options.social.file(name)
+            return file ? route.fulfill({ status: 200, contentType: file.type, body: file.body }) : json(route, 404, { message: 'not found' })
+        }
+        if (url.pathname.startsWith('/storage/v1/object/playlist-covers')) {
+            if (!options.social) return json(route, 400, { message: 'social не подключён' })
+            if (method === 'POST' || method === 'PUT') {
+                const name = decodeURIComponent(url.pathname.slice('/storage/v1/object/playlist-covers/'.length))
+                const part = multipartFile(req.postDataBuffer() ?? Buffer.alloc(0))
+                const res = await options.social.upload(caller?.id ?? null, name, part.body, part.type)
+                if (res.status === 200) coverUploads.push({ name, size: part.body.length, contentType: part.type })
+                return json(route, res.status, res.body)
+            }
+            if (method === 'DELETE') {
+                const res = await options.social.remove(caller?.id ?? null, (body.prefixes as string[]) ?? [])
+                return json(route, res.status, res.body)
+            }
+        }
+
         if (url.pathname.startsWith('/rest/v1/rpc/')) {
             const name = url.pathname.slice('/rest/v1/rpc/'.length)
-            const res = options.rpc?.(name, body) ?? accounts.rpc(name, body, caller)
+            const res =
+                options.rpc?.(name, body) ??
+                accounts.rpc(name, body, caller) ??
+                (options.social ? await options.social.rpc(name, body, caller && !accounts.isBanned(caller) ? caller.id : null) : socialStub(name))
             if (res) return json(route, res.status ?? 200, res.body)
             // Статистика сайта: принимается только от вошедших.
             if (name === 'increment_play_count' || name === 'record_listen_session') {
@@ -353,7 +392,26 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         return json(route, 404, { message: 'not mocked' })
     })
 
-    return { calls, unexpected, uploads, accounts }
+    return { calls, unexpected, uploads, coverUploads, accounts }
+}
+
+/** Файл из multipart/form-data (так supabase-js шлёт Blob в Storage). */
+function multipartFile(raw: Buffer): { body: Buffer; type: string } {
+    const boundary = raw.subarray(0, raw.indexOf('\r\n')).toString('latin1')
+    if (!boundary.startsWith('--')) return { body: raw, type: 'application/octet-stream' }
+    let pos = 0
+    for (;;) {
+        const start = raw.indexOf(boundary, pos)
+        if (start < 0) break
+        const headersEnd = raw.indexOf('\r\n\r\n', start)
+        const next = raw.indexOf(`\r\n${boundary}`, headersEnd)
+        if (headersEnd < 0 || next < 0) break
+        const headers = raw.subarray(start, headersEnd).toString('latin1')
+        const type = headers.match(/Content-Type: ([^\r]+)/i)?.[1]
+        if (type) return { body: raw.subarray(headersEnd + 4, next), type }
+        pos = next + 2
+    }
+    return { body: raw, type: 'application/octet-stream' }
 }
 
 /** Вход в админку через форму (ник + пароль). */

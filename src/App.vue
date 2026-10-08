@@ -11,6 +11,10 @@
       <FullscreenPlayer />
       <MiniPlayer />
     </div>
+    <template v-if="session.user">
+      <AddToPlaylistDialog />
+      <NoticeToast />
+    </template>
   </template>
 </template>
 
@@ -27,6 +31,9 @@ import { releases } from '@/config'
 import AppHeader from '@/site/components/AppHeader.vue'
 import FullscreenPlayer from '@/site/components/FullscreenPlayer.vue'
 import MiniPlayer from '@/site/components/MiniPlayer.vue'
+import AddToPlaylistDialog from '@/site/components/AddToPlaylistDialog.vue'
+import NoticeToast from '@/site/components/NoticeToast.vue'
+import { bindSocialToSession } from '@/site/social/session'
 import { resetPageAccent } from '@/site/services/colors'
 import { runSearch, search, setSearchOpen } from '@/site/stores/search'
 import { view } from '@/site/stores/view'
@@ -39,6 +46,9 @@ const router = useRouter()
 
 const bare = computed(() => !session.user || Boolean(route.meta.bare))
 const playerMounted = ref(false)
+
+// Избранное, плейлисты, индикатор заявок, «сейчас слушает» — по входу.
+bindSocialToSession()
 
 // Вошли — плеер; вышли (сами, истекла сессия, удалили или забанили) — музыка
 // останавливается, с закрытого экрана уводим на заставку.

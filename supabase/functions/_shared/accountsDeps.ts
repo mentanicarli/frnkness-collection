@@ -1,7 +1,7 @@
 // Настоящие зависимости функций аккаунтов: supabase-js с service role.
 // Только для Deno (Edge Functions); логика — в accountsCore.ts.
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import type { AccountsDeps, AccountPrivate, Profile } from './accountsCore.ts'
+import type { AccountsDeps, AccountPrivate, Playlist, Profile } from './accountsCore.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -127,12 +127,38 @@ export function accountsDeps(): AccountsDeps {
             async signOutUser(id) {
                 const { error } = await admin.rpc('service_sign_out_user', { p_user: id })
                 if (error) fail('service_sign_out_user', error)
+            },
+            async playlistById(id) {
+                const { data, error } = await admin.from('playlists').select('id, owner_id, title, cover_version').eq('id', id).maybeSingle()
+                if (error) fail('playlistById', error)
+                return (data as Playlist | null) ?? null
+            },
+            async updatePlaylist(id, patch) {
+                const { error } = await admin.from('playlists').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+                if (error) fail('updatePlaylist', error)
+            },
+            async deletePlaylist(id) {
+                const { error } = await admin.from('playlists').delete().eq('id', id)
+                if (error) fail('deletePlaylist', error)
             }
         },
         storage: {
             async removeAvatar(userId) {
                 const { error } = await admin.storage.from('avatars').remove([`${userId}/avatar`])
                 if (error) fail('removeAvatar', error)
+            },
+            async removePlaylistCover(ownerId, playlistId) {
+                const { error } = await admin.storage.from('playlist-covers').remove([`${ownerId}/${playlistId}`])
+                if (error) fail('removePlaylistCover', error)
+            },
+            async removePlaylistCovers(userId) {
+                // Не больше 50 плейлистов — хватает одной страницы списка.
+                const { data, error } = await admin.storage.from('playlist-covers').list(userId, { limit: 1000 })
+                if (error) fail('listPlaylistCovers', error)
+                const names = (data ?? []).map((f) => `${userId}/${f.name}`)
+                if (!names.length) return
+                const removed = await admin.storage.from('playlist-covers').remove(names)
+                if (removed.error) fail('removePlaylistCovers', removed.error)
             }
         }
     }

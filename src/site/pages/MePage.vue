@@ -4,7 +4,8 @@
       <UserAvatar :avatar="me.avatar" :nick="me.nick" :user-id="me.id" :size="5.5" :cover-of="coverOf" />
       <div class="min-w-0">
         <h1 class="profile-nick">{{ me.nick || 'Без ника' }}</h1>
-        <p class="profile-meta">С нами с {{ formatDate(me.createdAt) }}<template v-if="me.role !== 'user'"> · {{ me.role === 'owner' ? 'владелец' : 'админ' }}</template></p>
+        <p class="profile-meta">С нами с {{ formatDate(me.createdAt) }}<template v-if="friendsCount !== null"> · {{ friendsCount }} {{ plural(friendsCount, 'друг', 'друга', 'друзей') }}</template><template v-if="me.role !== 'user'"> · {{ me.role === 'owner' ? 'владелец' : 'админ' }}</template></p>
+        <RouterLink v-if="me.nick" class="acc-link" :to="{ name: 'user', params: { nick: me.nick } }">Мой профиль — как его видят другие</RouterLink>
         <p v-if="me.bio" class="profile-bio">{{ me.bio }}</p>
       </div>
     </div>
@@ -117,9 +118,11 @@
 </template>
 
 <script setup lang="ts">
-// Мой профиль и настройки (раздел 5 плана; избранное, плейлисты и
-// друзья — в следующем этапе, число друзей пока не показываем).
+// Настройки профиля (раздел 5 плана). Избранное, плейлисты, топ и
+// друзья — на странице пользователя (#/u/<ник>) и своих страницах.
 import { computed, reactive, ref, watch } from 'vue'
+import { api } from '@/site/social/api'
+import { plural } from '@/site/social/format'
 import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
@@ -131,6 +134,17 @@ import { BIO_MAX, NICK_CHANGE_INTERVAL_DAYS, cleanBio, nextNickChangeAt, validat
 
 const router = useRouter()
 const me = computed(() => session.user)
+
+// Число друзей — то же, что видят все вошедшие на странице профиля.
+const friendsCount = ref<number | null>(null)
+watch(
+  () => me.value?.nick,
+  (nick) => {
+    if (!nick) return
+    void api.profileByNick(nick).then((p) => { friendsCount.value = p ? p.friends_count : null }).catch(() => undefined)
+  },
+  { immediate: true }
+)
 
 const coverOf = (id: string) => releases[id]?.cover ?? null
 const covers = Object.entries(releases)
