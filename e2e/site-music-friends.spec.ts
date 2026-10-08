@@ -96,7 +96,7 @@ test('плейлист: создать, добавить из треклиста
 
     await page.goto('/#/playlists')
     await page.getByLabel('Название нового плейлиста').fill('Дорога <b>домой</b>')
-    await page.getByRole('button', { name: 'Создать' }).click()
+    await page.getByRole('button', { name: 'Создать', exact: true }).click()
     await expect(page).toHaveURL(/#\/playlist\/[0-9a-f-]{36}$/)
     // Текст пользователя — только текстом, без HTML.
     await expect(page.getByTestId('playlist-title')).toHaveText('Дорога <b>домой</b>')
