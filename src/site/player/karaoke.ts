@@ -153,6 +153,8 @@ export async function revealKaraokeAt(time: number): Promise<void> {
 let lyricsToggleGuardUntil = 0
 
 export function openFsPlayer(): void {
+    // Пока ничего не играет (например, в комнате до первого трека), открывать нечего.
+    if (!player.currentRelease) return
     karaoke.fsOpen = true
 }
 

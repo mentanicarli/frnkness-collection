@@ -1,6 +1,6 @@
 <template>
   <!-- Мини-плеер (плавающий) -->
-  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: shown, 'room-guest': player.roomRole === 'guest' }">
+  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: shown, 'room-guest': player.roomRole === 'guest', 'mini-idle': !player.currentRelease }">
     <div class="progress-container" @click="seekByClick">
       <div id="progress-bar" class="progress-bar" :style="{ width: `${player.progress}%` }"></div>
     </div>
@@ -18,7 +18,7 @@
               class="w-full h-full object-cover"
               @error="hideBrokenImage"
             >
-            <div class="cover-overlay">
+            <div v-if="player.currentRelease" class="cover-overlay">
               <button @click.stop="openFsPlayer" class="fullscreen-trigger-btn" aria-label="Открыть на весь экран">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
@@ -161,6 +161,6 @@ async function leaveRoom() {
 // (оверлей по hover на тач-экране не работает). На десктопе клик ничего не делает.
 const MOBILE_QUERY = '(max-width: 640px)'
 function openFsFromMiniPlayer() {
-  if (window.matchMedia(MOBILE_QUERY).matches) openFsPlayer()
+  if (player.currentRelease && window.matchMedia(MOBILE_QUERY).matches) openFsPlayer()
 }
 </script>

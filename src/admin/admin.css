@@ -64,10 +64,6 @@ body.adm-body::before { opacity: 0.6; }
 .adm-backdrop { display: none; }
 .adm-color { width: 2.5rem; height: 2.25rem; padding: 0; border: 1px solid var(--line-2); border-radius: var(--r-sm); background: transparent; cursor: pointer; }
 .adm-tag-preview { display: inline-block; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; line-height: 1.5; white-space: nowrap; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }
-.user-tag {
-  display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px;
-  font-size: 0.6875rem; font-weight: 700; line-height: 1.4; vertical-align: middle; white-space: nowrap; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
-}
 .adm-count {
   display: inline-block; min-width: 1.125rem; margin-left: 0.5rem; padding: 0 0.3125rem; border-radius: 999px;
   background: var(--fg); color: var(--bg); font-size: 0.6875rem; font-weight: 700; line-height: 1.125rem; text-align: center;
@@ -188,6 +184,7 @@ body.adm-body::before { opacity: 0.6; }
   background: var(--bg-1); border: 1px solid var(--line-2); border-radius: var(--r-lg);
   padding: 1.25rem; box-shadow: var(--shadow-pop);
 }
+.adm-modal-sm { max-width: 22rem; }
 .adm-modal h2 { font-family: 'Unbounded'; font-size: 1.0625rem; margin: 0 0 0.75rem; letter-spacing: -0.02em; }
 .adm-draft { margin-bottom: 0.75rem; }
 

@@ -89,6 +89,7 @@ test('выход: на заставку, закрытые адреса снов�
     await page.goto('/#/chart')
     await page.getByTestId('user-menu').click()
     await page.getByRole('menuitem', { name: 'Выйти' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await expect(page.getByTestId('welcome')).toBeVisible()
     await page.goto('/#/release/zlaya-nostalgia')
     await expect(page.getByTestId('welcome')).toBeVisible()
@@ -137,6 +138,7 @@ test('смена пароля: нужен текущий; потом вход т
     await expect(page.getByText('Пароль изменён')).toBeVisible()
 
     await page.getByRole('button', { name: 'Выйти на этом устройстве' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await page.getByRole('link', { name: 'Войти' }).click()
     await loginSite(page, PLAIN_USER.nick, PLAIN_USER.password)
     await expect(page.getByRole('alert')).toHaveText('Неверный ник или пароль')
@@ -274,6 +276,7 @@ test('админка: админ не трогает владельца и др�
 
     // Владелец: выдаёт права админа пользователю.
     await page.getByRole('button', { name: 'Выйти' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible()
     await loginAs(page, OWNER_USER)
     await page.getByRole('link', { name: 'Пользователи' }).click()

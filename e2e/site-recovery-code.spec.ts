@@ -23,6 +23,7 @@ async function registerUser(page: Page, nick: string, password = 'password1', ne
 async function logout(page: Page) {
     await page.getByTestId('user-menu').click()
     await page.getByRole('menuitem', { name: 'Выйти' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await expect(page.getByTestId('welcome')).toBeVisible()
 }
 

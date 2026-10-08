@@ -3,6 +3,7 @@ import App from './App.vue'
 import './assets/app.css'
 import './assets/account.css'
 import './assets/social.css'
+import './assets/user-tag.css'
 
 import { normalizeInitialHash, router } from './site/router'
 import { initSession } from './site/session'

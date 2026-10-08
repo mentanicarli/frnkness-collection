@@ -14,7 +14,7 @@
             <div class="adm-user">
                 <a class="adm-small adm-faint" href="./">На сайт</a>
                 <span class="adm-user-email" data-testid="admin-nick">{{ auth.name.value }}</span>
-                <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" @click="auth.signOut()">Выйти</button>
+                <LogoutButton button-class="adm-btn adm-btn-ghost adm-btn-sm" />
             </div>
         </div>
     </div>
@@ -50,6 +50,7 @@ import { useRoute } from './composables/useRoute'
 import { isActive, visibleGroups } from './lib/nav'
 import HomeView from './views/HomeView.vue'
 import PublishToast from './components/PublishToast.vue'
+import LogoutButton from './components/LogoutButton.vue'
 import { feedbackNewCount, startFeedbackBadge, stopFeedbackBadge } from './composables/useFeedbackBadge'
 
 const auth = useAuth()

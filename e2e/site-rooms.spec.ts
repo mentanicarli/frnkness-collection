@@ -61,7 +61,8 @@ test('комната: хозяин и гость в двух окнах — то
 
     const id = await hostStartsRoom(host)
     await expect(host.getByTestId('room-now-title')).toHaveText('BACK TO POOPSICKS 2')
-    await expect(host.getByTestId('room-next')).toContainText('Macan-Walker')
+    // Блока «Дальше» на странице комнаты нет.
+    await expect(host.getByTestId('room-next')).toHaveCount(0)
 
     // Гость открывает ссылку: до нажатия звука нет, есть кнопка «Подключиться».
     await guest.goto(`/#/room/${id}`)

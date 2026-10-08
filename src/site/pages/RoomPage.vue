@@ -13,7 +13,7 @@
       <p class="social-kicker">Комната</p>
       <h1 class="social-h1" data-testid="room-title">{{ room.title }}</h1>
       <p class="social-meta" data-testid="room-meta">
-        Хозяин: {{ ownerNick }}<UserTag :user-id="ownerId" /> · {{ room.members.length }} из {{ ROOM_CAPACITY }}
+        Хозяин: <NickWithTag :user-id="ownerId" :nick="ownerNick" /> · {{ room.members.length }} из {{ ROOM_CAPACITY }}
       </p>
 
       <p v-if="room.linkDown" class="acc-hint" role="status" data-testid="room-link-down">Переподключаемся…</p>
@@ -28,23 +28,24 @@
       <section class="settings-section" aria-labelledby="room-now" style="border-top: 0; padding-top: 0.5rem;">
         <h2 id="room-now">Сейчас играет</h2>
         <div v-if="now" class="room-now" data-testid="room-now">
-          <img v-if="now.cover" class="room-now-cover" :src="now.cover" alt="" width="64" height="64">
+          <span class="room-now-art" :data-state="room.playing ? 'playing' : 'paused'" data-testid="room-now-state">
+            <img v-if="now.cover" class="room-now-cover" :src="now.cover" alt="" width="64" height="64">
+            <!-- Состояние у обложки: играет — эквалайзер, пауза — значок паузы (текстом не дублируем заголовок) -->
+            <span class="room-now-badge" aria-hidden="true">
+              <span v-if="room.playing" class="eq"><i></i><i></i><i></i></span>
+              <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z" /></svg>
+            </span>
+          </span>
           <span class="min-w-0">
             <span class="room-now-title" data-testid="room-now-title">{{ now.title }}</span>
             <span v-if="now.releaseTitle" class="user-row-sub">{{ now.releaseTitle }}</span>
           </span>
-          <span v-if="room.playing" class="badge" style="background: var(--fg-faint);">играет</span>
-          <span v-else class="user-row-sub">пауза</span>
+          <span class="sr-only">{{ room.playing ? 'Играет' : 'Пауза' }}</span>
         </div>
-        <p v-else class="acc-hint">{{ room.isOwner ? 'Включи что-нибудь в плеере — оно заиграет у всех.' : 'Хозяин пока ничего не включил.' }}</p>
-        <div v-if="next.length || room.nextRandom" class="room-next" data-testid="room-next">
-          <p class="social-kicker" style="margin-top: 1rem;">Дальше</p>
-          <ol v-if="next.length" class="room-next-list">
-            <li v-for="(t, i) in next" :key="`${t.trackId}-${i}`">{{ t.title }}</li>
-          </ol>
-          <p v-else class="acc-hint">Случайный трек (Поток)</p>
-        </div>
+        <p v-else class="acc-hint">{{ room.isOwner ? 'Выбери, что включить, — оно заиграет у всех.' : 'Хозяин пока ничего не включил.' }}</p>
       </section>
+
+      <RoomPlayPicker v-if="room.isOwner" />
 
       <ReactionBar />
 
@@ -100,7 +101,7 @@
     <template v-else>
       <p class="social-kicker">Комната</p>
       <h1 class="social-h1" data-testid="room-title">{{ previewTitle }}</h1>
-      <p v-if="preview && !preview.closed" class="social-meta">Хозяин: {{ preview.owner.nick }}<UserTag :user-id="preview.owner.id" /> · {{ preview.members }} из {{ preview.capacity }}</p>
+      <p v-if="preview && !preview.closed" class="social-meta">Хозяин: <NickWithTag :user-id="preview.owner.id" :nick="preview.owner.nick" /> · {{ preview.members }} из {{ preview.capacity }}</p>
 
       <p v-if="preview && !preview.closed && preview.kicked" class="acc-alert acc-alert-error" data-testid="room-kicked">Тебя выгнали из этой комнаты.</p>
       <p v-else-if="preview && !preview.closed && preview.full && !preview.is_member" class="acc-alert acc-alert-info" data-testid="room-full">В комнате уже {{ preview.capacity }} человек.</p>
@@ -118,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-// Страница комнаты #/room/<id>: название, участники, что играет и что дальше.
+// Страница комнаты #/room/<id>: название, участники, что играет; у хозяина — выбор, что включить.
 // У хозяина — ссылка, приглашения, «Выгнать», «Закрыть комнату». Все тексты
 // (название комнаты, ники) выводятся только интерполяцией — с экранированием.
 import { computed, onMounted, ref, watch } from 'vue'
@@ -130,8 +131,9 @@ import { room, rooms, roomLink } from '../rooms'
 import type { RoomInfo, RoomMember } from '../rooms/api'
 import { ROOM_CAPACITY, isRoomId } from '../rooms/sync'
 import UserRow from '../components/UserRow.vue'
-import UserTag from '../components/UserTag.vue'
+import NickWithTag from '../components/NickWithTag.vue'
 import ReactionBar from '../components/ReactionBar.vue'
+import RoomPlayPicker from '../components/RoomPlayPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,7 +155,6 @@ const waitingForHost = computed(() => !room.isOwner && room.hostState === 'away'
 const previewTitle = computed(() => (preview.value && !preview.value.closed ? preview.value.title : room.roomId === id.value ? room.title : 'Комната'))
 
 const now = computed(() => (room.nowTrackId ? trackInfo(room.nowTrackId) : null))
-const next = computed(() => room.nextTrackIds.map((t) => trackInfo(t)))
 
 const inRoom = (userId: string) => room.members.some((m) => m.id === userId)
 const memberSub = (m: RoomMember): string => {
