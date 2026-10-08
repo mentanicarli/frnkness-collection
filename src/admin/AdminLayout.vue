@@ -32,7 +32,7 @@
                         :class="{ active: isActive(route.section.value, item.id) }"
                         :aria-current="isActive(route.section.value, item.id) ? 'page' : undefined"
                         :data-testid="`nav-${item.id}`"
-                    >{{ item.label }}</a>
+                    >{{ item.label }}<span v-if="item.id === 'feedback' && feedbackNewCount > 0" class="adm-count" data-testid="nav-badge-feedback" :aria-label="`новых: ${feedbackNewCount}`">{{ feedbackNewCount > 99 ? '99+' : feedbackNewCount }}</span></a>
                 </div>
             </nav>
         </aside>
@@ -50,6 +50,7 @@ import { useRoute } from './composables/useRoute'
 import { isActive, visibleGroups } from './lib/nav'
 import HomeView from './views/HomeView.vue'
 import PublishToast from './components/PublishToast.vue'
+import { feedbackNewCount, startFeedbackBadge, stopFeedbackBadge } from './composables/useFeedbackBadge'
 
 const auth = useAuth()
 const route = useRoute()
@@ -66,8 +67,14 @@ watch(() => route.segments.value.join('/'), () => {
 const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') menuOpen.value = false
 }
-onMounted(() => document.addEventListener('keydown', onKey))
-onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
+onMounted(() => {
+    document.addEventListener('keydown', onKey)
+    startFeedbackBadge()
+})
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onKey)
+    stopFeedbackBadge()
+})
 
 const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.vue'))
 
@@ -78,6 +85,8 @@ const VIEWS: Record<string, Component> = {
     recovery: defineAsyncComponent(() => import('./views/RecoveryView.vue')),
     stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
     recap: defineAsyncComponent(() => import('./views/RecapView.vue')),
+    errors: defineAsyncComponent(() => import('./views/ErrorsView.vue')),
+    feedback: defineAsyncComponent(() => import('./views/FeedbackView.vue')),
     lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
     lrc: defineAsyncComponent(() => import('./views/LrcView.vue')),
     promo: defineAsyncComponent(() => import('./views/PromoView.vue')),

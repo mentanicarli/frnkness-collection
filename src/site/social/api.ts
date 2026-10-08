@@ -158,6 +158,8 @@ export const api = {
     friendRemove: (userId: string) => rpc<null>('friend_remove', { p_user: userId }),
     friendsList: () => rpc<FriendsList>('friends_list'),
     friendRequestsCount: () => rpc<number>('friend_requests_count'),
+    submitFeedback: (message: string, page: string, browser: string, build: string) =>
+        rpc<{ ok: boolean }>('submit_feedback', { p_message: message, p_page: page, p_browser: browser, p_build: build }),
     /** Все активные пользователи (без меня) для «Друзей»: ник и аватар, страницами по курсору. */
     discoverUsers: (query: string, after: string | null, limit = 30) =>
         rpc<DiscoverPage>('list_discoverable_users', { p_query: query, p_after: after, p_limit: limit }),
