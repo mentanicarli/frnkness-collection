@@ -21,6 +21,7 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/playlists                        мои плейлисты
  *   #/playlist/<id>                    плейлист
  *   #/friends                          друзья и заявки
+ *   #/room/<id>                        комната: слушаем вместе
  * Без входа («мягкая стена», раздел 2 плана):
  *   #/welcome  #/login  #/register  #/forgot  #/privacy
  *
@@ -67,6 +68,7 @@ const routes: RouteRecordRaw[] = [
     { path: '/playlists', name: 'playlists', component: () => import('./pages/PlaylistsPage.vue') },
     { path: '/playlist/:id', name: 'playlist', component: () => import('./pages/PlaylistPage.vue') },
     { path: '/friends', name: 'friends', component: () => import('./pages/FriendsPage.vue') },
+    { path: '/room/:id', name: 'room', component: () => import('./pages/RoomPage.vue') },
     { path: '/change-password', name: 'change-password', component: () => import('./pages/ChangePasswordPage.vue'), meta: { bare: true } },
     { path: '/welcome', name: 'welcome', component: () => import('./pages/WelcomePage.vue'), meta: guest },
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: guest },

@@ -13,6 +13,7 @@
     </div>
     <template v-if="session.user">
       <AddToPlaylistDialog />
+      <CreateRoomDialog />
       <NoticeToast />
     </template>
   </template>
@@ -32,7 +33,9 @@ import AppHeader from '@/site/components/AppHeader.vue'
 import FullscreenPlayer from '@/site/components/FullscreenPlayer.vue'
 import MiniPlayer from '@/site/components/MiniPlayer.vue'
 import AddToPlaylistDialog from '@/site/components/AddToPlaylistDialog.vue'
+import CreateRoomDialog from '@/site/components/CreateRoomDialog.vue'
 import NoticeToast from '@/site/components/NoticeToast.vue'
+import { bindRoomsToSession } from '@/site/rooms'
 import { bindSocialToSession } from '@/site/social/session'
 import { resetPageAccent } from '@/site/services/colors'
 import { runSearch, search, setSearchOpen } from '@/site/stores/search'
@@ -49,6 +52,8 @@ const playerMounted = ref(false)
 
 // Избранное, плейлисты, индикатор заявок, «сейчас слушает» — по входу.
 bindSocialToSession()
+// Комната: вошли — вернуться в свою, вышли — забыть; переходы по сайту её не рвут.
+bindRoomsToSession()
 
 // Вошли — плеер; вышли (сами, истекла сессия, удалили или забанили) — музыка
 // останавливается, с закрытого экрана уводим на заставку.
@@ -63,7 +68,7 @@ watch(
     }
     if (prev === undefined) return
     if (karaoke.fsOpen) closeFsPlayer()
-    closeMiniPlayer()
+    closeMiniPlayer(true)
     if (!route.meta.public) void router.replace(welcomeLocation(route.fullPath))
   },
   { immediate: true }

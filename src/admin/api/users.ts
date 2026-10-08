@@ -103,6 +103,27 @@ export async function fetchUserSocial(id: string): Promise<UserSocial> {
     }
 }
 
+// ── Комнаты (этап 4) ───────────────────────────────────────────────────
+
+export interface UserRoom {
+    id: string
+    title: string
+    created_at: string
+    last_activity: string
+    members: number
+}
+
+/** Открытая комната пользователя (он её хозяин) или null. */
+export async function fetchUserRoom(id: string): Promise<UserRoom | null> {
+    const r = await rpc<UserRoom | null>('admin_user_room', { p_user: id })
+    return r ? { ...r, members: num(r.members) } : null
+}
+
+/** Закрыть комнату: участники выходят. Права проверяет база (admin и owner). */
+export async function closeUserRoom(roomId: string): Promise<void> {
+    await rpc('admin_room_close', { p_room: roomId })
+}
+
 export interface UsersOverview {
     total: number
     active7: number

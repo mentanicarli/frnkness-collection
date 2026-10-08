@@ -1,6 +1,10 @@
 <template>
   <div class="shell shell-narrow social-page">
     <h1 class="social-h1">Друзья</h1>
+    <div class="social-actions" style="margin-top: 0.75rem;">
+      <RouterLink v-if="room.roomId && room.isOwner" class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="my-room-link">Вернуться в комнату</RouterLink>
+      <button v-else class="acc-btn acc-btn-sm" type="button" data-testid="friends-create-room" @click="openCreateRoom">Создать комнату</button>
+    </div>
 
     <section class="settings-section" aria-labelledby="fr-search" style="border-top: 0; padding-top: 0.5rem;">
       <h2 id="fr-search">Найти по нику</h2>
@@ -16,6 +20,16 @@
 
     <p v-if="!list" class="acc-hint">Загрузка…</p>
     <template v-else>
+      <section v-if="invites.length" class="settings-section" aria-labelledby="fr-rooms">
+        <h2 id="fr-rooms">Приглашения в комнаты <span class="badge" data-testid="invites-count">{{ invites.length }}</span></h2>
+        <ul class="user-list">
+          <UserRow v-for="inv in invites" :key="inv.room_id" :user="inv.from" :sub="`зовёт в «${inv.title}»`">
+            <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy" data-testid="invite-enter" @click="enter(inv)">Войти</button>
+            <button class="acc-btn acc-btn-sm" type="button" :disabled="busy" @click="dismiss(inv)">Отклонить</button>
+          </UserRow>
+        </ul>
+      </section>
+
       <section v-if="list.incoming.length" class="settings-section" aria-labelledby="fr-in">
         <h2 id="fr-in">Заявки в друзья <span class="badge" data-testid="incoming-count">{{ list.incoming.length }}</span></h2>
         <ul class="user-list">
@@ -51,9 +65,12 @@
 <script setup lang="ts">
 // Друзья: поиск по нику, заявки (принять / отклонить / отменить),
 // список друзей с «сейчас слушает», удаление из друзей.
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import { api, errorText, type FriendsList, type Profile, type Relation } from '../social/api'
-import { refreshFriendRequests } from '../social/friends'
+import { roomApi, type RoomInvite } from '../rooms/api'
+import { openCreateRoom, room, rooms } from '../rooms'
+import { friendRequests, refreshFriendRequests, setFastFriendPolling } from '../social/friends'
 import { showNotice } from '../social/notice'
 import { formatDate } from '../social/format'
 import { trackInfo } from '../social/tracks'
@@ -62,7 +79,9 @@ import UserRow from '../components/UserRow.vue'
 
 const RELATION_TEXT: Record<Relation, string> = { self: '', friend: 'в друзьях', incoming: 'прислал(а) заявку', outgoing: 'заявка отправлена', none: '' }
 
+const router = useRouter()
 const list = ref<FriendsList | null>(null)
+const invites = ref<RoomInvite[]>([])
 const busy = ref(false)
 const query = ref('')
 const results = ref<(Profile & { relation: Relation })[]>([])
@@ -71,15 +90,51 @@ let searchSeq = 0
 
 const nowPlayingTitle = (id: string) => trackInfo(id).title
 
-async function reload() {
+/** Перечитать списки. refreshBadge=false — когда список обновляется из-за значка (чтобы не ходить по кругу). */
+async function reload(refreshBadge = true) {
   try {
-    list.value = await api.friendsList()
+    ;[list.value, invites.value] = await Promise.all([api.friendsList(), roomApi.invitesList().catch(() => [])])
   } catch (e) {
     showNotice(errorText(e), true)
   }
-  void refreshFriendRequests()
+  if (refreshBadge) void refreshFriendRequests()
 }
-onMounted(reload)
+onMounted(() => {
+  void reload()
+  setFastFriendPolling(true)
+})
+onBeforeUnmount(() => setFastFriendPolling(false))
+
+// Значок на аватаре изменился (пришла заявка или приглашение) — список обновляется сразу следом.
+watch(
+  () => [friendRequests.incoming, friendRequests.invites] as const,
+  () => void reload(false)
+)
+
+// «Войти»: нажатие и есть разрешение на звук, поэтому входим сразу.
+async function enter(inv: RoomInvite) {
+  busy.value = true
+  try {
+    await rooms.join(inv.room_id)
+    void refreshFriendRequests()
+    void router.push({ name: 'room', params: { id: inv.room_id } })
+  } catch (e) {
+    showNotice(errorText(e), true)
+    await dismiss(inv)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function dismiss(inv: RoomInvite) {
+  try {
+    await roomApi.inviteDismiss(inv.room_id)
+    invites.value = invites.value.filter((i) => i.room_id !== inv.room_id)
+    void refreshFriendRequests()
+  } catch (e) {
+    showNotice(errorText(e), true)
+  }
+}
 
 const runSearch = debounce(async () => {
   const q = query.value.trim()

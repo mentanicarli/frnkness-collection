@@ -30,7 +30,25 @@ export const SOCIAL_RPCS = [
     'friend_requests_count',
     'user_search',
     'profile_by_nick',
-    'admin_user_social'
+    'admin_user_social',
+    // Комнаты (этап 4)
+    'server_now',
+    'room_create',
+    'room_join',
+    'room_leave',
+    'room_close',
+    'room_get',
+    'room_my',
+    'room_info',
+    'room_set_state',
+    'room_heartbeat',
+    'room_kick',
+    'room_invite',
+    'room_invites_list',
+    'room_invites_count',
+    'room_invite_dismiss',
+    'admin_user_room',
+    'admin_room_close'
 ] as const
 
 const COVERS = 'playlist-covers'
@@ -199,6 +217,18 @@ export class SocialBackend {
         }
     }
 
+    /**
+     * Политика Realtime для канала комнаты — настоящая функция базы
+     * (room_topic_access, на ней стоят политики realtime.messages).
+     */
+    roomAccess(userId: string | null, topic: string, ownerOnly: boolean): Promise<boolean> {
+        if (!userId) return Promise.resolve(false)
+        return this.run(async (db) => {
+            const { rows } = await this.asUser(db, userId, () => db.query<{ ok: boolean }>('select public.room_topic_access($1, $2) as ok', [topic, ownerOnly]))
+            return rows[0]?.ok === true
+        })
+    }
+
     /** Прямой запрос к базе (подготовка данных в тесте), без ролей. */
     sql<T = Record<string, unknown>>(query: string, params?: unknown[]): Promise<T[]> {
         return this.run(async (db) => (await db.query<T>(query, params)).rows)
@@ -215,9 +245,17 @@ export function socialStub(name: string): MockResponse | null {
         case 'user_top':
             return { status: 200, body: [] }
         case 'friend_requests_count':
+        case 'room_invites_count':
             return { status: 200, body: 0 }
+        case 'room_invites_list':
+            return { status: 200, body: [] }
+        case 'room_my':
+        case 'admin_user_room':
+            return { status: 200, body: null }
         case 'friends_list':
             return { status: 200, body: { friends: [], incoming: [], outgoing: [] } }
+        case 'server_now':
+            return { status: 200, body: Date.now() }
         case 'now_playing_set':
         case 'profile_by_nick':
             return { status: 200, body: null }

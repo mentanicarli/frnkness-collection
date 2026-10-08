@@ -28,6 +28,11 @@ export const player = shallowReactive({
     isPlaying: false,
     // Мини-плеер показан (после первого запуска, до нажатия «закрыть»).
     visible: false,
+    /**
+     * Роль в комнате (этап 4). Гость слушает то, что включил хозяин: движок
+     * не выполняет его команды (кроме громкости). У хозяина плеер обычный.
+     */
+    roomRole: null as 'host' | 'guest' | null,
     /** Играет Поток по всему каталогу (кнопка на главной). */
     flowModeActive: false,
     trackCounted: false,
