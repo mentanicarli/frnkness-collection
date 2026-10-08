@@ -2,7 +2,7 @@
   <div class="shell shell-narrow social-page">
     <h1 class="social-h1">Друзья</h1>
     <div class="social-actions" style="margin-top: 0.75rem;">
-      <RouterLink v-if="room.roomId && room.isOwner" class="acc-btn acc-btn-sm" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="my-room-link">Моя комната</RouterLink>
+      <RouterLink v-if="room.roomId && room.isOwner" class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="my-room-link">Вернуться в комнату</RouterLink>
       <button v-else class="acc-btn acc-btn-sm" type="button" data-testid="friends-create-room" @click="openCreateRoom">Создать комнату</button>
     </div>
 
@@ -65,12 +65,12 @@
 <script setup lang="ts">
 // Друзья: поиск по нику, заявки (принять / отклонить / отменить),
 // список друзей с «сейчас слушает», удаление из друзей.
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { api, errorText, type FriendsList, type Profile, type Relation } from '../social/api'
 import { roomApi, type RoomInvite } from '../rooms/api'
 import { openCreateRoom, room, rooms } from '../rooms'
-import { refreshFriendRequests } from '../social/friends'
+import { friendRequests, refreshFriendRequests, setFastFriendPolling } from '../social/friends'
 import { showNotice } from '../social/notice'
 import { formatDate } from '../social/format'
 import { trackInfo } from '../social/tracks'
@@ -90,14 +90,26 @@ let searchSeq = 0
 
 const nowPlayingTitle = (id: string) => trackInfo(id).title
 
-async function reload() {
+/** Перечитать списки. refreshBadge=false — когда список обновляется из-за значка (чтобы не ходить по кругу). */
+async function reload(refreshBadge = true) {
   try {
     ;[list.value, invites.value] = await Promise.all([api.friendsList(), roomApi.invitesList().catch(() => [])])
   } catch (e) {
     showNotice(errorText(e), true)
   }
-  void refreshFriendRequests()
+  if (refreshBadge) void refreshFriendRequests()
 }
+onMounted(() => {
+  void reload()
+  setFastFriendPolling(true)
+})
+onBeforeUnmount(() => setFastFriendPolling(false))
+
+// Значок на аватаре изменился (пришла заявка или приглашение) — список обновляется сразу следом.
+watch(
+  () => [friendRequests.incoming, friendRequests.invites] as const,
+  () => void reload(false)
+)
 
 // «Войти»: нажатие и есть разрешение на звук, поэтому входим сразу.
 async function enter(inv: RoomInvite) {
@@ -123,7 +135,6 @@ async function dismiss(inv: RoomInvite) {
     showNotice(errorText(e), true)
   }
 }
-onMounted(reload)
 
 const runSearch = debounce(async () => {
   const q = query.value.trim()

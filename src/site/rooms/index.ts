@@ -32,6 +32,10 @@ export const rooms = createRoomController({
         }
         document.addEventListener('visibilitychange', handler)
         return () => document.removeEventListener('visibilitychange', handler)
+    },
+    onHide: (cb) => {
+        window.addEventListener('pagehide', cb)
+        return () => window.removeEventListener('pagehide', cb)
     }
 })
 
@@ -49,13 +53,32 @@ export function roomLink(id: string, resolveHref: (id: string) => string): strin
     return new URL(resolveHref(id), window.location.href).href
 }
 
-/** Один раз из App.vue: вошли — вернуться в свою комнату; вышли — забыть её. */
+/** Как часто проверять «нет ли у меня комнаты», если при входе это не вышло (сеть, токен). */
+const RESTORE_CHECK_MS = 60_000
+
+/**
+ * Один раз из App.vue: вошли — вернуться в свою комнату; вышли — забыть её.
+ * Если комнаты нет в памяти, проверяем ещё раз при возвращении на вкладку и раз
+ * в минуту: тогда хозяин находит свою комнату, даже если первая проверка не прошла.
+ */
 export function bindRoomsToSession(): void {
+    const recheck = () => {
+        if (session.user && !room.roomId && document.visibilityState === 'visible') void rooms.restore()
+    }
+    let timer: ReturnType<typeof setInterval> | null = null
     watch(
         () => session.user?.id ?? null,
         (id) => {
-            if (id) void rooms.restore()
-            else void rooms.reset()
+            if (timer) clearInterval(timer)
+            timer = null
+            document.removeEventListener('visibilitychange', recheck)
+            if (!id) {
+                void rooms.reset()
+                return
+            }
+            void rooms.restore()
+            timer = setInterval(recheck, RESTORE_CHECK_MS)
+            document.addEventListener('visibilitychange', recheck)
         },
         { immediate: true }
     )

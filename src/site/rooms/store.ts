@@ -3,9 +3,13 @@ import { SocialError } from '../social/api'
 import type { RoomApi, RoomInfo, RoomMember, RoomView } from './api'
 import type { ChannelEvents, ChannelFactory, PresenceEntry, RoomChannel } from './channel'
 import type { ServerClock } from './clock'
+import { rlog } from './log'
 import type { PlayerPort } from './port'
 import {
     CLOCK_RESYNC_MS,
+    CONNECT_ATTEMPTS,
+    CONNECT_BACKOFF_MS,
+    LINK_DOWN_REOPEN_MS,
     HEARTBEAT_MS,
     HOST_RESYNC_MS,
     HOST_STALE_MS,
@@ -43,6 +47,8 @@ export interface RoomDeps {
     notify(text: string, error?: boolean): void
     /** Вкладка снова на экране. */
     onVisible(cb: () => void): () => void
+    /** Вкладку закрывают или перезагружают (pagehide). */
+    onHide(cb: () => void): () => void
 }
 
 export interface RoomUiState {
@@ -56,6 +62,10 @@ export interface RoomUiState {
     /** Кто сейчас в канале (по Presence). */
     online: string[]
     hostState: HostState
+    /** Номер попытки подключения (1…CONNECT_ATTEMPTS), пока статус 'connecting'. */
+    attempt: number
+    /** Канал оборвался, клиент возвращается: показываем «Переподключаемся…». */
+    linkDown: boolean
     /** Участник в базе, но в этой вкладке не подключён (перезагрузка): нужно нажатие. */
     needsConnect: boolean
     /** Браузер не пустил звук без нажатия. */
@@ -79,6 +89,8 @@ const initialState = (): RoomUiState => ({
     members: [],
     online: [],
     hostState: 'online',
+    attempt: 0,
+    linkDown: false,
     needsConnect: false,
     needsGesture: false,
     outdated: false,
@@ -107,6 +119,9 @@ interface Session {
     target: PlaybackTarget | null
     /** Состояние устарело (хозяин пропал): не играем, пока не придёт новое. */
     stale: boolean
+    /** Хозяин сообщил, что закрывает вкладку: считаем его ушедшим, не дожидаясь Presence. */
+    hostBye: boolean
+    downTimer: ReturnType<typeof setTimeout> | null
     /** Серверное время (мс), когда мы в последний раз слышали хозяина. */
     hostSeenMs: number
     watch: HostWatch
@@ -129,6 +144,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
     let session: Session | null = null
     /** Номер попытки подключения: устаревшие (человек успел нажать другое) бросаются. */
     let startToken = 0
+    let restoring = false
 
     // ── Состояние для экранов ──────────────────────────────────────────
 
@@ -163,6 +179,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         s.offs.forEach((off) => off())
         if (s.publishTimer) clearTimeout(s.publishTimer)
         if (s.refreshTimer) clearTimeout(s.refreshTimer)
+        if (s.downTimer) clearTimeout(s.downTimer)
         port.setRole(null)
         if (s.role === 'guest') port.release()
         await s.channel?.stop().catch(() => undefined)
@@ -186,6 +203,8 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             lastSeq: 0,
             target: null,
             stale: false,
+            hostBye: false,
+            downTimer: null,
             hostSeenMs: view.owner_seen_ms,
             watch: { absentSince: Date.now() },
             lastSeekAt: null,
@@ -220,11 +239,13 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         state.hostState = 'online'
         showPlayback(null)
         port.setRole(s.role)
+        rlog('вход в комнату', view.id, s.role, `эпоха ${view.epoch}`)
         try {
-            await clock.sync()
-            await openChannel(s, me.id)
-        } catch {
+            // Часы сверяем параллельно с подключением: каждая секунда ожидания заметна.
+            await Promise.all([clock.sync(), connectWithRetry(s, me.id, token)])
+        } catch (e) {
             if (token === startToken && current(s)) {
+                rlog('подключение не удалось после всех попыток', String(e))
                 state.status = 'error'
                 deps.notify('Не удалось подключиться к комнате — проверь интернет и нажми «Подключиться»', true)
                 await stopSession()
@@ -234,6 +255,8 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         }
         if (token !== startToken || !current(s)) return
         state.status = 'live'
+        state.attempt = 0
+        rlog('в комнате', view.id, s.role)
         startTimers(s)
         if (s.role === 'host') await hostEnter(s)
         else guestEnter(s)
@@ -243,7 +266,8 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         const events: ChannelEvents = {
             onBroadcast: (event, payload) => onBroadcast(s, event, payload),
             onPresence: (users) => onPresence(s, users),
-            onReconnect: () => void onReconnect(s)
+            onReconnect: () => void onReconnect(s),
+            onDown: () => onDown(s)
         }
         const channel = deps.channel(roomTopic(s.view.id, s.epoch), userId, events)
         s.channel = channel
@@ -251,11 +275,74 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         await channel.track({ role: s.role })
     }
 
+    const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+    /**
+     * Войти в канал с повторами: первый вход в приватный канал на настоящем
+     * Realtime бывает неудачным (токен ещё не дошёл, сервер «просыпается»).
+     * Каждая попытка — новый канал; всё это время статус «Подключаемся…».
+     */
+    async function connectWithRetry(s: Session, userId: string, token: number): Promise<void> {
+        let last: unknown = null
+        for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+            if (token !== startToken || !current(s)) throw new Error('отменено')
+            const delay = CONNECT_BACKOFF_MS[Math.min(attempt - 1, CONNECT_BACKOFF_MS.length - 1)]
+            if (delay) await wait(delay)
+            if (token !== startToken || !current(s)) throw new Error('отменено')
+            state.attempt = attempt
+            try {
+                rlog('попытка подключения', attempt, 'из', CONNECT_ATTEMPTS)
+                await openChannel(s, userId)
+                return
+            } catch (e) {
+                last = e
+                rlog('попытка', attempt, 'не удалась:', String(e instanceof Error ? e.message : e))
+                const failed = s.channel
+                s.channel = null
+                await failed?.stop().catch(() => undefined)
+            }
+        }
+        throw last ?? new Error('канал не открылся')
+    }
+
+    /** Канал оборвался: клиент сам пробует вернуться; не вернулся за LINK_DOWN_REOPEN_MS — открываем заново. */
+    function onDown(s: Session): void {
+        if (!current(s)) return
+        rlog('связь оборвалась, ждём возвращения')
+        state.linkDown = true
+        if (s.downTimer) return
+        s.downTimer = setTimeout(() => {
+            s.downTimer = null
+            if (!current(s) || !state.linkDown) return
+            const me = deps.me()
+            if (!me) return
+            rlog('связь не вернулась, открываем канал заново')
+            const old = s.channel
+            s.channel = null
+            void (async () => {
+                await old?.stop().catch(() => undefined)
+                try {
+                    await connectWithRetry(s, me.id, startToken)
+                    state.linkDown = false
+                    await onReconnect(s)
+                } catch {
+                    rlog('не удалось открыть канал заново')
+                    if (current(s)) onDown(s)
+                }
+            })()
+        }, LINK_DOWN_REOPEN_MS)
+    }
+
     function startTimers(s: Session): void {
         s.timers.push(setInterval(() => void heartbeat(s), HEARTBEAT_MS))
         s.timers.push(setInterval(() => void clock.sync(), CLOCK_RESYNC_MS))
-        if (s.role === 'host') s.timers.push(setInterval(() => schedulePublish(s, true), HOST_RESYNC_MS))
-        else s.timers.push(setInterval(() => tick(s), TICK_MS))
+        if (s.role === 'host') {
+            s.timers.push(setInterval(() => schedulePublish(s, true), HOST_RESYNC_MS))
+            // Вкладку закрывают: гости не ждут, пока Presence заметит, а сразу начинают отсчёт.
+            s.offs.push(deps.onHide(() => void s.channel?.send('bye', { epoch: s.epoch })))
+        } else {
+            s.timers.push(setInterval(() => tick(s), TICK_MS))
+        }
         s.offs.push(deps.onVisible(() => void onVisible(s)))
     }
 
@@ -326,6 +413,12 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
 
     async function onReconnect(s: Session): Promise<void> {
         if (!current(s)) return
+        rlog('связь вернулась')
+        state.linkDown = false
+        if (s.downTimer) {
+            clearTimeout(s.downTimer)
+            s.downTimer = null
+        }
         await s.channel?.track({ role: s.role }).catch(() => undefined)
         await refresh(s)
         if (current(s) && s.role === 'host') schedulePublish(s, true)
@@ -343,7 +436,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         await old?.stop().catch(() => undefined)
         if (!current(s)) return
         try {
-            await openChannel(s, me.id)
+            await connectWithRetry(s, me.id, startToken)
         } catch {
             deps.notify('Не удалось переподключиться к комнате', true)
         }
@@ -370,11 +463,16 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             const ps = parseRoomState(p.state)
             if (typeof seq !== 'number' || typeof at !== 'number' || !ps) return
             s.hostSeenMs = clock.now()
+            s.hostBye = false
             applyState(s, ps, seq, at, true)
         } else if (event === 'kick') {
             const epoch = Number(p.epoch)
             if (p.user_id === deps.me()?.id) void leaveLocal('Тебя выгнали из комнаты')
             else if (Number.isInteger(epoch) && epoch > s.epoch) void rekey(s, epoch).then(() => refresh(s))
+        } else if (event === 'bye') {
+            rlog('хозяин закрывает вкладку')
+            s.hostBye = true
+            evaluateHost(s)
         } else if (event === 'close') {
             void leaveLocal('Хозяин закрыл комнату')
         }
@@ -392,7 +490,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
 
     function evaluateHost(s: Session): void {
         if (!current(s) || s.role !== 'guest') return
-        const online = hostOnline(s.presence.has(s.view.owner.id), clock.now() - s.hostSeenMs)
+        const online = !s.hostBye && hostOnline(s.presence.has(s.view.owner.id), clock.now() - s.hostSeenMs)
         const step = stepHostWatch(s.watch, online, Date.now())
         s.watch = step.watch
         if (step.state === state.hostState) return
@@ -550,14 +648,34 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         return session
     }
 
-    /** После входа в аккаунт: вернуться в свою комнату, если она есть. */
+    /**
+     * После входа в аккаунт (и позже, если не вышло): вернуться в свою комнату.
+     * Хозяин подключается сам; гость видит «Подключиться» (звук — только по нажатию).
+     * Запрос повторяется: сразу после загрузки страницы сеть и токен бывают не готовы.
+     */
     async function restore(): Promise<void> {
-        if (session || !deps.me()) return
-        const view = await api.my().catch(() => null)
-        if (!view || session || !deps.me()) return
-        showView(view)
-        if (view.is_owner) await startSession(view)
-        else state.needsConnect = true
+        if (session || restoring || !deps.me()) return
+        restoring = true
+        try {
+            let view: RoomView | null = null
+            for (let attempt = 1; attempt <= 4; attempt++) {
+                try {
+                    view = await api.my()
+                    rlog('моя комната:', view ? `${view.id} (${view.is_owner ? 'хозяин' : 'гость'})` : 'нет')
+                    break
+                } catch (e) {
+                    rlog('не удалось узнать свою комнату, попытка', attempt, String(e))
+                    if (attempt < 4) await wait(1000 * attempt)
+                    if (!deps.me()) return
+                }
+            }
+            if (!view || session || !deps.me()) return
+            showView(view)
+            if (view.is_owner) await startSession(view)
+            else state.needsConnect = true
+        } finally {
+            restoring = false
+        }
     }
 
     async function create(title: string): Promise<RoomView> {

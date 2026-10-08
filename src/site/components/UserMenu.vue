@@ -20,7 +20,7 @@
       <RouterLink role="menuitem" :to="{ name: 'friends' }">
         Друзья<span v-if="pending" class="badge" style="margin-left: 0.5rem;">{{ pending }}</span>
       </RouterLink>
-      <RouterLink v-if="room.roomId" role="menuitem" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="menu-room">Комната «{{ room.title }}»</RouterLink>
+      <RouterLink v-if="room.roomId" role="menuitem" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="menu-room">{{ room.isOwner ? 'Вернуться в комнату' : 'Комната' }} «{{ room.title }}»</RouterLink>
       <button v-if="!room.isOwner" role="menuitem" type="button" data-testid="menu-create-room" @click="openCreateRoom">Создать комнату</button>
       <RouterLink role="menuitem" :to="{ name: 'me' }">Настройки</RouterLink>
       <a v-if="isAdminRole(session.user.role)" role="menuitem" href="./admin.html">Админка</a>

@@ -1,6 +1,6 @@
 <template>
   <!-- Мини-плеер (плавающий) -->
-  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: player.visible, 'room-guest': player.roomRole === 'guest' }">
+  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: shown, 'room-guest': player.roomRole === 'guest' }">
     <div class="progress-container" @click="seekByClick">
       <div id="progress-bar" class="progress-bar" :style="{ width: `${player.progress}%` }"></div>
     </div>
@@ -28,7 +28,7 @@
           </div>
           <div class="min-w-0 flex items-center" style="gap: clamp(0.5rem, 1.5vw, 0.75rem);">
             <div class="min-w-0">
-              <p id="player-track" class="truncate text-sm">{{ currentTrack?.title }}</p>
+              <p id="player-track" class="truncate text-sm">{{ currentTrack?.title ?? (room.roomId ? 'Ничего не играет' : '') }}</p>
               <p class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
             </div>
             <button id="lyrics-btn" @click="goCurrentTrack" class="lyrics-action-btn sm:flex" :class="{ hidden: !player.currentRelease }" aria-label="Открыть текст">
@@ -51,7 +51,7 @@
               @click.stop
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              <span class="room-chip-text">{{ room.status === 'live' ? 'В комнате' : 'Комната' }} · {{ room.title }}</span>
+              <span class="room-chip-text">{{ chipLabel }} · {{ room.title }}</span>
             </RouterLink>
             <span v-if="room.roomId && room.hostState === 'away' && !room.isOwner" class="room-chip-wait" data-testid="room-chip-wait">Ждём хозяина</span>
           </div>
@@ -122,10 +122,17 @@ onMounted(() => {
 })
 
 const currentTrack = computed(() => player.currentRelease?.tracks[player.currentTrackIndex] ?? null)
+// В комнате мини-плеер виден всегда (даже пока ничего не играет): на нём метка комнаты.
+const shown = computed(() => player.visible || Boolean(room.roomId))
+const chipLabel = computed(() => {
+  if (room.status === 'live') return room.linkDown ? 'Переподключаемся' : 'В комнате'
+  if (room.status === 'connecting') return 'Подключаемся'
+  return room.isOwner ? 'Вернуться в комнату' : 'Комната'
+})
 const volumeWaves = computed(() => volumeWavesFor(player.sliderValue, player.muted))
 
 // Отступ страницы под мини-плеером.
-watch(() => player.visible, (visible) => document.body.classList.toggle('mini-player-visible', visible), { immediate: true })
+watch(shown, (visible) => document.body.classList.toggle('mini-player-visible', visible), { immediate: true })
 
 function seekByClick(e: MouseEvent) {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()

@@ -23,10 +23,18 @@ export const FORCE_THRESHOLD_MS = 300
 /** Сколько ждём хозяина, прежде чем поставить паузу всем. */
 export const HOST_GRACE_MS = 15_000
 /** Хозяин, от которого давно нет вестей, считается ушедшим, даже если Presence на месте. */
-export const HOST_STALE_MS = 60_000
+export const HOST_STALE_MS = 45_000
 /** Сколько проб server_now() делаем и сколько лучших (по задержке) берём. */
 export const CLOCK_SAMPLES = 5
 export const CLOCK_BEST = 3
+/**
+ * Подключение к каналу: попытки с нарастающей паузой. «Подключаемся…» всё это
+ * время; ошибку показываем, только если не получилось ни разу из CONNECT_ATTEMPTS.
+ */
+export const CONNECT_ATTEMPTS = 6
+export const CONNECT_BACKOFF_MS = [0, 1000, 2000, 3500, 5000, 8000]
+/** Канал оборвался и сам не вернулся за это время — открываем заново. */
+export const LINK_DOWN_REOPEN_MS = 20_000
 /** Сердцебиение участника и повторная рассылка состояния хозяином. */
 export const HEARTBEAT_MS = 45_000
 export const HOST_RESYNC_MS = 15_000

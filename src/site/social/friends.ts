@@ -14,6 +14,9 @@ export const friendRequests = shallowReactive({ incoming: 0, invites: 0 })
 export const pendingCount = (): number => friendRequests.incoming + friendRequests.invites
 
 const POLL_MS = 120_000
+/** Пока открыта страница «Друзья», проверяем чаще: заявка и приглашение должны появиться сами. */
+export const FAST_POLL_MS = 10_000
+let fast = false
 let timer: ReturnType<typeof setInterval> | null = null
 let seq = 0
 
@@ -35,12 +38,21 @@ function onVisible() {
 }
 
 export function startFriendRequestsPolling(): void {
+    const keep = { incoming: friendRequests.incoming, invites: friendRequests.invites }
     stopFriendRequestsPolling()
+    friendRequests.incoming = keep.incoming
+    friendRequests.invites = keep.invites
     void refreshFriendRequests()
     timer = setInterval(() => {
         if (document.visibilityState === 'visible') void refreshFriendRequests()
-    }, POLL_MS)
+    }, fast ? FAST_POLL_MS : POLL_MS)
     document.addEventListener('visibilitychange', onVisible)
+}
+
+/** Страница «Друзья» открыта (true) или закрыта (false): частота проверки. */
+export function setFastFriendPolling(on: boolean): void {
+    fast = on
+    if (timer) startFriendRequestsPolling()
 }
 
 export function stopFriendRequestsPolling(): void {

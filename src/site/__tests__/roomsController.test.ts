@@ -313,13 +313,15 @@ interface Win {
     room: RoomController
     notices: { text: string; error: boolean }[]
     visible: () => void
+    hide: () => void
 }
 
-function openWindow(backend: FakeBackend, uid: string, clockSkewMs: number): Win {
+function openWindow(backend: FakeBackend, uid: string, clockSkewMs: number, over: { channel?: ChannelFactory; api?: Partial<RoomApi> } = {}): Win {
     const player = new FakePlayer()
     const state = createRoomState()
     const notices: Win['notices'] = []
     let visibleCb: () => void = () => undefined
+    let hideCb: () => void = () => undefined
     const clock = createServerClock({
         serverNow: () => backend.api(uid).serverNow(),
         deviceNow: () => Date.now() + clockSkewMs,
@@ -327,8 +329,8 @@ function openWindow(backend: FakeBackend, uid: string, clockSkewMs: number): Win
     })
     const room = createRoomController(
         {
-            api: backend.api(uid),
-            channel: backend.channelFactory,
+            api: { ...backend.api(uid), ...over.api },
+            channel: over.channel ?? backend.channelFactory,
             port: player,
             clock,
             me: () => ({ id: uid }),
@@ -336,11 +338,15 @@ function openWindow(backend: FakeBackend, uid: string, clockSkewMs: number): Win
             onVisible: (cb) => {
                 visibleCb = cb
                 return () => undefined
+            },
+            onHide: (cb) => {
+                hideCb = cb
+                return () => undefined
             }
         },
         state
     )
-    return { uid, player, state, room, notices, visible: () => visibleCb() }
+    return { uid, player, state, room, notices, visible: () => visibleCb(), hide: () => hideCb() }
 }
 
 const lastNotice = (list: { text: string }[]) => list[list.length - 1]?.text
@@ -683,41 +689,192 @@ describe('комнаты: хозяин и гости', () => {
         expect(again.player.isPlaying).toBe(true)
     })
 
-    it('нет Realtime: понятная ошибка, комната остаётся доступной для повторного входа', async () => {
+    /** Фабрика каналов: первые `failures` входов неудачны (как первый вход в настоящий Realtime). */
+    function flaky(backend: FakeBackend, failures: number, calls: { n: number }): ChannelFactory {
+        return (topic, userId, events) => {
+            const inner = new FakeChannel(backend, topic, userId, events)
+            calls.n++
+            if (calls.n <= failures) {
+                inner.start = async () => {
+                    throw new Error('CHANNEL_ERROR')
+                }
+            }
+            return inner
+        }
+    }
+
+    it('первый вход в канал неудачен — тихие повторы со статусом «Подключаемся…», без ошибки', async () => {
+        await hostRoom()
+        const calls = { n: 0 }
+        const guest = openWindow(backend, 'guest', 0, { channel: flaky(backend, 2, calls) })
+        void guest.room.join(ROOM_ID)
+        await settle(500)
+        expect(guest.state.status).toBe('connecting')
+        expect(guest.state.attempt).toBeGreaterThanOrEqual(1)
+        await settle(2000)
+        // Вторая попытка тоже не вышла, но человек ещё видит «Подключаемся…», а не ошибку.
+        expect(guest.state.status).toBe('connecting')
+        expect(guest.notices.filter((n) => n.error)).toEqual([])
+        await settle(6000)
+        expect(calls.n).toBe(3)
+        expect(guest.state.status).toBe('live')
+        expect(guest.state.attempt).toBe(0)
+        expect(guest.notices.filter((n) => n.error)).toEqual([])
+        expect(guest.player.trackId).toBe('album-one/first-track')
+    })
+
+    it('ошибка подключения — только после всех попыток, одна на всё; комната остаётся доступной для повторного входа', async () => {
+        await hostRoom()
+        const calls = { n: 0 }
+        const guest = openWindow(backend, 'guest', 0, { channel: flaky(backend, 99, calls) })
+        void guest.room.join(ROOM_ID)
+        await settle(10_000)
+        expect(guest.state.status).toBe('connecting')
+        expect(guest.notices).toEqual([])
+        await settle(30_000)
+        expect(calls.n).toBe(6)
+        expect(guest.state.status).toBe('error')
+        expect(guest.state.needsConnect).toBe(true)
+        expect(guest.state.roomId).toBe(ROOM_ID)
+        expect(guest.notices.filter((n) => n.error && /Не удалось подключиться/.test(n.text))).toHaveLength(1)
+        expect(guest.player.role).toBeNull()
+    })
+
+    it('создание комнаты: канал с трудом, но поднимается — человек не видит ошибки', async () => {
+        const calls = { n: 0 }
+        const host = openWindow(backend, 'host', 0, { channel: flaky(backend, 1, calls) })
+        host.player.start(0, 5000)
+        void host.room.create('С повтором')
+        await settle(6000)
+        expect(host.state.status).toBe('live')
+        expect(host.notices).toEqual([])
+        expect(backend.rooms.get(ROOM_ID)!.seq).toBeGreaterThan(0)
+    })
+
+    it('хозяин открыл сайт заново: комната найдена и подключена сама, даже если первые запросы не прошли', async () => {
+        await hostRoom()
+        let failures = 2
+        const back = openWindow(backend, 'host', 0, {
+            api: {
+                my: async () => {
+                    if (failures-- > 0) throw new SocialError('Не удалось связаться с сервером', 'network')
+                    return backend.api('host').my()
+                }
+            }
+        })
+        void back.room.restore()
+        await settle(8000)
+        expect(back.state.roomId).toBe(ROOM_ID)
+        expect(back.state.isOwner).toBe(true)
+        expect(back.state.status).toBe('live')
+        expect(back.player.role).toBe('host')
+    })
+
+    it('первая проверка комнаты не удалась совсем — повторный вызов (минутная проверка) находит её', async () => {
+        await hostRoom()
+        let down = true
+        const back = openWindow(backend, 'host', 0, {
+            api: {
+                my: async () => {
+                    if (down) throw new SocialError('Не удалось связаться с сервером', 'network')
+                    return backend.api('host').my()
+                }
+            }
+        })
+        await Promise.all([back.room.restore(), settle(20_000)])
+        expect(back.state.roomId).toBeNull()
+        down = false
+        void back.room.restore()
+        await settle(4000)
+        expect(back.state.roomId).toBe(ROOM_ID)
+        expect(back.state.status).toBe('live')
+    })
+
+    it('хозяин вернулся, а канал не поднялся: комната всё равно видна (меню, кнопка «Вернуться»), подключение по нажатию', async () => {
+        await hostRoom()
+        const calls = { n: 0 }
+        const back = openWindow(backend, 'host', 0, { channel: flaky(backend, 6, calls) })
+        void back.room.restore()
+        await settle(40_000)
+        expect(back.state.status).toBe('error')
+        expect(back.state.roomId).toBe(ROOM_ID)
+        expect(back.state.isOwner).toBe(true)
+        expect(back.state.needsConnect).toBe(true)
+        // Нажатие «Подключиться»: канал теперь поднимается.
+        void back.room.connect()
+        await settle(4000)
+        expect(back.state.status).toBe('live')
+        expect(back.state.needsConnect).toBe(false)
+    })
+
+    it('хозяин закрыл вкладку, а Presence «застрял»: сообщение «ухожу» запускает 15 секунд до паузы', async () => {
         const host = await hostRoom()
         const guest = openWindow(backend, 'guest', 0)
-        const broken: ChannelFactory = () => ({
-            start: async () => {
-                throw new Error('down')
-            },
-            send: async () => false,
-            track: async () => undefined,
-            stop: async () => undefined
-        })
-        const guest2 = openWindow(backend, 'guest2', 0)
-        void guest
-        void host
-        // Подменяем фабрику каналов у второго гостя.
-        const state = createRoomState()
-        const notices: string[] = []
-        const room = createRoomController(
-            {
-                api: backend.api('guest2'),
-                channel: broken,
-                port: guest2.player,
-                clock: createServerClock({ serverNow: async () => Date.now(), deviceNow: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) }),
-                me: () => ({ id: 'guest2' }),
-                notify: (t) => notices.push(t),
-                onVisible: () => () => undefined
-            },
-            state
-        )
-        void room.join(ROOM_ID)
+        void guest.room.join(ROOM_ID)
         await settle(3000)
-        expect(state.status).toBe('error')
-        expect(state.needsConnect).toBe(true)
-        expect(state.roomId).toBe(ROOM_ID)
-        expect(notices.some((t) => /Не удалось подключиться/.test(t))).toBe(true)
-        expect(guest2.player.role).toBeNull()
+        expect(guest.player.isPlaying).toBe(true)
+        // Хозяин закрывает вкладку, но сервер ещё считает его присутствующим.
+        host.hide()
+        // Вкладки больше нет: дальше ничего не рассылается (Presence при этом ещё на месте).
+        await settle(10)
+        const hostChannel = [...backend.channels.get(roomTopic(ROOM_ID, 0))!].find((c) => c.userId === 'host')!
+        hostChannel.send = async () => false
+        await settle(1500)
+        expect(guest.state.hostState).toBe('grace')
+        expect(guest.player.isPlaying).toBe(true)
+        await settle(14_000)
+        expect(guest.state.hostState).toBe('away')
+        expect(guest.player.isPlaying).toBe(false)
+        expect(guest.state.members.map((m) => m.id)).toContain('host')
+        // Вернулся (перезагрузка): первая же его рассылка снимает «Ждём хозяина».
+        await host.room.reset()
+        const back = openWindow(backend, 'host', 0)
+        void back.room.restore()
+        await settle(4000)
+        expect(guest.state.hostState).toBe('online')
+    })
+
+    it('Presence застрял и сообщения «ухожу» нет (сеть пропала): хозяин без вестей 45 секунд — пауза через ещё 15', async () => {
+        const host = await hostRoom()
+        const guest = openWindow(backend, 'guest', 0)
+        void guest.room.join(ROOM_ID)
+        await settle(3000)
+        // Хозяин «пропал»: его таймеры больше не рассылают состояние, Presence на месте.
+        host.player.onChange(() => undefined)
+        const hostChannel = [...backend.channels.get(roomTopic(ROOM_ID, 0))!].find((c) => c.userId === 'host')!
+        hostChannel.send = async () => false
+        await settle(40_000)
+        expect(guest.state.hostState).not.toBe('away')
+        await settle(25_000)
+        expect(guest.state.hostState).toBe('away')
+        expect(guest.player.isPlaying).toBe(false)
+    })
+
+    it('обрыв связи: «Переподключаемся…», вернулась сама — без пересоздания; не вернулась за 20 секунд — канал открывается заново', async () => {
+        await hostRoom()
+        const calls = { n: 0 }
+        const counting: ChannelFactory = (t, u, e) => {
+            calls.n++
+            return backend.channelFactory(t, u, e)
+        }
+        const guest = openWindow(backend, 'guest', 0, { channel: counting })
+        void guest.room.join(ROOM_ID)
+        await settle(3000)
+        const channel = [...backend.channels.get(roomTopic(ROOM_ID, 0))!].find((c) => c.userId === 'guest')!
+        expect(calls.n).toBe(1)
+
+        channel.events.onDown()
+        expect(guest.state.linkDown).toBe(true)
+        await settle(5000)
+        channel.events.onReconnect()
+        expect(guest.state.linkDown).toBe(false)
+        await settle(30_000)
+        expect(calls.n).toBe(1)
+
+        channel.events.onDown()
+        await settle(21_000)
+        expect(calls.n).toBe(2)
+        expect(guest.state.linkDown).toBe(false)
+        expect(guest.state.status).toBe('live')
     })
 })

@@ -282,3 +282,58 @@ test('админка: открытая комната пользователя �
     // Хозяин узнаёт об этом по сердцебиению; музыка у него не прерывается.
     await expect(mini(host)).toHaveText('BACK TO POOPSICKS 2')
 })
+
+test('хозяин закрыл вкладку и открыл сайт снова: метка в мини-плеере, «Вернуться в комнату» в меню и на «Друзьях»', async ({ browser }) => {
+    const social = await newSocial()
+    const realtime = new FakeRealtime()
+    const host = await openAs(browser, social, realtime, PLAIN_USER)
+    const id = await hostStartsRoom(host, 'Вернусь')
+    await host.context().close()
+
+    const back = await openAs(browser, social, realtime, PLAIN_USER)
+    // Не страница комнаты, а главная: путь назад должен быть виден отовсюду.
+    await back.goto('/#/')
+    const chip = back.getByTestId('room-chip')
+    await expect(chip).toBeVisible()
+    await expect(chip).toContainText('Вернусь')
+    await back.getByTestId('user-menu').click()
+    await expect(back.getByTestId('menu-room')).toHaveText('Вернуться в комнату «Вернусь»')
+    await back.keyboard.press('Escape')
+    await back.goto('/#/friends')
+    await expect(back.getByTestId('my-room-link')).toHaveText('Вернуться в комнату')
+    await back.getByTestId('my-room-link').click()
+    await expect(back).toHaveURL(new RegExp(`#/room/${id}$`))
+    await expect(back.getByTestId('room-title')).toHaveText('Вернусь')
+    // Хозяин снова на связи, а не просто «числится».
+    await expect(members(back).filter({ hasText: PLAIN_USER.nick })).toContainText('хозяин')
+    await expect(back.getByTestId('room-close')).toBeVisible()
+    // Метка в мини-плеере ведёт обратно в комнату с любой страницы.
+    await back.goto('/#/chart')
+    await back.getByTestId('room-chip').click()
+    await expect(back).toHaveURL(new RegExp(`#/room/${id}$`))
+})
+
+test('«Друзья»: приглашение приходит и появляется в списке само, вместе со значком', async ({ browser }) => {
+    const social = await newSocial()
+    const realtime = new FakeRealtime()
+    await social.sql(`insert into public.friendships (requester, addressee, status, accepted_at) values ($1, $2, 'accepted', now())`, [PLAIN_USER.id, SECOND_USER.id])
+    const host = await openAs(browser, social, realtime, PLAIN_USER)
+    const friend = await openAs(browser, social, realtime, SECOND_USER)
+    await friend.goto('/#/friends')
+    await expect(friend.getByTestId('invites-count')).toHaveCount(0)
+
+    await hostStartsRoom(host, 'Зову')
+    await host.getByTestId('room-invite-toggle').click()
+    await host.getByTestId('room-invite-friend').click()
+    await expect(host.getByTestId('notice')).toContainText('Приглашение отправлено')
+
+    // Страницу не обновляем: значок и строка приглашения появляются сами.
+    await expect(friend.getByTestId('friend-requests-badge')).toHaveText('1', { timeout: 20_000 })
+    await expect(friend.getByTestId('invites-count')).toHaveText('1')
+    await expect(friend.getByText('зовёт в «Зову»')).toBeVisible()
+    // Хозяин закрыл комнату — приглашение исчезает так же сам.
+    host.once('dialog', (d) => void d.accept())
+    await host.getByTestId('room-close').click()
+    await expect(friend.getByTestId('invites-count')).toHaveCount(0, { timeout: 20_000 })
+    await expect(friend.getByTestId('friend-requests-badge')).toHaveCount(0)
+})

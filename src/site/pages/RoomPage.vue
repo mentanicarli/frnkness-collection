@@ -16,6 +16,7 @@
         Хозяин: {{ ownerNick }} · {{ room.members.length }} из {{ ROOM_CAPACITY }}
       </p>
 
+      <p v-if="room.linkDown" class="acc-hint" role="status" data-testid="room-link-down">Переподключаемся…</p>
       <p v-if="waitingForHost" class="acc-alert acc-alert-info" role="status" data-testid="room-waiting">Ждём хозяина</p>
       <p v-else-if="room.hostState === 'grace' && !room.isOwner" class="acc-hint" data-testid="room-grace">Хозяин переподключается…</p>
       <p v-if="room.outdated" class="acc-alert acc-alert-info" role="status" data-testid="room-outdated">Обнови страницу: у хозяина трек, которого нет в твоей версии сайта.</p>
@@ -91,7 +92,7 @@
       </section>
     </template>
 
-    <p v-else-if="inThisRoom && room.status === 'connecting'" class="acc-hint" data-testid="room-connecting">Подключаемся…</p>
+    <p v-else-if="inThisRoom && room.status === 'connecting'" class="acc-hint" data-testid="room-connecting">Подключаемся…<template v-if="room.attempt > 1"> (попытка {{ room.attempt }})</template></p>
 
     <!-- Ссылку открыл не подключённый: показываем комнату и кнопку «Подключиться» -->
     <template v-else>
@@ -106,7 +107,7 @@
         <p v-if="room.isOwner && room.roomId && room.roomId !== id" class="acc-alert acc-alert-info">Сначала закрой свою комнату <RouterLink :to="{ name: 'room', params: { id: room.roomId } }">«{{ room.title }}»</RouterLink>.</p>
         <p class="acc-hint">Музыка заиграет после нажатия — так устроены браузеры.</p>
         <div class="social-actions" style="margin-top: 1rem;">
-          <button class="acc-btn acc-btn-primary" type="button" :disabled="busy" data-testid="room-connect" @click="connect">Подключиться</button>
+          <button class="acc-btn acc-btn-primary" type="button" :disabled="busy" data-testid="room-connect" @click="connect">{{ room.isOwner && room.roomId === id ? 'Вернуться в комнату' : 'Подключиться' }}</button>
           <RouterLink class="acc-btn" :to="{ name: 'home' }">Не сейчас</RouterLink>
         </div>
       </template>
