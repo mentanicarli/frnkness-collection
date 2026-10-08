@@ -614,7 +614,14 @@ describe('комнаты: права и лимиты', () => {
 
         it('других политик на realtime.messages нет', async () => {
             const rows = (await db.query<{ policyname: string }>(`select policyname from pg_policies where schemaname = 'realtime' and tablename = 'messages' order by 1`)).rows
-            expect(rows.map((r) => r.policyname)).toEqual(['rooms: members announce presence', 'rooms: members listen', 'rooms: owner sends commands'])
+            // Три политики этапа 4 + две для реакций (этап 5, тесты — top4Feed.test.ts).
+            expect(rows.map((r) => r.policyname)).toEqual([
+                'rooms: members announce presence',
+                'rooms: members hear reactions',
+                'rooms: members listen',
+                'rooms: members send reactions',
+                'rooms: owner sends commands'
+            ])
         })
     })
 
@@ -629,7 +636,13 @@ describe('комнаты: права и лимиты', () => {
             expect(of('1 rls').map((r) => r.value)).toEqual(['true', 'true', 'true', 'true'])
             expect(of('2 table grants')).toEqual([])
             expect(of('3 table policies')).toEqual([])
-            expect(of('4 realtime').map((r) => r.item)).toEqual(['rooms: members announce presence', 'rooms: members listen', 'rooms: owner sends commands'])
+            expect(of('4 realtime').map((r) => r.item)).toEqual([
+                'rooms: members announce presence',
+                'rooms: members hear reactions',
+                'rooms: members listen',
+                'rooms: members send reactions',
+                'rooms: owner sends commands'
+            ])
             expect(of('5 functions').filter((r) => r.value.includes('anon=true'))).toEqual([])
             const internal = of('5 functions').filter((r) => /^(rooms_sweep|room_close_internal|room_json|require_own_room|epoch_ms|rooms_on_user_blocked)/.test(r.item))
             expect(internal.every((r) => r.value.includes('authenticated=false'))).toBe(true)

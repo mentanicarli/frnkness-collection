@@ -88,6 +88,17 @@
       </form>
     </section>
 
+    <!-- Лента друзей -->
+    <section class="settings-section" aria-labelledby="s-feed">
+      <h2 id="s-feed">Лента друзей</h2>
+      <label class="acc-check">
+        <input type="checkbox" name="hide-listens" :checked="hideListens === true" :disabled="hideListens === null || hideBusy" data-testid="feed-hide-listens" @change="toggleHideListens">
+        <span>Не показывать мои прослушивания в ленте</span>
+      </label>
+      <p class="acc-hint" style="margin-top: 0.5rem;">Скрываются только прослушивания. Избранное, новые публичные плейлисты, топ-4 и комнаты друзья по-прежнему увидят.</p>
+      <p v-if="feedMsg" class="acc-alert acc-alert-error" style="margin-top: 0.75rem;" role="status" data-testid="feed-pref-error">{{ feedMsg }}</p>
+    </section>
+
     <!-- Выход и удаление -->
     <section class="settings-section" aria-labelledby="s-exit">
       <h2 id="s-exit">Аккаунт</h2>
@@ -121,7 +132,7 @@
 // Настройки профиля (раздел 5 плана). Избранное, плейлисты, топ и
 // друзья — на странице пользователя (#/u/<ник>) и своих страницах.
 import { computed, reactive, ref, watch } from 'vue'
-import { api } from '@/site/social/api'
+import { api, errorText } from '@/site/social/api'
 import { plural } from '@/site/social/format'
 import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
@@ -145,6 +156,32 @@ watch(
   },
   { immediate: true }
 )
+
+// Лента друзей: «Не показывать мои прослушивания» (по умолчанию выключено).
+// null — настройка ещё грузится. Переключатель меняется сразу; не сохранилось — возвращаем.
+const hideListens = ref<boolean | null>(null)
+const hideBusy = ref(false)
+const feedMsg = ref('')
+void api.feedPrefsGet().then((p) => { hideListens.value = Boolean(p?.hide_listens) }).catch(() => { hideListens.value = false })
+
+async function toggleHideListens(e: Event) {
+  const input = e.target as HTMLInputElement
+  const want = input.checked
+  const before = hideListens.value
+  hideListens.value = want
+  hideBusy.value = true
+  feedMsg.value = ''
+  try {
+    const saved = await api.feedPrefsSet(want)
+    hideListens.value = Boolean(saved?.hide_listens)
+  } catch (err) {
+    hideListens.value = before
+    input.checked = before === true
+    feedMsg.value = errorText(err)
+  } finally {
+    hideBusy.value = false
+  }
+}
 
 const coverOf = (id: string) => releases[id]?.cover ?? null
 const covers = Object.entries(releases)

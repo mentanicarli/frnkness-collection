@@ -90,6 +90,8 @@ export interface AdminPlaylist {
 
 export interface UserSocial {
     favorites: { track_id: string; added_at: string }[]
+    /** «Мой топ-4» пользователя: места 1…4 и постоянные id треков. */
+    top4: { position: number; track_id: string }[]
     playlists: AdminPlaylist[]
     friends: { id: string; nick: string; avatar: string; status: 'pending' | 'accepted'; direction: 'both' | 'incoming' | 'outgoing'; since: string }[]
 }
@@ -98,6 +100,7 @@ export async function fetchUserSocial(id: string): Promise<UserSocial> {
     const s = await rpc<UserSocial>('admin_user_social', { p_user: id })
     return {
         favorites: s.favorites ?? [],
+        top4: [...(s.top4 ?? [])].sort((a, b) => num(a.position) - num(b.position)),
         playlists: (s.playlists ?? []).map((p) => ({ ...p, track_count: num(p.track_count), tracks: p.tracks ?? [] })),
         friends: s.friends ?? []
     }

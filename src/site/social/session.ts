@@ -2,6 +2,7 @@ import { watch } from 'vue'
 import { player } from '../player/state'
 import { session } from '../session'
 import { api } from './api'
+import { feed } from './feedStore'
 import { loadFavorites, resetFavorites } from './favorites'
 import { startFriendRequestsPolling, stopFriendRequestsPolling } from './friends'
 import { createNowPlayingReporter } from './nowPlaying'
@@ -24,6 +25,7 @@ export function bindSocialToSession(): void {
         () => session.user?.id ?? null,
         (id) => {
             reporter.reset()
+            feed.reset()
             resetFavorites(id)
             resetMyPlaylists(id)
             if (!id) {

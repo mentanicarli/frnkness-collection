@@ -61,6 +61,31 @@ export interface TopRow {
     plays: number
 }
 
+/** Место в топ-4 (1…4) и постоянный id трека. */
+export interface Top4Row {
+    position: number
+    track_id: string
+}
+
+/** Событие ленты как его отдаёт база (friends_feed); разбирает ./feed.ts. */
+export interface FeedRow {
+    kind: string
+    at: string
+    key: string
+    user: Profile
+    track_key?: string
+    track_id?: string
+    track_ids?: string[]
+    playlist?: { id: string; title: string }
+    room?: { id: string; title: string }
+    can_join?: boolean
+}
+
+export interface FeedPage {
+    events: FeedRow[]
+    has_more: boolean
+}
+
 export class SocialError extends Error {
     constructor(message: string, readonly code?: string) {
         super(message)
@@ -112,6 +137,13 @@ export const api = {
     userPlaylists: (userId: string) => rpc<PlaylistSummary[]>('user_playlists', { p_user: userId }),
 
     userTop: (userId: string, days: 7 | 30 | null) => rpc<TopRow[]>('user_top', { p_user: userId, p_days: days }),
+    userTop4: (userId: string) => rpc<Top4Row[]>('user_top4', { p_user: userId }),
+    top4Set: (trackIds: readonly string[]) => rpc<Top4Row[]>('top4_set', { p_track_ids: [...trackIds] }),
+
+    feedPrefsGet: () => rpc<{ hide_listens: boolean }>('feed_prefs_get'),
+    feedPrefsSet: (hideListens: boolean) => rpc<{ hide_listens: boolean }>('feed_prefs_set', { p_hide_listens: hideListens }),
+    friendsFeed: (before: { at: string; key: string } | null, limit = 40) =>
+        rpc<FeedPage>('friends_feed', { p_before_at: before?.at ?? null, p_before_key: before?.key ?? null, p_limit: limit }),
     nowPlayingSet: (trackId: string) => rpc<null>('now_playing_set', { p_track_id: trackId }),
 
     friendRequest: (userId: string) => rpc<{ status: 'pending' | 'accepted' }>('friend_request', { p_user: userId }),

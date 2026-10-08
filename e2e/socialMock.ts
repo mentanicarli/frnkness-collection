@@ -31,6 +31,12 @@ export const SOCIAL_RPCS = [
     'user_search',
     'profile_by_nick',
     'admin_user_social',
+    // Топ-4 и лента (этап 5)
+    'user_top4',
+    'top4_set',
+    'feed_prefs_get',
+    'feed_prefs_set',
+    'friends_feed',
     // Комнаты (этап 4)
     'server_now',
     'room_create',
@@ -224,7 +230,11 @@ export class SocialBackend {
     roomAccess(userId: string | null, topic: string, ownerOnly: boolean): Promise<boolean> {
         if (!userId) return Promise.resolve(false)
         return this.run(async (db) => {
-            const { rows } = await this.asUser(db, userId, () => db.query<{ ok: boolean }>('select public.room_topic_access($1, $2) as ok', [topic, ownerOnly]))
+            // Канал реакций (roomfx:…) — свои правила: пишут и слушают все участники
+            // (room_react_access, на ней стоят политики «members send/hear reactions»).
+            const { rows } = topic.startsWith('roomfx:')
+                ? await this.asUser(db, userId, () => db.query<{ ok: boolean }>('select public.room_react_access($1) as ok', [topic]))
+                : await this.asUser(db, userId, () => db.query<{ ok: boolean }>('select public.room_topic_access($1, $2) as ok', [topic, ownerOnly]))
             return rows[0]?.ok === true
         })
     }
@@ -243,7 +253,14 @@ export function socialStub(name: string): MockResponse | null {
         case 'user_playlists':
         case 'user_search':
         case 'user_top':
+        case 'user_top4':
+        case 'top4_set':
             return { status: 200, body: [] }
+        case 'feed_prefs_get':
+        case 'feed_prefs_set':
+            return { status: 200, body: { hide_listens: false } }
+        case 'friends_feed':
+            return { status: 200, body: { events: [], has_more: false } }
         case 'friend_requests_count':
         case 'room_invites_count':
             return { status: 200, body: 0 }
