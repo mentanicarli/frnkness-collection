@@ -46,6 +46,7 @@
     "src/**/*.tsx",
     "src/**/*.vue",
     "scripts/**/*.ts",
+    "infra/**/*.ts",
     "tests/**/*.ts"
   ],
   "references": [

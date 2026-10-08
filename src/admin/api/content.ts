@@ -1,4 +1,5 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from './supabase'
+import { routedFetch } from '@/supabaseNet'
 import { useAuth } from '../composables/useAuth'
 
 /** Ошибка функции admin-content с машинным кодом и понятным текстом. */
@@ -27,7 +28,7 @@ export async function callContent<T>(action: string, payload: Record<string, unk
     }
     let res: Response
     try {
-        res = await fetch(FUNCTION_URL, {
+        res = await routedFetch(FUNCTION_URL, {
             method: 'POST',
             headers: {
                 Authorization: `Bearer ${token}`,

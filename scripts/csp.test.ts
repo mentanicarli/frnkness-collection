@@ -26,6 +26,14 @@ describe('CSP', () => {
         expect(p).not.toMatch(/script-src[^;]*'unsafe-inline'/)
     })
 
+    it('адрес посредника добавляется в connect-src (https и wss) и img-src; без него политика прежняя', () => {
+        const withProxy = cspPolicy('https://abc.supabase.co', ["'sha256-x'"], 'https://frnk.example.workers.dev/')
+        expect(withProxy).toContain('connect-src \'self\' https://abc.supabase.co https://frnk.example.workers.dev wss://abc.supabase.co wss://frnk.example.workers.dev https://challenges.cloudflare.com')
+        expect(withProxy).toContain("img-src 'self' data: blob: https://abc.supabase.co https://frnk.example.workers.dev")
+        expect(cspPolicy('https://abc.supabase.co', ["'sha256-x'"], '')).toBe(cspPolicy('https://abc.supabase.co', ["'sha256-x'"]))
+        expect(injectCsp(HTML, 'https://abc.supabase.co', 'https://frnk.example.workers.dev')).toContain('wss://frnk.example.workers.dev')
+    })
+
     it('тег встаёт сразу после <meta charset>', () => {
         const out = injectCsp(HTML, 'https://abc.supabase.co')
         expect(out.indexOf('Content-Security-Policy')).toBeGreaterThan(out.indexOf('charset'))

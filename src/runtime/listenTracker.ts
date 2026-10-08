@@ -175,13 +175,18 @@ export function setupListenTracker(deps: ListenTrackerDeps) {
  * от имени вошедшего (access-токен). Без входа сессии не пишутся — база
  * их и не примет. Ошибки — тихо: сайт не должен ломаться.
  */
-export function createListenSender(supabaseUrl: string, apiKey: string, getToken: () => string | null) {
+export function createListenSender(
+    supabaseUrl: string,
+    apiKey: string,
+    getToken: () => string | null,
+    doFetch: typeof fetch = (input, init) => fetch(input, init)
+) {
     const url = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/record_listen_session`
     return (payload: ListenPayload) => {
         if (typeof fetch !== 'function') return
         const token = getToken()
         if (!token) return
-        fetch(url, {
+        doFetch(url, {
             method: 'POST',
             keepalive: true,
             headers: { apikey: apiKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

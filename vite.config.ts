@@ -7,6 +7,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 import fs from 'fs'
 import { injectCsp } from './scripts/csp'
+import { normalizeBase } from './src/supabaseRoute'
 import { COVER_WIDTHS } from './src/utils/cover'
 import { buildPreviewPages, homeMetaTags, normalizeSiteUrl } from './scripts/previews'
 
@@ -19,6 +20,17 @@ function supabaseUrlFor(mode: string): string {
     const m = config.match(/DEFAULT_SUPABASE_URL = '([^']+)'/)
     if (!m) throw new Error('vite.config: не найден DEFAULT_SUPABASE_URL в src/supabaseConfig.ts')
     return m[1]
+}
+
+// Адрес посредника для CSP: env сборки или DEFAULT_SUPABASE_PROXY_URL из
+// src/supabaseConfig.ts. Невалидный адрес сайт тоже игнорирует (normalizeBase).
+function proxyUrlFor(mode: string): string {
+    const env = loadEnv(mode, __dirname, 'VITE_')
+    if (env.VITE_SUPABASE_PROXY_URL) return normalizeBase(env.VITE_SUPABASE_PROXY_URL)
+    const config = fs.readFileSync(path.resolve(__dirname, 'src/supabaseConfig.ts'), 'utf-8')
+    const m = config.match(/DEFAULT_SUPABASE_PROXY_URL = '([^']*)'/)
+    if (!m) throw new Error('vite.config: не найден DEFAULT_SUPABASE_PROXY_URL в src/supabaseConfig.ts')
+    return normalizeBase(m[1])
 }
 
 // Склеивает тексты в один JSON, чтобы поиску по строкам не приходилось
@@ -104,13 +116,13 @@ function previewsPlugin(siteUrl: string) {
 }
 
 // CSP только в продакшен-сборке: dev-сервер Vite вставляет свои скрипты.
-function cspPlugin(supabaseUrl: string) {
+function cspPlugin(supabaseUrl: string, proxyUrl: string) {
     return {
         name: 'frnkness-csp',
         apply: 'build' as const,
         transformIndexHtml: {
             order: 'post' as const,
-            handler: (html: string) => injectCsp(html, supabaseUrl)
+            handler: (html: string) => injectCsp(html, supabaseUrl, proxyUrl)
         }
     }
 }
@@ -207,7 +219,7 @@ export default defineConfig(({ mode }) => ({
     plugins: [
         vue(),
         previewsPlugin(normalizeSiteUrl(loadEnv(mode, __dirname, 'VITE_').VITE_SITE_URL)),
-        cspPlugin(supabaseUrlFor(mode)),
+        cspPlugin(supabaseUrlFor(mode), proxyUrlFor(mode)),
         lyricsIndexPlugin(),
         coverVariantsPlugin(),
         tailwindcss(),

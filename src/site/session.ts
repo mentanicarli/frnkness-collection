@@ -2,6 +2,7 @@ import { reactive, readonly } from 'vue'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/supabaseClient'
 import { functionUrl, SUPABASE_ANON_KEY } from '@/supabaseConfig'
+import { routedFetch } from '@/supabaseNet'
 import { clearRecoveryHandoff, recoveryHandoff } from './auth/recovery'
 import { type AppRole, cleanNick, roleOf, techEmail } from '../../supabase/functions/_shared/accounts.ts'
 
@@ -281,7 +282,7 @@ export async function callFunction<T = Record<string, unknown>>(name: string, bo
         headers.Authorization = `Bearer ${data.session.access_token}`
     }
     try {
-        const res = await fetch(functionUrl(name), { method: 'POST', headers, body: JSON.stringify(body) })
+        const res = await routedFetch(functionUrl(name), { method: 'POST', headers, body: JSON.stringify(body) })
         const json = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null
         if (!res.ok) {
             return {

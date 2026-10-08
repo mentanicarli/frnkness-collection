@@ -3,6 +3,13 @@
 const DEFAULT_SUPABASE_URL = 'https://momcakikuivtvxkmgjhx.supabase.co'
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_ept_0dlTFn9cWLM0wIK2JA_a7xNSx-I'
 
+// Адрес посредника (Cloudflare Worker, свой сервер — любой, что пересылает
+// запросы на Supabase один в один, см. infra/cloudflare-worker и
+// docs/operations.md). Пустая строка — сайт ходит напрямую на Supabase, как раньше.
+// Адрес можно менять на любой другой: больше нигде ничего править не нужно.
+// Если посредник не отвечает, сайт сам переходит на прямой адрес (supabaseRoute.ts).
+const DEFAULT_SUPABASE_PROXY_URL = ''
+
 // Публичный ключ (Site Key) виджета Cloudflare Turnstile — капча при
 // регистрации и в заявке «Забыли пароль?». Секретный ключ хранится только
 // в секретах Edge Functions (TURNSTILE_SECRET_KEY). См. docs/operations.md.
@@ -10,6 +17,7 @@ const DEFAULT_TURNSTILE_SITE_KEY = '0x4AAAAAAFPFOS1W3XFaMh_t'
 
 // Fallback-значения нужны для локального запуска, если env не задан.
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL
+export const SUPABASE_PROXY_URL = import.meta.env.VITE_SUPABASE_PROXY_URL || DEFAULT_SUPABASE_PROXY_URL
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY
 export const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || DEFAULT_TURNSTILE_SITE_KEY
 
