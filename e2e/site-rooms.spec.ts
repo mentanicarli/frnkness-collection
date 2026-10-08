@@ -106,12 +106,13 @@ test('комната: хозяин и гость в двух окнах — то
     await expect(mini(guest)).toHaveText('Macan-Walker')
     await expect.poll(() => paused(guest)).toBe(false)
 
-    // Перемотка хозяина до середины — гость догоняет, и ему засчитывается прослушивание.
+    // Перемотка хозяина до середины — гость догоняет (на запас старта звук стоит у обоих), а прослушивание
+    // засчитывается ему после 10 секунд его собственного звука, а не по позиции трека.
     const bar = host.locator('#player .progress-container')
     const box = (await bar.boundingBox())!
     await host.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2)
     await expect.poll(async () => Math.abs((await position(guest)) - (await position(host))), { timeout: 8000 }).toBeLessThan(1.5)
-    await expect.poll(() => counted, { timeout: 8000 }).toContain('most-venture-poopsicks-2')
+    await expect.poll(() => counted, { timeout: 25_000 }).toContain('most-venture-poopsicks-2')
 
     // Пауза хозяина.
     await host.locator('#play-pause-btn').click()

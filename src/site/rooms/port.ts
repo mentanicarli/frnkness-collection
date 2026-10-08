@@ -3,12 +3,18 @@ import {
     applyRemotePlayback,
     getPlaybackInfo,
     onAudioAttached,
+    getStartLatencyMs,
+    holdRemote,
     pauseRemote,
     playRemote,
-    releaseRemote,
+    preloadRoomTrack,
+    resetPlayer,
     seekRemoteMs,
+    setHostHook,
+    setPlaybackRate,
     setRemoteQueue,
     unlockAudio,
+    type HostHook,
     type PlaybackInfo,
     type RemoteApplyResult
 } from '../player/engine'
@@ -20,22 +26,35 @@ import { player } from '../player/state'
  * Контроллер (./store.ts) работает с этим интерфейсом, поэтому в тестах
  * вместо настоящего <audio> подставляется подделка.
  */
+export type ChangeKind = 'state' | 'seeked' | 'play' | 'pause'
+
 export interface PlayerPort {
     info(): PlaybackInfo
     queue(): Queue | null
     /** 'guest' блокирует кнопки плеера; 'host' и null — плеер обычный. */
     setRole(role: 'host' | 'guest' | null): void
-    apply(queue: Queue, playing: boolean, targetMs: () => number): RemoteApplyResult
+    /** Загрузить очередь и трек; когда он готов (canplay) — перемотать на targetMs() и вызвать onReady. */
+    apply(queue: Queue, playing: boolean, targetMs: () => number, onReady?: () => void): RemoteApplyResult
     setQueue(queue: Queue): void
     seekMs(ms: number): void
     play(): Promise<boolean>
     pause(): void
-    /** Гость вышел: замолчать и убрать чужую очередь. */
-    release(): void
+    /** Остановить звук, не меняя вид плеера: хозяин ждёт назначенного старта (кнопка остаётся «играет»). */
+    hold(): void
+    /** Выход из комнаты: плеер как после загрузки страницы (тишина, пустая очередь, закрытый мини-плеер). */
+    reset(): void
+    /** Скорость воспроизведения (подстройка гостя под хозяина). */
+    setRate(rate: number): void
+    /** Заранее загрузить трек (следующий в очереди), чтобы переход был без паузы. */
+    preload(trackId: string): void
+    /** Сколько мс проходит от play() до звука: старт назначают на это раньше. */
+    startLatencyMs(): number
+    /** Хозяин: нажатие «играть» отдаётся комнате, она пускает звук по расписанию. */
+    setHostHook(hook: HostHook | null): void
     /** Звук разрешают только по нажатию: вызывать до любых await. */
     unlock(): void
-    /** Хозяин: что-то изменилось (трек, очередь, пауза, перемотка). */
-    onChange(cb: () => void): () => void
+    /** Хозяин: что-то изменилось (трек, очередь, пауза, перемотка); kind — что именно случилось с <audio>. */
+    onChange(cb: (kind: ChangeKind) => void): () => void
 }
 
 export const playerPort: PlayerPort = {
@@ -49,15 +68,21 @@ export const playerPort: PlayerPort = {
     seekMs: seekRemoteMs,
     play: playRemote,
     pause: pauseRemote,
-    release: releaseRemote,
+    hold: holdRemote,
+    reset: resetPlayer,
+    setRate: setPlaybackRate,
+    preload: preloadRoomTrack,
+    startLatencyMs: getStartLatencyMs,
+    setHostHook,
     unlock: unlockAudio,
     onChange(cb) {
-        const stopWatch = watch(() => [player.playSession, player.queue, player.isPlaying] as const, () => cb())
+        const stopWatch = watch(() => [player.playSession, player.queue, player.isPlaying] as const, () => cb('state'))
         let detach = () => undefined as void
         const stopAudio = onAudioAttached((audio) => {
             const events = ['seeked', 'play', 'pause'] as const
-            events.forEach((e) => audio.addEventListener(e, cb))
-            detach = () => events.forEach((e) => audio.removeEventListener(e, cb))
+            const handlers = events.map((e) => [e, () => cb(e)] as const)
+            handlers.forEach(([e, h]) => audio.addEventListener(e, h))
+            detach = () => handlers.forEach(([e, h]) => audio.removeEventListener(e, h))
         })
         return () => {
             stopWatch()

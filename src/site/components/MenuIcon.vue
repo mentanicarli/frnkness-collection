@@ -1,6 +1,6 @@
 <template>
   <!-- Один набор иконок меню: линейные, 24×24, как у остальных значков сайта. -->
-  <svg class="menu-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  <svg class="menu-icon" :class="{ filled }" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
     <path v-if="name === 'heart'" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     <template v-else-if="name === 'playlist'"><path d="M3 6h12M3 12h12M3 18h7" /><circle cx="18" cy="17" r="2.5" /><path d="M20.5 17V7l-4 1" /></template>
     <template v-else-if="name === 'friends'"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></template>
@@ -12,12 +12,14 @@
     <path v-else-if="name === 'shield'" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     <path v-else-if="name === 'logout'" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
     <path v-else-if="name === 'star'" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+    <template v-else-if="name === 'text'"><path d="M4 6h16M4 10h16M4 14h10M4 18h7" /></template>
+    <template v-else-if="name === 'share'"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7" /><path d="M16 6l-4-4-4 4M12 2v13" /></template>
     <path v-else-if="name === 'chevron'" d="M9 18l6-6-6-6" />
   </svg>
 </template>
 
 <script setup lang="ts">
-export type MenuIconName = 'heart' | 'playlist' | 'friends' | 'feed' | 'plus' | 'enter' | 'settings' | 'flag' | 'shield' | 'logout' | 'star' | 'chevron'
+export type MenuIconName = 'heart' | 'playlist' | 'friends' | 'feed' | 'plus' | 'enter' | 'settings' | 'flag' | 'shield' | 'logout' | 'star' | 'text' | 'share' | 'chevron'
 
-defineProps<{ name: MenuIconName }>()
+defineProps<{ name: MenuIconName; filled?: boolean }>()
 </script>

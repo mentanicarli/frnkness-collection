@@ -63,13 +63,12 @@ test('телефон: в строке релиза только номер, на
     )
     expect(overlaps).toBe(0)
 
-    // Панель: избранное, плейлист, текст, поделиться; «Играть следующим» — только когда есть очередь.
+    // Панель: избранное, плейлист, текст, поделиться.
     await more.click()
     const sheet = page.getByTestId('track-sheet')
     await expect(sheet).toBeVisible()
     await expect(sheet).toContainText('BACK TO POOPSICKS 2')
     for (const id of ['sheet-favorite', 'sheet-playlist', 'sheet-lyrics', 'sheet-share']) await expect(sheet.getByTestId(id)).toBeVisible()
-    await expect(sheet.getByTestId('sheet-play-next')).toHaveCount(0)
     // Escape и «Закрыть» закрывают панель.
     await page.keyboard.press('Escape')
     await expect(sheet).toBeHidden()
@@ -80,7 +79,7 @@ test('телефон: в строке релиза только номер, на
     await expect.poll(() => social.sql(`select track_id from public.favorites where user_id = '${PLAIN_USER.id}'`)).toEqual([{ track_id: 'most-venture-poopsicks/back-to-poopsicks-2' }])
     await more.click()
     await expect(page.getByTestId('sheet-favorite')).toContainText('Убрать из избранного')
-    await page.getByTestId('sheet-close').click()
+    await page.keyboard.press('Escape')
 
     // «Текст» ведёт на страницу трека, «В плейлист» открывает выбор плейлиста.
     await more.click()
@@ -89,18 +88,39 @@ test('телефон: в строке релиза только номер, на
     await expect(sheet).toBeHidden()
 })
 
-test('телефон: «Играть следующим» ставит трек после текущего', async ({ browser }) => {
+test('телефон: панель «⋯» в стиле меню профиля — четыре пункта по порядку, контурные иконки без эмодзи, без «Закрыть»', async ({ browser }) => {
     const social = await newSocial()
     const page = await openAs(browser, social, PLAIN_USER)
     await page.goto('/#/release/most-venture-poopsicks')
-    await releaseRow(page, 'BACK TO POOPSICKS 2').locator('.track-title').click()
-    await expect(miniTitle(page)).toHaveText('BACK TO POOPSICKS 2')
-
     await releaseRow(page, 'Macan-Walker').getByTestId('track-more').click()
-    await page.getByTestId('sheet-play-next').click()
-    await expect(page.getByTestId('notice')).toHaveText('Сыграет следующим')
-    await page.locator('#player').getByRole('button', { name: 'Следующий трек' }).click()
-    await expect(miniTitle(page)).toHaveText('Macan-Walker')
+    const sheet = page.getByTestId('track-sheet')
+    await expect(sheet.locator('.menu-item')).toHaveText(['В избранное', 'Текст', 'В плейлист', 'Поделиться'])
+    await expect(sheet.getByTestId('sheet-play-next')).toHaveCount(0)
+    await expect(sheet.getByRole('button', { name: 'Закрыть', exact: true })).toHaveCount(0)
+    // Иконки — svg из набора меню профиля, одного цвета; эмодзи нет.
+    await expect(sheet.locator('.menu-item svg.menu-icon')).toHaveCount(4)
+    const colors = await sheet.locator('.menu-item svg.menu-icon').evaluateAll((l) => l.map((e) => getComputedStyle(e).color))
+    expect(new Set(colors).size).toBe(1)
+    expect(await sheet.innerText()).not.toMatch(/\p{Extended_Pictographic}/u)
+    // Тот же фон, шрифт и размер пункта, что у меню профиля.
+    const sheetStyle = await sheet.evaluate((e) => ({ bg: getComputedStyle(e).backgroundColor }))
+    const item = sheet.locator('.menu-item').first()
+    const itemStyle = await item.evaluate((e) => ({ fs: getComputedStyle(e).fontSize, h: e.getBoundingClientRect().height }))
+    await page.keyboard.press('Escape')
+    await page.getByTestId('user-menu').click()
+    const menu = page.getByTestId('user-menu-list')
+    await page.waitForTimeout(400) // меню «всплывает» с масштабом
+    expect(await menu.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(sheetStyle.bg)
+    const mi = await menu.locator('.menu-item').first().evaluate((e) => ({ fs: getComputedStyle(e).fontSize, h: e.getBoundingClientRect().height }))
+    expect(itemStyle.fs).toBe(mi.fs)
+    expect(Math.abs(itemStyle.h - mi.h)).toBeLessThan(1)
+    await page.keyboard.press('Escape')
+    // Заполненное сердце, если трек уже в избранном.
+    await releaseRow(page, 'Macan-Walker').getByTestId('track-more').click()
+    await sheet.getByTestId('sheet-favorite').click()
+    await releaseRow(page, 'Macan-Walker').getByTestId('track-more').click()
+    await expect(sheet.getByTestId('sheet-favorite')).toContainText('Убрать из избранного')
+    await expect(sheet.getByTestId('sheet-favorite').locator('svg')).toHaveClass(/filled/)
 })
 
 test('телефон: «⋯» есть в избранном, чарте и поиске; в плейлисте порядок и удаление — в панели', async ({ browser }) => {

@@ -49,6 +49,8 @@
 
       <ReactionBar />
 
+      <RoomDebug v-if="showDebug" :debug="room.debug" :host="room.isOwner" />
+
       <section class="settings-section" aria-labelledby="room-people">
         <h2 id="room-people">Участники · {{ room.members.length }}</h2>
         <ul class="user-list">
@@ -134,6 +136,8 @@ import UserRow from '../components/UserRow.vue'
 import NickWithTag from '../components/NickWithTag.vue'
 import ReactionBar from '../components/ReactionBar.vue'
 import RoomPlayPicker from '../components/RoomPlayPicker.vue'
+import RoomDebug from '../components/RoomDebug.vue'
+import { session } from '../session'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,6 +145,9 @@ const router = useRouter()
 const id = computed(() => String(route.params.id ?? ''))
 const validId = computed(() => isRoomId(id.value))
 const inThisRoom = computed(() => room.roomId === id.value && !room.needsConnect)
+
+// Отладочные цифры синхронизации: владельцу сайта и по ?debug в адресе.
+const showDebug = computed(() => session.user?.role === 'owner' || route.query.debug !== undefined)
 
 const loading = ref(true)
 const busy = ref(false)

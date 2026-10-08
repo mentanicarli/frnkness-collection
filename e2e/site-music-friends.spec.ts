@@ -117,7 +117,7 @@ test('плейлист: создать, добавить из треклиста
     await page.locator('.track-row').filter({ hasText: 'Бильярд' }).getByTestId('add-to-playlist-btn').click()
     await page.getByTestId('add-to-playlist').getByRole('button', { name: /Дорога/ }).click()
     await expect(page.getByTestId('notice')).toHaveText('Трек уже в плейлисте')
-    await page.getByTestId('add-to-playlist').getByRole('button', { name: 'Закрыть' }).click()
+    await page.getByTestId('add-to-playlist').getByRole('button', { name: 'Закрыть', exact: true }).click()
 
     await page.goto(playlistUrl)
     await expect(page.getByTestId('track-row')).toHaveText([/Маканочки/, /FAAA/, /Бильярд/])
@@ -142,6 +142,9 @@ test('плейлист: создать, добавить из треклиста
 
     // Своя обложка: обрезка, 512×512, файл <владелец>/<плейлист>.
     const playlistId = playlistUrl.split('/').pop()!
+    // Настройки спрятаны за «⋯».
+    await expect(page.getByTestId('playlist-cover-file')).toHaveCount(0)
+    await page.getByTestId('playlist-settings').click()
     await page.getByTestId('playlist-cover-file').setInputFiles(path.join(FIXTURE_UPLOADS, 'tall.jpg'))
     const cropper = page.getByRole('dialog', { name: 'Обрезка обложки' })
     await cropper.getByRole('button', { name: 'Сохранить' }).click()
@@ -159,11 +162,15 @@ test('плейлист: создать, добавить из треклиста
     await page.getByRole('button', { name: 'Вернуть коллаж' }).click()
     await expect(page.locator('.pl-head-cover [data-testid="playlist-collage-img"]')).toHaveCount(1)
     await expect.poll(() => social.covers.size).toBe(0)
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('playlist-settings-dialog')).toHaveCount(0)
 
     // Удаление трека и плейлиста.
+
     await row(page, 'Маканочки').getByRole('button', { name: 'Убрать из плейлиста' }).click()
     await expect(page.getByTestId('track-row')).toHaveText([/FAAA/, /Бильярд/])
     page.once('dialog', (d) => void d.accept())
+    await page.getByTestId('playlist-settings').click()
     await page.getByRole('button', { name: 'Удалить плейлист' }).click()
     await expect(page).toHaveURL(/#\/playlists$/)
     await expect.poll(() => social.sql('select count(*)::int n from public.playlists')).toEqual([{ n: 0 }])

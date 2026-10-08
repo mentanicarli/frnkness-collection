@@ -7,8 +7,17 @@ import {
     QUEUE_AFTER,
     QUEUE_BEFORE,
     SEEK_MIN_GAP_MS,
+    AUTO_LEAD_MS,
+    RATE_DEADBAND_MS,
+    START_LEAD_MS,
     compactQueue,
+    decideDrift,
     decideSeek,
+    isNewerCommand,
+    msUntilStart,
+    parseBeacon,
+    planStart,
+    resumeSeq,
     estimateOffset,
     expectedPositionMs,
     hostOnline,
@@ -111,10 +120,10 @@ describe('позиция по состоянию хозяина', () => {
 describe('подкрутка гостя', () => {
     const ctx = (over: Partial<{ now: number; lastSeekAt: number | null; force: boolean }> = {}) => ({ now: 100_000, lastSeekAt: null, ...over })
 
-    it('расхождение до секунды не трогаем, больше — перематываем', () => {
-        expect(decideSeek(50_000, 50_000 + DRIFT_THRESHOLD_MS, ctx())).toEqual({ seek: false, toMs: 51_000 })
+    it('расхождение до порога не перематываем, больше — перематываем', () => {
+        expect(decideSeek(50_000, 50_000 + DRIFT_THRESHOLD_MS, ctx())).toEqual({ seek: false, toMs: 50_000 + DRIFT_THRESHOLD_MS })
         expect(decideSeek(50_000, 50_000 - 600, ctx()).seek).toBe(false)
-        expect(decideSeek(50_000, 51_001, ctx())).toEqual({ seek: true, toMs: 51_001 })
+        expect(decideSeek(50_000, 50_000 + DRIFT_THRESHOLD_MS + 1, ctx())).toEqual({ seek: true, toMs: 50_000 + DRIFT_THRESHOLD_MS + 1 })
         expect(decideSeek(60_000, 50_000, ctx())).toEqual({ seek: true, toMs: 50_000 })
     })
 
@@ -252,5 +261,130 @@ describe('состояние плеера на проводе', () => {
         expect(isRoomId('12345678-1234-4123-8123-123456789ABC')).toBe(false)
         expect(isRoomId('new')).toBe(false)
         expect(isRoomId(undefined)).toBe(false)
+    })
+})
+
+describe('расписание старта', () => {
+    it('нажатие хозяина: старт через ~1,2 с, позиция сохраняется', () => {
+        expect(planStart(10_000, 42_500.4)).toEqual({ startAt: 10_000 + START_LEAD_MS, posMs: 42_500 })
+        expect(START_LEAD_MS).toBeGreaterThanOrEqual(1000)
+        expect(START_LEAD_MS).toBeLessThanOrEqual(1500)
+    })
+
+    it('медленная сеть хозяина увеличивает запас, но не больше 1,5 с', () => {
+        expect(planStart(0, 0, { rttMs: 100 }).startAt).toBe(START_LEAD_MS)
+        expect(planStart(0, 0, { rttMs: 600 }).startAt).toBe(1400)
+        expect(planStart(0, 0, { rttMs: 5000 }).startAt).toBe(1500)
+    })
+
+    it('трек сменился сам — короткий запас: следующий у гостей уже загружен', () => {
+        expect(planStart(5000, 0, { gapless: true, rttMs: 900 })).toEqual({ startAt: 5000 + AUTO_LEAD_MS, posMs: 0 })
+    })
+
+    it('сколько ждать до старта: с поправкой на запуск звука, отрицательное — время пришло', () => {
+        expect(msUntilStart(11_200, 10_000)).toBe(1200)
+        expect(msUntilStart(11_200, 10_000, 80)).toBe(1120)
+        expect(msUntilStart(11_200, 11_300, 0)).toBe(-100)
+    })
+
+    it('до назначенного старта позиция стоит на месте, после — идёт', () => {
+        const t = { posMs: 30_000, atMs: 11_200, playing: true }
+        expect(expectedPositionMs(t, 10_000)).toBe(30_000)
+        expect(expectedPositionMs(t, 11_200)).toBe(30_000)
+        expect(expectedPositionMs(t, 12_200)).toBe(31_000)
+    })
+})
+
+describe('порядок команд', () => {
+    it('новее — больший номер команды, а внутри команды — больший маячок', () => {
+        expect(isNewerCommand({ seq: 5, beat: 0 }, { seq: 4, beat: 99 })).toBe(true)
+        expect(isNewerCommand({ seq: 5, beat: 2 }, { seq: 5, beat: 1 })).toBe(true)
+        expect(isNewerCommand({ seq: 5, beat: 1 }, { seq: 5, beat: 1 })).toBe(false)
+        expect(isNewerCommand({ seq: 4, beat: 100 }, { seq: 5, beat: 0 })).toBe(false)
+        expect(isNewerCommand({ seq: 1, beat: 0 }, { seq: 0, beat: -1 })).toBe(true)
+    })
+
+    it('после перезагрузки хозяин продолжает с сохранённого в базе, а не с нуля', () => {
+        expect(resumeSeq(12, { cseq: 40 })).toBe(40)
+        expect(resumeSeq(12, { cseq: 3 })).toBe(12)
+        expect(resumeSeq(12, null)).toBe(12)
+        expect(resumeSeq(0, {})).toBe(0)
+        expect(resumeSeq(NaN, { cseq: 7 })).toBe(7)
+    })
+
+    it('состояние и маячок из сети проверяются', () => {
+        const q = createListQueue({ kind: 'release', releaseId: 'album-one' }, ids(3), 1, always)!
+        const st = snapshotState(q, 12_345.6, true, { atMs: 99_000.2, cseq: 7 })
+        expect(st).toMatchObject({ pos_ms: 12_346, playing: true, at_ms: 99_000, cseq: 7, track_id: 'album-one/track-1' })
+        expect(parseRoomState(JSON.parse(JSON.stringify(st)))).toEqual(st)
+        // Без новых полей (старая версия сайта) состояние тоже годное.
+        expect(parseRoomState({ ...st, at_ms: undefined, cseq: undefined })).not.toBeNull()
+        expect(parseRoomState({ ...st, cseq: -1 })).toBeNull()
+        expect(parseRoomState({ ...st, cseq: 1.5 })).toBeNull()
+        expect(parseRoomState({ ...st, at_ms: 'скоро' })).toBeNull()
+
+        const beacon = { seq: 7, beat: 3, sent: 1, at: 2, track_id: 'album-one/track-1', pos_ms: 5, playing: false }
+        expect(parseBeacon(beacon)).toMatchObject(beacon)
+        for (const bad of [null, {}, { ...beacon, seq: -1 }, { ...beacon, beat: 0.5 }, { ...beacon, track_id: '../x' }, { ...beacon, pos_ms: 9e9 }, { ...beacon, playing: 'да' }, { ...beacon, at: NaN }]) {
+            expect(parseBeacon(bad)).toBeNull()
+        }
+    })
+})
+
+describe('подстройка скоростью', () => {
+    const ctx = (over: Partial<{ now: number; lastSeekAt: number | null; currentRate: number; force: boolean }> = {}) => ({ now: 100_000, lastSeekAt: null, currentRate: 1, ...over })
+
+    it('в мёртвой зоне скорость обычная', () => {
+        for (const diff of [0, 10, -30, RATE_DEADBAND_MS - 1]) expect(decideDrift(diff, 50_000, ctx())).toEqual({ action: 'none', rate: 1, toMs: 50_000 })
+    })
+
+    it('впереди — замедляемся, позади — ускоряемся; сильнее при большом расхождении', () => {
+        expect(decideDrift(100, 0, ctx()).rate).toBeCloseTo(0.98)
+        expect(decideDrift(-100, 0, ctx()).rate).toBeCloseTo(1.02)
+        expect(decideDrift(400, 0, ctx()).rate).toBeCloseTo(0.96)
+        expect(decideDrift(-900, 0, ctx()).rate).toBeCloseTo(1.04)
+        expect(decideDrift(900, 0, ctx())).toMatchObject({ action: 'rate' })
+    })
+
+    it('скорость не выходит за ±5 %', () => {
+        for (const diff of [41, 150, 151, 600, 1199, -1199, 1200, -1200]) {
+            const r = decideDrift(diff, 0, ctx()).rate
+            expect(r).toBeGreaterThanOrEqual(0.95)
+            expect(r).toBeLessThanOrEqual(1.05)
+        }
+    })
+
+    it('уже идущая подстройка отпускается позже входа в зону (гистерезис)', () => {
+        expect(decideDrift(30, 0, ctx({ currentRate: 0.96 })).rate).toBeCloseTo(0.98)
+        expect(decideDrift(20, 0, ctx({ currentRate: 0.96 }))).toEqual({ action: 'rate', rate: 1, toMs: 0 })
+        // Та же скорость повторно не назначается.
+        expect(decideDrift(400, 0, ctx({ currentRate: 0.96 })).action).toBe('none')
+    })
+
+    it('перемотка — только при расхождении больше порога и не чаще раза в 2 с', () => {
+        expect(decideDrift(DRIFT_THRESHOLD_MS, 50_000, ctx()).action).toBe('rate')
+        expect(decideDrift(DRIFT_THRESHOLD_MS + 1, 50_000, ctx())).toEqual({ action: 'seek', rate: 1, toMs: 50_000 })
+        expect(decideDrift(-5000, 50_000, ctx({ currentRate: 1.04 }))).toEqual({ action: 'seek', rate: 1, toMs: 50_000 })
+        // Только что перематывали — пока подстраиваем скоростью.
+        expect(decideDrift(5000, 0, ctx({ lastSeekAt: 99_000 })).action).toBe('rate')
+        // Первая выверка строже и без ограничения частоты.
+        expect(decideDrift(400, 0, ctx({ force: true, lastSeekAt: 99_999 })).action).toBe('seek')
+        expect(decideDrift(200, 0, ctx({ force: true })).action).toBe('rate')
+    })
+
+    it('сходимость: с расхождением 0,3 с и скоростью ±4 % за ≤ 12 с мы в мёртвой зоне, без перемоток', () => {
+        let diff = 300
+        let rate = 1
+        let seconds = 0
+        while (seconds < 30) {
+            const d = decideDrift(diff, 0, ctx({ currentRate: rate, now: 100_000 + seconds * 1000 }))
+            expect(d.action).not.toBe('seek')
+            rate = d.rate
+            diff += (rate - 1) * 1000
+            seconds++
+            if (Math.abs(diff) < RATE_DEADBAND_MS && rate === 1) break
+        }
+        expect(seconds).toBeLessThanOrEqual(12)
+        expect(Math.abs(diff)).toBeLessThan(RATE_DEADBAND_MS)
     })
 })

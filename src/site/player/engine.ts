@@ -9,7 +9,7 @@ import { incrementPlayCount } from '../services/stats'
 import { showNotice } from '../social/notice'
 import { view } from '../stores/view'
 import { getAudio, setAudio } from './audio'
-import { loadLyrics, updateKaraoke } from './karaoke'
+import { closeFsPlayer, loadLyrics, updateKaraoke } from './karaoke'
 import {
     type Queue,
     type QueueSource,
@@ -35,6 +35,11 @@ import { karaoke, player } from './state'
 type Direction = 'next' | 'prev' | 'fade' | null
 
 const COUNT_AFTER_SEC = 10
+/** Шаг timeupdate больше этого — перемотка или заминка, а не прослушивание. */
+const LISTEN_MAX_STEP_SEC = 1.5
+/** Сколько секунд этот слушатель реально слушал текущий запуск трека. */
+let listenedSec = 0
+let lastTickTime: number | null = null
 
 /**
  * Гость комнаты: плеером управляет хозяин. Кнопки гостя ничего не делают,
@@ -212,9 +217,71 @@ function guardFor(audio: HTMLAudioElement): PlaybackGuard {
  * трека): до audio.play() не должно быть ни одного await.
  */
 function playNow(audio: HTMLAudioElement): Promise<boolean> {
+    // Хозяин комнаты: звук не пускаем сразу, а по расписанию — вместе с гостями.
+    if (hostHook && player.roomRole === 'host') {
+        primeAudio(audio)
+        player.isPlaying = true
+        hostHook.start({ gapless: naturalAdvance })
+        return Promise.resolve(true)
+    }
+    return playNowDirect(audio)
+}
+
+/** Настоящий запуск звука (комната вызывает его в назначенный момент). */
+function playNowDirect(audio: HTMLAudioElement): Promise<boolean> {
     player.isPlaying = true
+    playCalledAt = performance.now()
     return guardFor(audio).play()
 }
+
+// ── Комната: старт хозяина по расписанию ────────────────────────────────
+
+/**
+ * Хозяин комнаты не запускает звук сам: нажатие «играть» (и новый трек) отдаётся
+ * комнате, она назначает всем общий момент старта и пускает звук в этот момент.
+ * Пауза и перемотка идут обычным путём — комната замечает их по событиям <audio>.
+ */
+export interface HostHook {
+    /** Хозяин запускает звук. gapless — трек сменился сам, без нажатия. */
+    start(opts: { gapless: boolean }): void
+    /** Старт назначен, но звук ещё не пошёл (для кнопки «пауза» в это время). */
+    pending(): boolean
+    /** Отменить назначенный старт (хозяин нажал паузу, не дождавшись). */
+    cancel(): void
+}
+
+let hostHook: HostHook | null = null
+/** Следующий трек включается сам (конец предыдущего), а не по нажатию. */
+let naturalAdvance = false
+let audioPrimed = false
+let playCalledAt = 0
+/** Сколько проходит от play() до звука: старт назначается на это раньше. */
+let startLatencyMs = 80
+
+export function setHostHook(hook: HostHook | null): void {
+    hostHook = hook
+}
+
+const hostPending = (): boolean => Boolean(hostHook && player.roomRole === 'host' && hostHook.pending())
+
+/**
+ * Браузеры (iPhone) разрешают programmatic play() только элементу, который
+ * хоть раз запускали из нажатия. Хозяину звук пускает таймер, поэтому в самом
+ * нажатии элемент один раз «прогреваем» мгновенным play()+pause().
+ */
+function primeAudio(audio: HTMLAudioElement): void {
+    if (audioPrimed) return
+    audioPrimed = true
+    try {
+        const p = audio.play()
+        audio.pause()
+        if (p && typeof p.catch === 'function') p.catch(() => undefined)
+    } catch {
+        // Без прогрева на iPhone звук хозяина может потребовать второго нажатия.
+    }
+}
+
+export const getStartLatencyMs = (): number => startLatencyMs
 
 // Трек релиза: треклист, поиск, чарт, страница трека. Очередь — этот
 // релиз; если играет Поток по каталогу — он продолжается с этого трека.
@@ -260,9 +327,13 @@ function startTrack(index: number, direction: Direction, options: { autoplay?: b
     player.playSession += 1
     player.trackCounted = false
     player.trackCountPending = false
+    listenedSec = 0
+    lastTickTime = null
     karaoke.hardStart = true
 
     guardFor(audio).reset()
+    // Подстройка скорости гостя комнаты не должна переходить на следующий трек.
+    if (audio.playbackRate !== 1) audio.playbackRate = 1
     audio.src = buildAssetUrl(release.audioPath, track.file)
     setMiniPlayerVisible(true)
     player.trackStart = { n: ++trackStartSeq, cover: release.cover, direction }
@@ -277,7 +348,10 @@ function startTrack(index: number, direction: Direction, options: { autoplay?: b
     // Следующий по списку — заранее (в Потоке следующий заранее неизвестен).
     const upcoming = player.queue && !player.queue.endless ? nextInQueue(player.queue, isTrackAvailable) : null
     const upcomingRef = upcoming ? findTrackById(releases, currentTrackId(upcoming) ?? '') : null
-    if (upcomingRef) preloadTrackMetadata(upcomingRef.releaseId, upcomingRef.trackIndex)
+    if (upcomingRef) {
+        if (player.roomRole) preloadRoomTrack(currentTrackId(upcoming!) ?? '')
+        else preloadTrackMetadata(upcomingRef.releaseId, upcomingRef.trackIndex)
+    }
 
     if (options.autoplay === false) {
         // Комната: трек загружается на паузе, играть и перематывать будет
@@ -294,6 +368,14 @@ export function togglePlay(): void {
     if (guestBlocked()) return
     const audio = getAudio()
     if (!audio) return
+    if (hostPending()) {
+        // Хозяин нажал паузу, не дождавшись назначенного старта: у всех стоим.
+        hostHook?.cancel()
+        guardFor(audio).userPause()
+        audio.pause()
+        player.isPlaying = false
+        return
+    }
     if (audio.paused || player.playback === 'tap') {
         void playNow(audio)
         setMiniPlayerVisible(true)
@@ -455,6 +537,8 @@ export interface PlaybackInfo {
     playing: boolean
     /** Трек загружен настолько, что его можно перематывать и играть без заминки. */
     ready: boolean
+    /** Скорость воспроизведения (1 — обычная; гость подстраивает её, догоняя хозяина). */
+    rate: number
 }
 
 export function getPlaybackInfo(): PlaybackInfo {
@@ -466,7 +550,8 @@ export function getPlaybackInfo(): PlaybackInfo {
         positionMs: audio ? Math.max(0, audio.currentTime * 1000) : 0,
         durationMs: duration,
         playing: Boolean(audio && trackId && !audio.paused && !audio.ended),
-        ready: Boolean(audio && audio.readyState >= 3)
+        ready: Boolean(audio && audio.readyState >= 3),
+        rate: audio ? audio.playbackRate || 1 : 1
     }
 }
 
@@ -525,7 +610,7 @@ function whenTrackReady(audio: HTMLAudioElement, run: () => void): void {
  * команды — иначе загрузка сдвинула бы гостя назад. Трека нет в каталоге
  * этого сайта (устаревшая версия в кэше) — 'missing-track', без ошибки.
  */
-export function applyRemotePlayback(queue: Queue, playing: boolean, targetMs: () => number): RemoteApplyResult {
+export function applyRemotePlayback(queue: Queue, playing: boolean, targetMs: () => number, onReady?: () => void): RemoteApplyResult {
     const trackId = currentTrackId(queue)
     const ref = trackId ? findTrackById(releases, trackId) : null
     const audio = getAudio()
@@ -541,6 +626,7 @@ export function applyRemotePlayback(queue: Queue, playing: boolean, targetMs: ()
     whenTrackReady(audio, () => {
         seekRemoteMs(targetMs())
         if (playing) void playRemote()
+        onReady?.()
     })
     return 'ok'
 }
@@ -562,15 +648,102 @@ export async function playRemote(): Promise<boolean> {
     const audio = getAudio()
     if (!audio) return false
     // Первый play() — синхронно (до await); дальше сторож сам ждёт результат и повторяет при обрыве.
-    const ok = await playNow(audio)
+    const ok = await playNowDirect(audio)
     if (ok) setMiniPlayerVisible(true)
     return ok
 }
 
-/** Гость вышел из комнаты: музыка хозяина замолкает, очередь чужая — убираем. */
-export function releaseRemote(): void {
-    pauseRemote()
-    if (player.queue?.controller === 'remote') setQueue(null)
+/**
+ * Выход из комнаты (гость, хозяин, кик, закрытие, простой): плеер как после
+ * загрузки страницы — звука нет, очереди и текущего трека нет, мини-плеер и
+ * полноэкранный режим закрыты. Дальше любой трек включается как обычно.
+ */
+export function resetPlayer(): void {
+    const audio = getAudio()
+    // Ждущие загрузки трека обратные вызовы (перемотка, play) больше не сработают.
+    trackStartSeq++
+    if (audio) {
+        guardFor(audio).userPause()
+        guardFor(audio).reset()
+        try {
+            audio.pause()
+            audio.playbackRate = 1
+            audio.removeAttribute('src')
+            audio.load()
+        } catch {
+            // Подделка <audio> в тестах или редкий браузер: главное, что звук остановлен.
+        }
+    }
+    listenedSec = 0
+    lastTickTime = null
+    roomPreloads.length = 0
+    player.queue = null
+    player.flowModeActive = false
+    player.currentTrackId = null
+    player.currentRelease = null
+    player.currentReleaseId = null
+    player.currentTrackIndex = -1
+    // Отменяет незавершённые засчёты и обновления цвета предыдущего запуска.
+    player.playSession += 1
+    player.trackCounted = false
+    player.trackCountPending = false
+    player.isPlaying = false
+    player.playback = 'ok'
+    player.progress = 0
+    player.currentSecond = 0
+    player.duration = NaN
+    player.trackStart = null
+    setMiniPlayerVisible(false)
+    closeFsPlayer()
+    karaoke.lines = []
+    karaoke.plainText = null
+    karaoke.currentIndex = -1
+    karaoke.hardStart = false
+    try {
+        if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+            navigator.mediaSession.metadata = null
+            navigator.mediaSession.playbackState = 'none'
+        }
+    } catch {
+        // Экран блокировки не обязателен.
+    }
+}
+
+/** Подстройка скорости гостя (1 — обычная). */
+export function setPlaybackRate(rate: number): void {
+    const audio = getAudio()
+    if (!audio || !Number.isFinite(rate) || rate < 0.5 || rate > 2) return
+    if (audio.playbackRate !== rate) audio.playbackRate = rate
+}
+
+// Следующие треки очереди комнаты загружаются заранее целиком (а не только
+// метаданные), чтобы переход между треками был без паузы.
+const roomPreloads: HTMLAudioElement[] = []
+
+export function preloadRoomTrack(trackId: string): void {
+    const ref = trackId ? findTrackById(releases, trackId) : null
+    const release = ref ? releases[ref.releaseId] : null
+    const track = ref && release ? release.tracks[ref.trackIndex] : null
+    if (!release || !track) return
+    const src = buildAssetUrl(release.audioPath, track.file)
+    if (roomPreloads.some((a) => a.dataset.src === src)) return
+    const probe = new Audio()
+    probe.preload = 'auto'
+    probe.dataset.src = src
+    probe.src = src
+    roomPreloads.push(probe)
+    while (roomPreloads.length > 2) {
+        const old = roomPreloads.shift()!
+        old.removeAttribute('src')
+    }
+}
+
+/** Хозяин ждёт назначенного старта: звук стоит, а плеер для него по-прежнему «играет». */
+export function holdRemote(): void {
+    const audio = getAudio()
+    if (!audio) return
+    guardFor(audio).userPause()
+    audio.pause()
 }
 
 export function pauseRemote(): void {
@@ -609,6 +782,11 @@ export function attachAudio(audio: HTMLAudioElement): void {
     audioHooks.clear()
     audio.preload = 'auto'
     audio.volume = player.sliderValue
+    try {
+        audio.preservesPitch = true
+    } catch {
+        // Старый браузер: подстройка скоростью чуть меняет высоту тона.
+    }
 
     let lastProgress = -1
     let lastSecond = -1
@@ -627,12 +805,39 @@ export function attachAudio(audio: HTMLAudioElement): void {
             player.currentSecond = second
         }
         updateKaraoke()
-        if (currentTime >= COUNT_AFTER_SEC && !player.trackCounted && !player.trackCountPending) void countPlay()
+        // Прослушивание — это 10 секунд звука, который слушатель реально услышал:
+        // перемотка (хозяином или гостем при входе посреди трека) секунд не добавляет.
+        if (lastTickTime !== null && !audio.paused) {
+            const step = currentTime - lastTickTime
+            if (step > 0 && step <= LISTEN_MAX_STEP_SEC * Math.max(1, audio.playbackRate)) listenedSec += step
+        }
+        lastTickTime = currentTime
+        if (listenedSec >= COUNT_AFTER_SEC && !player.trackCounted && !player.trackCountPending) void countPlay()
+    })
+    audio.addEventListener('seeking', () => { lastTickTime = null })
+    // Хозяин ждёт назначенного старта: звук на паузе, но кнопка остаётся «играет» (сторож по паузе её гасит).
+    audio.addEventListener('pause', () => {
+        setTimeout(() => {
+            if (hostPending()) player.isPlaying = true
+        }, 0)
+    })
+    audio.addEventListener('playing', () => {
+        if (playCalledAt) {
+            const took = performance.now() - playCalledAt
+            playCalledAt = 0
+            if (took > 0 && took < 2000) startLatencyMs = Math.round(startLatencyMs * 0.5 + took * 0.5)
+        }
     })
     audio.addEventListener('loadedmetadata', () => { player.duration = audio.duration })
     // Трек гостя доигрывает и ждёт: следующий включит хозяин.
     audio.addEventListener('ended', () => {
-        if (player.roomRole !== 'guest') nextTrack()
+        if (player.roomRole === 'guest') return
+        naturalAdvance = true
+        try {
+            nextTrack()
+        } finally {
+            naturalAdvance = false
+        }
     })
 
     // Кнопки на экране блокировки, в шторке и на наушниках делают то же, что
@@ -644,8 +849,8 @@ export function attachAudio(audio: HTMLAudioElement): void {
             const track = release?.tracks[player.currentTrackIndex]
             return release && track ? { title: track.title, album: release.title, cover: release.cover } : null
         },
-        play: () => { if (audio.paused || player.playback === 'tap') togglePlay() },
-        pause: () => { if (!audio.paused) togglePlay() },
+        play: () => { if ((audio.paused && !hostPending()) || player.playback === 'tap') togglePlay() },
+        pause: () => { if (!audio.paused || hostPending()) togglePlay() },
         next: nextTrack,
         prev: prevTrack,
         seek: (time) => { if (!guestBlocked()) audio.currentTime = time }

@@ -31,6 +31,8 @@ export class FakeRealtime {
     readonly stats = { delivered: 0, denied: 0, joinsDenied: 0 }
     /** Отправленные хозяином broadcast: для проверок. */
     readonly log: { topic: string; event: string; from: string | null }[] = []
+    /** Задержка доставки broadcast до каждого получателя, мс (для измерений синхронизации). */
+    latencyMs: () => number = () => 0
 
     async attach(page: Page, social: SocialBackend): Promise<void> {
         await page.routeWebSocket(/\/realtime\/v1\/websocket/, (ws) => {
@@ -159,7 +161,10 @@ export class FakeRealtime {
         for (const c of this.peers(topic)) {
             if (c === from) continue
             this.stats.delivered++
-            c.ws.send(this.encodeBroadcast(wireTopic, event, payload))
+            const frame = this.encodeBroadcast(wireTopic, event, payload)
+            const delay = this.latencyMs()
+            if (delay > 0) setTimeout(() => c.ws.send(frame), delay)
+            else c.ws.send(frame)
         }
     }
 }

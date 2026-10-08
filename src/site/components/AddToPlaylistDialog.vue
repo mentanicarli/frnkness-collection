@@ -1,6 +1,6 @@
 <template>
-  <div v-if="addDialog.trackId" class="cropper-backdrop" @click.self="closeAddToPlaylist">
-    <div class="cropper-box" role="dialog" aria-modal="true" aria-labelledby="add-pl-title" data-testid="add-to-playlist" @keydown.esc="closeAddToPlaylist">
+  <ModalFrame :open="Boolean(addDialog.trackId)" label="В плейлист" testid="add-to-playlist" @close="closeAddToPlaylist">
+    <div>
       <p id="add-pl-title" class="acc-title" style="font-size: 1.125rem;">В плейлист</p>
       <p class="acc-sub" style="margin-bottom: 0.875rem;">{{ info.title }}<template v-if="info.releaseTitle"> · {{ info.releaseTitle }}</template></p>
 
@@ -28,12 +28,13 @@
         <button class="acc-btn acc-btn-sm" type="button" @click="closeAddToPlaylist">Закрыть</button>
       </div>
     </div>
-  </div>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
 // Выбор плейлиста для трека или создание нового сразу с ним.
 import { computed, nextTick, ref, watch } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { addDialog, closeAddToPlaylist } from '../social/addDialog'
 import { PLAYLISTS_MAX, PLAYLIST_TRACKS_MAX, addToPlaylist, createPlaylist, loadMyPlaylists, myPlaylists } from '../social/playlists'
 import type { PlaylistSummary } from '../social/api'
