@@ -57,9 +57,12 @@ async function loadAccount(s: Session): Promise<void> {
         supabase.from('profiles').select('nick, avatar, bio, created_at').eq('id', uid).maybeSingle(),
         supabase.from('account_private').select('must_change_password, nick_changed_at').eq('id', uid).maybeSingle()
     ])
+    // До появления пользователя: роутер и App.vue смотрят на него и не должны пустить дальше, не зная про несохранённый код.
+    const recoveryPending = await readRecoveryPending()
     if (seq !== loadSeq) return
     const p = profile.data as { nick: string; avatar: string; bio: string; created_at: string } | null
     const a = priv.data as { must_change_password: boolean; nick_changed_at: string | null } | null
+    state.recoveryPending = recoveryPending
     state.user = {
         id: uid,
         nick: p?.nick ?? '',
@@ -70,7 +73,6 @@ async function loadAccount(s: Session): Promise<void> {
     }
     state.mustChangePassword = Boolean(a?.must_change_password)
     state.nickChangedAt = a?.nick_changed_at ?? null
-    state.recoveryPending = await readRecoveryPending()
 }
 
 /** Код создан, но не подтверждён. Сбой чтения не должен закрывать сайт: тогда считаем, что ждать нечего. */

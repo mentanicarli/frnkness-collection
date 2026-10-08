@@ -66,6 +66,11 @@ test('регистрация: ник, пароль, капча, согласие
     await page.getByLabel('Повтор пароля').fill('password1')
     await page.getByRole('button', { name: 'Зарегистрироваться' }).click()
 
+    // После регистрации — экран с кодом восстановления; дальше только после «Я сохранил».
+    await expect(page.getByTestId('recovery-page')).toBeVisible()
+    await page.getByTestId('recovery-written').check()
+    await page.getByTestId('recovery-saved').click()
+
     await expect(page).toHaveURL(/#\/track\/zlaya-nostalgia\/makanochki$/)
     const created = [...mocks.accounts.accounts.values()].find((a) => a.nick === 'Новичок')!
     expect(created.email).toBe(techEmailSync('новичок'))

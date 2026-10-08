@@ -98,7 +98,7 @@
       </template>
       <form v-else class="acc-form" novalidate style="margin-top: 0.75rem;" @submit.prevent="makeRecoveryCode">
         <label class="acc-field">
-          <span class="acc-label">Пароль для подтверждения</span>
+          <span class="acc-label">Пароль, чтобы создать код</span>
           <input v-model="recoveryPassword" class="acc-input" type="password" name="recovery-password" autocomplete="current-password" data-testid="recovery-password">
         </label>
         <div><button class="acc-btn acc-btn-sm" type="submit" :disabled="recoveryBusy" data-testid="recovery-create">{{ recoveryState?.exists ? 'Создать новый код' : 'Создать код восстановления' }}</button></div>
