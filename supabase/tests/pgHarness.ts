@@ -95,6 +95,27 @@ export async function createDb(normalizeSql: string = NORMALIZE_OK): Promise<PGl
             ('${USER.sub}', 'user@example.com', '{"provider":"email"}'),
             ('${USER2.sub}', 'user2@example.com', '{"provider":"email","role":"user"}');
 
+        -- Realtime Authorization: политики лежат на realtime.messages, топик
+        -- канала Realtime кладёт в настройку realtime.topic (тест — вручную).
+        create schema realtime;
+        grant usage on schema realtime to anon, authenticated;
+        create table realtime.messages (
+            id bigserial primary key,
+            topic text not null,
+            extension text not null,
+            payload jsonb,
+            event text,
+            private boolean default false,
+            inserted_at timestamptz not null default now()
+        );
+        alter table realtime.messages enable row level security;
+        grant select, insert on realtime.messages to authenticated;
+        grant usage on sequence realtime.messages_id_seq to authenticated;
+        create function realtime.topic() returns text language sql stable as $$
+            select nullif(current_setting('realtime.topic', true), '')
+        $$;
+        grant execute on function realtime.topic() to anon, authenticated;
+
         create schema storage;
         grant usage on schema storage to anon, authenticated;
         create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
