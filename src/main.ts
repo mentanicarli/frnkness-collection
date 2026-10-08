@@ -1,13 +1,16 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import './assets/fonts.css'
 import './assets/app.css'
 import './assets/account.css'
 import './assets/social.css'
 import './assets/user-tag.css'
+import './assets/mobile.css'
 
 import { normalizeInitialHash, router } from './site/router'
 import { initSession } from './site/session'
 import { describeError, installErrorLogging } from './site/errorLog'
+import { setupUpdates } from './site/updates'
 
 installErrorLogging()
 normalizeInitialHash()
@@ -21,11 +24,4 @@ app.config.errorHandler = (err) => {
 }
 app.use(router).mount('#app')
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        const swUrl = `${import.meta.env.BASE_URL}sw.js`
-        navigator.serviceWorker.register(swUrl).catch(() => {
-            // Ошибку регистрации игнорируем: в private mode/PWA-ограничениях это допустимо.
-        })
-    })
-}
+setupUpdates(import.meta.env.BASE_URL)

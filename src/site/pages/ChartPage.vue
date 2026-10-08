@@ -17,9 +17,10 @@
               @click="play(t.releaseId, t.trackIndex)"
             >
               <div class="chart-num" :class="i < 3 ? `top-${i + 1}` : ''">{{ i + 1 }}</div>
-              <div class="chart-cover"><img :loading="i < 8 ? 'eager' : 'lazy'" decoding="async" :fetchpriority="i < 3 ? 'high' : 'low'" :src="t.cover" alt=""></div>
+              <div class="chart-cover"><img :loading="i < 8 ? 'eager' : 'lazy'" decoding="async" :fetchpriority="i < 3 ? 'high' : 'low'" :src="t.cover" :srcset="coverSrcset(t.cover)" sizes="48px" alt=""></div>
               <div class="chart-info"><div class="chart-title">{{ t.title }}</div><div class="chart-artist">frnk ness</div></div>
               <div class="chart-plays"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>{{ t.plays }}</div>
+              <TrackMoreButton v-if="trackIdOf(t)" :track-id="trackIdOf(t)!" />
             </div>
           </template>
         </template>
@@ -29,12 +30,15 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { playTrackByRef } from '../player/engine'
 import { loadChart, statsVersion, type ChartResult } from '../services/stats'
 import { goRelease } from '../router'
+import { releases } from '@/config'
 import BackButton from '../components/BackButton.vue'
+import TrackMoreButton from '../components/TrackMoreButton.vue'
 
 const route = useRoute()
 // Пока цифры грузятся, на экране остаётся прежний список.
@@ -49,6 +53,8 @@ watch([() => route.name, statsVersion], async () => {
   const result = await loadChart()
   if (mine === token) chart.value = result
 }, { immediate: true })
+
+const trackIdOf = (t: { releaseId: string; trackIndex: number }): string | null => releases[t.releaseId]?.tracks[t.trackIndex]?.id ?? null
 
 // Клик по строке — релиз этого трека и сразу воспроизведение.
 function play(releaseId: string, trackIndex: number) {

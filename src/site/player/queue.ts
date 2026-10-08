@@ -181,3 +181,17 @@ export function jumpTo(queue: Queue, index: number): Queue | null {
     const order = [...queue.order.slice(0, queue.pos + 1), index].slice(-ENDLESS_HISTORY)
     return { ...queue, order, pos: order.length - 1 }
 }
+
+/**
+ * «Играть следующим»: трек встаёт сразу после текущего. В список он
+ * добавляется в конец (исходный порядок и индексы остальных не меняются),
+ * в порядке игры — на позицию pos + 1. Очередь хозяина комнаты не трогаем.
+ */
+export function insertNext(queue: Queue, trackId: string): Queue | null {
+    if (queue.controller === 'remote') return null
+    let index = queue.endless ? queue.trackIds.indexOf(trackId) : -1
+    const trackIds = index >= 0 ? queue.trackIds : [...queue.trackIds, trackId]
+    if (index < 0) index = trackIds.length - 1
+    const order = [...queue.order.slice(0, queue.pos + 1), index, ...queue.order.slice(queue.pos + 1)]
+    return { ...queue, trackIds, order }
+}

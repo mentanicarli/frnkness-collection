@@ -1,4 +1,5 @@
-import { createRouter, createWebHashHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
+import { watch } from 'vue'
+import { createRouter, createWebHashHistory, type RouteLocationNormalized, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
 import { releases } from '@/config'
 import { findTrackRefBySlug, getTrackSlug } from '@/utils/slug'
 import { sanitizeNext, welcomeLocation } from './auth/redirect'
@@ -99,6 +100,47 @@ export function nextTarget(raw: unknown): string | null {
     return resolved.fullPath
 }
 
+/**
+ * Экраны, которые аккаунт может навязать (сменить пароль, сохранить код
+ * восстановления). Флаги берутся из копии на устройстве и уточняются, когда
+ * профиль догрузится: тогда проверка повторяется для открытого экрана.
+ * leave — разрешить и обратное: с экрана кода без дела уйти на сайт (только
+ * когда флаги уже точные).
+ */
+function accountGate(to: RouteLocationNormalized, leave = true): RouteLocationRaw | null {
+    if (!session.user) return null
+    // С экрана входа/регистрации «дальше» ведёт ?next=, а не сам экран входа.
+    const here = to.meta.guestOnly ? (nextTarget(to.query.next) ?? '/') : to.fullPath
+    if (session.mustChangePassword && to.name !== 'change-password' && to.name !== 'privacy') {
+        const next = sanitizeNext(here)
+        return { name: 'change-password', query: next && next !== '/' ? { next } : {}, replace: true }
+    }
+    // Код восстановления выдан, но не сохранён: пока человек не нажмёт «Я сохранил», дальше не пускаем.
+    if (session.recoveryPending && to.name !== 'recovery-code' && to.name !== 'change-password' && to.name !== 'privacy') {
+        const next = sanitizeNext(here)
+        return { name: 'recovery-code', query: next && next !== '/' ? { next } : {}, replace: true }
+    }
+    // Экран кода без дела (нет несохранённого кода и это не предложение после восстановления) — на сайт.
+    // Пока профиль не загружен, не знаем, так ли это: решает повторная проверка.
+    if (leave && session.accountLoaded && to.name === 'recovery-code' && !session.recoveryPending && to.query.offer !== '1') {
+        return nextTarget(to.query.next) ?? { name: 'home', replace: true }
+    }
+    return null
+}
+
+// Профиль догрузился или флаг включился (код выдан при регистрации, сброс пароля):
+// навязанный экран открываем сейчас, на каком бы месте сайта человек ни был.
+watch(
+    () => [session.accountLoaded, session.mustChangePassword, session.recoveryPending] as const,
+    ([loaded], [wasLoaded]) => {
+        const current = router.currentRoute.value
+        if (!current.matched.length) return
+        // Обратное («выйти с экрана кода») — только в момент, когда профиль пришёл.
+        const gate = accountGate(current, loaded && !wasLoaded)
+        if (gate) void router.replace(gate)
+    }
+)
+
 // Проверка на каждом переходе (beforeEach, а не beforeEnter: тот не
 // срабатывает при смене параметров — с одного релиза на другой).
 router.beforeEach(async (to) => {
@@ -109,19 +151,8 @@ router.beforeEach(async (to) => {
         if (to.meta.public) return true
         return { ...welcomeLocation(to.fullPath), replace: true }
     }
-    if (session.mustChangePassword && to.name !== 'change-password' && to.name !== 'privacy') {
-        const next = sanitizeNext(to.fullPath)
-        return { name: 'change-password', query: next && next !== '/' ? { next } : {}, replace: true }
-    }
-    // Код восстановления выдан, но не сохранён: пока человек не нажмёт «Я сохранил», дальше не пускаем.
-    if (session.recoveryPending && to.name !== 'recovery-code' && to.name !== 'change-password' && to.name !== 'privacy') {
-        const next = sanitizeNext(to.fullPath)
-        return { name: 'recovery-code', query: next && next !== '/' ? { next } : {}, replace: true }
-    }
-    // Экран кода без дела (нет несохранённого кода и это не предложение после восстановления) — на сайт.
-    if (to.name === 'recovery-code' && !session.recoveryPending && to.query.offer !== '1') {
-        return nextTarget(to.query.next) ?? { name: 'home', replace: true }
-    }
+    const gate = accountGate(to)
+    if (gate) return gate
     if (to.meta.guestOnly) return nextTarget(to.query.next) ?? { name: 'home', replace: true }
 
     // ── Существование релиза и трека ──

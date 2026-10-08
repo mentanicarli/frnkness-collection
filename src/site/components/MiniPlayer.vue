@@ -14,7 +14,7 @@
               loading="eager"
               fetchpriority="high"
               decoding="async"
-              :src="player.currentRelease.cover"
+              :src="player.currentRelease.cover" :srcset="coverSrcset(player.currentRelease.cover)" sizes="48px"
               class="w-full h-full object-cover"
               @error="hideBrokenImage"
             >
@@ -29,7 +29,9 @@
           <div class="min-w-0 flex items-center" style="gap: clamp(0.5rem, 1.5vw, 0.75rem);">
             <div class="min-w-0">
               <p id="player-track" class="truncate text-sm">{{ currentTrack?.title ?? (room.roomId ? 'Ничего не играет' : '') }}</p>
-              <p class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
+              <button v-if="player.playback === 'tap'" type="button" class="tap-to-play" data-testid="tap-to-play" @click.stop="togglePlay">Нажми, чтобы играть</button>
+              <p v-else-if="player.playback === 'retrying'" class="text-xs text-[var(--fg-muted)] truncate" data-testid="playback-retrying">Связь пропала, пробуем снова…</p>
+              <p v-else class="text-xs text-[var(--fg-muted)] truncate">frnk ness</p>
             </div>
             <button id="lyrics-btn" @click="goCurrentTrack" class="lyrics-action-btn sm:flex" :class="{ hidden: !player.currentRelease }" aria-label="Открыть текст">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -102,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { computed, onMounted, ref, watch } from 'vue'
 import { formatTime } from '@/utils/helpers'
 import { goTrack } from '../router'

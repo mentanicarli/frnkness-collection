@@ -23,8 +23,9 @@ export function cspPolicy(supabaseUrl: string, scriptHashes: string[]): string {
         'default-src': ["'self'"],
         'script-src': ["'self'", ...scriptHashes, TURNSTILE_ORIGIN],
         // Vue и Tailwind ставят style="" — без 'unsafe-inline' сайт развалится.
-        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        // Шрифты лежат на сайте (public/fonts/), внешний хостинг шрифтов не нужен.
+        'font-src': ["'self'"],
         // Аватары — из публичного бакета Supabase Storage.
         'img-src': ["'self'", 'data:', 'blob:', supabase],
         'media-src': ["'self'", 'blob:'],

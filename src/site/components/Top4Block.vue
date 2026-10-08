@@ -10,7 +10,7 @@
         <li v-for="(trackId, i) in slots" :key="i" class="top4-slot" data-testid="top4-slot" :data-empty="trackId ? 'false' : 'true'">
           <button v-if="trackId" class="top4-card" type="button" :class="{ playing: isPlaying(trackId) }" :aria-label="`Играть: ${info(trackId).title}`" @click="play(trackId)">
             <span class="top4-cover">
-              <img v-if="info(trackId).cover" :src="info(trackId).cover!" alt="" loading="lazy" decoding="async">
+              <img v-if="info(trackId).cover" :src="info(trackId).cover!" :srcset="coverSrcset(info(trackId).cover)" sizes="64px" alt="" loading="lazy" decoding="async">
               <span class="top4-n" aria-hidden="true">{{ i + 1 }}</span>
             </span>
             <span class="top4-title" data-testid="top4-title">{{ info(trackId).title }}</span>
@@ -32,6 +32,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 // «Мой топ-4» на странице профиля: четыре обложки крупно в ряд, под ними
 // название; по нажатию трек играет. Трек, пропавший из каталога, — пустое
 // место, без ошибки. Названия выводятся интерполяцией (с экранированием).

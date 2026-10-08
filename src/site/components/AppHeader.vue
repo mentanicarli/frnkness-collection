@@ -34,19 +34,24 @@
             <p v-if="!search.results.length" class="text-sm text-[var(--fg-faint)] font-mono py-2">Ничего не найдено.</p>
             <template v-else>
               <p class="font-mono text-xs text-[var(--fg-faint)] mb-2">Результатов: {{ search.results.length }}</p>
-              <button
+              <div
                 v-for="(item, index) in search.results"
                 :key="`${item.type}|${item.releaseId}|${item.trackIndex}|${item.line}|${index}`"
-                class="w-full text-left rounded-md hover:bg-[var(--bg-2)] transition-colors p-3 mb-0.5 flex items-center justify-between gap-4"
-                @click="openResult(item)"
+                class="flex items-center rounded-md hover:bg-[var(--bg-2)] transition-colors mb-0.5"
               >
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-[var(--fg)] truncate">{{ item.title }}</p>
-                  <p v-if="item.trackTitle" class="text-xs text-[var(--fg-muted)] mt-1">{{ item.trackTitle }}</p>
-                  <p v-if="item.line" class="text-xs text-[var(--fg-muted)] mt-1 line-clamp-2 italic">{{ item.line }}</p>
-                </div>
-                <span class="font-mono text-[0.5625rem] uppercase tracking-wider text-[var(--fg-faint)] flex-shrink-0 border border-white/10 rounded px-2 py-1">{{ BADGES[item.type] }}</span>
-              </button>
+                <button
+                  class="flex-1 min-w-0 text-left p-3 flex items-center justify-between gap-4"
+                  @click="openResult(item)"
+                >
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-[var(--fg)] truncate">{{ item.title }}</p>
+                    <p v-if="item.trackTitle" class="text-xs text-[var(--fg-muted)] mt-1 truncate">{{ item.trackTitle }}</p>
+                    <p v-if="item.line" class="text-xs text-[var(--fg-muted)] mt-1 line-clamp-2 italic">{{ item.line }}</p>
+                  </div>
+                  <span class="font-mono text-[0.5625rem] uppercase tracking-wider text-[var(--fg-faint)] flex-shrink-0 border border-white/10 rounded px-2 py-1">{{ BADGES[item.type] }}</span>
+                </button>
+                <TrackMoreButton v-if="hitTrackId(item)" :track-id="hitTrackId(item)!" />
+              </div>
             </template>
           </template></div>
         </div>
@@ -97,6 +102,10 @@ import { focusLyricLine } from '@/site/services/lyricFocus'
 import type { SearchHit } from '@/site/services/searchIndex'
 import { runSearch, search, setSearchOpen, toggleSearch } from '@/site/stores/search'
 import UserMenu from './UserMenu.vue'
+import TrackMoreButton from './TrackMoreButton.vue'
+
+/** id трека, к которому относится результат поиска (у релиза его нет). */
+const hitTrackId = (item: SearchHit): string | null => (item.type === 'release' ? null : releases[item.releaseId]?.tracks[item.trackIndex]?.id ?? null)
 
 const BADGES: Record<SearchHit['type'], string> = { release: 'Релиз', track: 'Трек', lyric: 'Строка' }
 

@@ -7,6 +7,7 @@ import {
     createEndlessQueue,
     createListQueue,
     currentTrackId,
+    insertNext,
     jumpTo,
     nextInQueue,
     prevInQueue,
@@ -168,4 +169,34 @@ describe('sameSource', () => {
         expect(sameSource({ kind: 'flow' }, { kind: 'flow' })).toBe(true)
         expect(sameSource(null, { kind: 'flow' })).toBe(false)
     })
+})
+
+describe('играть следующим', () => {
+  it('список: трек встаёт после текущего, порядок остальных не меняется', () => {
+    const q = createListQueue({ kind: 'release', releaseId: 'r' }, IDS, 1, all)!
+    const next = insertNext(q, 'x/new')!
+    expect(currentTrackId(next)).toBe('r/b')
+    const after = nextInQueue(next, all)!
+    expect(currentTrackId(after)).toBe('x/new')
+    expect(currentTrackId(nextInQueue(after, all)!)).toBe('r/c')
+    // Индексы старых треков прежние — клики по строкам релиза не сбиваются.
+    expect(next.trackIds.slice(0, IDS.length)).toEqual(IDS)
+  })
+
+  it('перемешанный список: тоже сразу после текущего', () => {
+    const q = createListQueue({ kind: 'release', releaseId: 'r' }, IDS, 2, all, { shuffle: true, rng: seeded(7) })!
+    const next = insertNext(q, 'x/new')!
+    expect(currentTrackId(nextInQueue(next, all)!)).toBe('x/new')
+  })
+
+  it('Поток: следующим идёт выбранный трек, а не случайный', () => {
+    const q = createEndlessQueue({ kind: 'flow' }, IDS, all, { startTrackId: 'r/a' })!
+    const next = insertNext(q, 'r/d')!
+    expect(currentTrackId(nextInQueue(next, all, seeded(3))!)).toBe('r/d')
+  })
+
+  it('очередь хозяина комнаты не меняется', () => {
+    const q = { ...createListQueue({ kind: 'release', releaseId: 'r' }, IDS, 0, all)!, controller: 'remote' as const }
+    expect(insertNext(q, 'x/new')).toBeNull()
+  })
 })

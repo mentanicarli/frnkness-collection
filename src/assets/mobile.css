@@ -1,0 +1,50 @@
+/* Телефон и PWA (iPhone Safari, установленное приложение, Android Chrome).
+   Подключается последним: правила здесь переопределяют остальные файлы.
+   Что исправлено в аудите на 375 и 390 px — см. описание PR. */
+
+/* Двойное касание не приближает страницу (щипок для зума остаётся) */
+html { touch-action: manipulation; }
+/* Адресная строка Safari прячется и появляется: высота — по реально видимой области */
+main { min-height: 100dvh; }
+
+/* Экраны без шапки (вход, заставка, итоги года): отступ под вырез и полосу «домой» в PWA */
+.acc-shell, .welcome {
+  padding-top: max(clamp(1.5rem, 5vw, 4rem), calc(var(--safe-top) + 1rem));
+  padding-bottom: max(clamp(1.5rem, 5vw, 4rem), calc(var(--safe-bottom) + 1rem));
+}
+
+/* Диалоги: не по центру, а вверху — клавиатура iOS не закрывает поле ввода; отступы под вырез */
+.cropper-backdrop { padding: max(1rem, var(--safe-top)) 1rem max(1rem, var(--safe-bottom)); }
+@media (max-width: 640px) {
+  .cropper-backdrop { align-items: flex-start; overflow-y: auto; overscroll-behavior: contain; }
+  .cropper-box { max-height: calc(100dvh - 2rem - var(--safe-top) - var(--safe-bottom)); overflow-y: auto; }
+}
+
+@media (max-width: 640px), (hover: none) {
+  /* Поля не меньше 16 px: иначе iOS приближает страницу при фокусе и не возвращает */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+  textarea,
+  select,
+  .acc-input,
+  .acc-textarea { font-size: 16px; }
+
+  /* Цели нажатия не меньше 40 px */
+  .acc-btn-sm { min-height: 2.5rem; height: 2.5rem; }
+  .fav-btn { width: 2.5rem; height: 2.5rem; }
+  .mini-fav { margin-left: 0; }
+  .lyrics-action-btn { min-height: 2.5rem; }
+  .social-tab { min-height: 2.5rem; }
+  .pick-chip { height: 2.5rem; }
+  .room-leave-btn, .room-chip { min-height: 2.5rem; }
+  .acc-link { display: inline-block; padding: 0.625rem 0; }
+  /* Кнопка профиля в шапке: круг остаётся прежним, область нажатия шире */
+  .user-menu-btn::after { content: ''; position: absolute; inset: -0.25rem; }
+}
+
+/* Шапка на 375 px и уже: с настоящими шрифтами логотип и кнопки были шире экрана на доли пикселя.
+   Логотип может сжаться, кнопки — нет, промежутки меньше. */
+header > div:first-child > button.group { min-width: 0; overflow: hidden; }
+header > div:first-child > nav { flex-shrink: 0; }
+@media (max-width: 380px) {
+  header > div:first-child > nav { gap: 0.25rem; }
+}

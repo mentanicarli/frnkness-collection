@@ -16,28 +16,32 @@
       <span v-if="editable" class="tl-handle" aria-hidden="true" title="Перетащи, чтобы переставить">⋮⋮</span>
       <span v-else class="tl-num">{{ numbered ? i + 1 : '' }}</span>
       <button class="tl-main" type="button" :disabled="!item.info.available" @click="emit('play', i)">
-        <span class="tl-cover"><img v-if="item.info.cover" :src="item.info.cover" alt="" loading="lazy" decoding="async"></span>
+        <span class="tl-cover"><img v-if="item.info.cover" :src="item.info.cover" :srcset="coverSrcset(item.info.cover)" sizes="48px" alt="" loading="lazy" decoding="async"></span>
         <span class="tl-text">
           <span class="tl-title">{{ item.info.title }}</span>
           <span class="tl-sub">{{ item.info.available ? item.info.releaseTitle : 'Его больше нет в каталоге' }}<template v-if="item.extra"> · {{ item.extra }}</template></span>
         </span>
       </button>
       <span class="tl-actions">
-        <template v-if="item.info.available">
-          <FavoriteButton :track-id="item.trackId" />
-          <AddToPlaylistButton :track-id="item.trackId" />
-        </template>
-        <template v-if="editable">
-          <button class="fav-btn" type="button" :disabled="busy || i === 0" aria-label="Выше" title="Выше" @click="emit('move', i, i - 1)">↑</button>
-          <button class="fav-btn" type="button" :disabled="busy || i === rows.length - 1" aria-label="Ниже" title="Ниже" @click="emit('move', i, i + 1)">↓</button>
-          <button class="fav-btn" type="button" :disabled="busy" aria-label="Убрать из плейлиста" title="Убрать из плейлиста" @click="emit('remove', i)">✕</button>
-        </template>
+        <span class="track-inline-actions tl-actions">
+          <template v-if="item.info.available">
+            <FavoriteButton :track-id="item.trackId" />
+            <AddToPlaylistButton :track-id="item.trackId" />
+          </template>
+          <template v-if="editable">
+            <button class="fav-btn" type="button" :disabled="busy || i === 0" aria-label="Выше" title="Выше" @click="emit('move', i, i - 1)">↑</button>
+            <button class="fav-btn" type="button" :disabled="busy || i === rows.length - 1" aria-label="Ниже" title="Ниже" @click="emit('move', i, i + 1)">↓</button>
+            <button class="fav-btn" type="button" :disabled="busy" aria-label="Убрать из плейлиста" title="Убрать из плейлиста" @click="emit('remove', i)">✕</button>
+          </template>
+        </span>
+        <TrackMoreButton :track-id="item.trackId" :extras="extrasFor(i)" />
       </span>
     </li>
   </ol>
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 // Список треков по id: избранное, плейлист, топ. Недоступные треки (их
 // нет в каталоге) видны серыми и не запускаются. В режиме правки —
 // перетаскивание и кнопки ↑/↓ (на телефоне перетаскивания нет).
@@ -47,6 +51,8 @@ import { type QueueSource, sameSource } from '../player/queue'
 import { trackInfo } from '../social/tracks'
 import FavoriteButton from './FavoriteButton.vue'
 import AddToPlaylistButton from './AddToPlaylistButton.vue'
+import TrackMoreButton from './TrackMoreButton.vue'
+import type { MenuAction } from '../social/trackMenu'
 
 const props = withDefaults(
   defineProps<{
@@ -68,6 +74,16 @@ const rows = computed(() => props.trackIds.map((trackId, i) => ({ key: `${trackI
 
 const isPlaying = (trackId: string) =>
   player.visible && player.currentTrackId === trackId && (!props.source || sameSource(player.queue?.source, props.source))
+
+// В режиме правки действия порядка и удаления живут в нижней панели «⋯» (на телефоне).
+function extrasFor(i: number): MenuAction[] {
+  if (!props.editable) return []
+  return [
+    { id: 'move-up', label: 'Выше', disabled: props.busy || i === 0, run: () => emit('move', i, i - 1) },
+    { id: 'move-down', label: 'Ниже', disabled: props.busy || i === rows.value.length - 1, run: () => emit('move', i, i + 1) },
+    { id: 'remove', label: 'Убрать из плейлиста', danger: true, disabled: props.busy, run: () => emit('remove', i) }
+  ]
+}
 
 const dragFrom = ref<number | null>(null)
 const dragOver = ref<number | null>(null)

@@ -6,7 +6,7 @@
         :loading="priority < 6 ? 'eager' : 'lazy'"
         decoding="async"
         :fetchpriority="priority < 4 ? 'high' : 'low'"
-        :src="release.cover"
+        :src="release.cover" :srcset="coverSrcset(release.cover)" sizes="(max-width: 640px) 50vw, 300px"
         :alt="release.title"
         class="card-image w-full h-full object-cover"
         @error="hideBrokenImage"
@@ -18,6 +18,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { ref } from 'vue'
 import type { Release } from '@/types'
 import { goRelease } from '../router'

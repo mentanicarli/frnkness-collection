@@ -9,7 +9,7 @@
   >
     <div class="flex flex-col sm:flex-row items-start sm:items-center" style="gap: clamp(1.125rem,3vw,2.5rem);">
       <div class="promo-cover-wrap aspect-square overflow-hidden bg-[var(--bg)] flex-shrink-0" style="border-radius: 0.5rem;">
-        <img :src="release.cover" :alt="release.title" class="card-image w-full h-full object-cover" loading="eager" decoding="async" fetchpriority="high" @error="hideBrokenImage">
+        <img :src="release.cover" :srcset="coverSrcset(release.cover)" sizes="(max-width: 640px) 100vw, 480px" :alt="release.title" class="card-image w-full h-full object-cover" loading="eager" decoding="async" fetchpriority="high" @error="hideBrokenImage">
       </div>
       <div class="flex-1 min-w-0 flex flex-col" style="gap: 1rem;">
         <div class="promo-badge">последний релиз</div>
@@ -26,6 +26,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { onMounted, ref, watch } from 'vue'
 import type { Release } from '@/types'
 import { applyCardAccent } from '../services/colors'

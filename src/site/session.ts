@@ -24,8 +24,13 @@ export interface SessionUser {
 
 const state = reactive({
     user: null as SessionUser | null,
-    // Сессия проверена при загрузке (до этого роутер ждёт).
+    // Локальная сессия проверена при загрузке (до этого роутер ждёт). Профиль
+    // и флаги аккаунта догружаются в фоне — см. accountLoaded.
     ready: false,
+    // Профиль и флаги (смена пароля, код восстановления) прочитаны с сервера.
+    // До этого user заполнен из токена и локальной копии, а роутер не
+    // решает судьбу экранов «сменить пароль» / «код восстановления».
+    accountLoaded: false,
     mustChangePassword: false,
     // Есть код восстановления, который человек ещё не сохранил («Я сохранил»): до этого сайт не пускает дальше.
     recoveryPending: false,
@@ -50,6 +55,62 @@ export function currentAccessToken(): string | null {
     return accessToken
 }
 
+// Копия аккаунта на устройстве: сайт открывается с ником и флагами сразу,
+// не дожидаясь базы. Каждое чтение с сервера её обновляет (в том числе
+// после переименования), выход — стирает.
+const ACCOUNT_CACHE_KEY = 'frnk-account-v1'
+
+interface AccountCache {
+    id: string
+    nick: string
+    avatar: string
+    bio: string
+    createdAt: string
+    mustChangePassword: boolean
+    recoveryPending: boolean
+    nickChangedAt: string | null
+}
+
+function readAccountCache(uid: string): AccountCache | null {
+    try {
+        const raw = localStorage.getItem(ACCOUNT_CACHE_KEY)
+        const c = raw ? (JSON.parse(raw) as Partial<AccountCache>) : null
+        if (!c || c.id !== uid || typeof c.nick !== 'string') return null
+        return {
+            id: uid,
+            nick: c.nick,
+            avatar: typeof c.avatar === 'string' ? c.avatar : 'initials:0',
+            bio: typeof c.bio === 'string' ? c.bio : '',
+            createdAt: typeof c.createdAt === 'string' ? c.createdAt : '',
+            mustChangePassword: Boolean(c.mustChangePassword),
+            recoveryPending: Boolean(c.recoveryPending),
+            nickChangedAt: typeof c.nickChangedAt === 'string' ? c.nickChangedAt : null
+        }
+    } catch {
+        return null
+    }
+}
+
+function writeAccountCache(): void {
+    try {
+        const u = state.user
+        if (!u) return localStorage.removeItem(ACCOUNT_CACHE_KEY)
+        const c: AccountCache = {
+            id: u.id,
+            nick: u.nick,
+            avatar: u.avatar,
+            bio: u.bio,
+            createdAt: u.createdAt,
+            mustChangePassword: state.mustChangePassword,
+            recoveryPending: state.recoveryPending,
+            nickChangedAt: state.nickChangedAt
+        }
+        localStorage.setItem(ACCOUNT_CACHE_KEY, JSON.stringify(c))
+    } catch {
+        /* без хранилища (приватный режим) — просто без копии */
+    }
+}
+
 async function loadAccount(s: Session): Promise<void> {
     const seq = ++loadSeq
     const uid = s.user.id
@@ -57,6 +118,8 @@ async function loadAccount(s: Session): Promise<void> {
         supabase.from('profiles').select('nick, avatar, bio, created_at').eq('id', uid).maybeSingle(),
         supabase.from('account_private').select('must_change_password, nick_changed_at').eq('id', uid).maybeSingle()
     ])
+    // Ошибка чтения — не «профиля нет»: остаёмся с копией на устройстве.
+    if (profile.error || priv.error) throw new Error('account-load-failed')
     // До появления пользователя: роутер и App.vue смотрят на него и не должны пустить дальше, не зная про несохранённый код.
     const recoveryPending = await readRecoveryPending()
     if (seq !== loadSeq) return
@@ -73,6 +136,8 @@ async function loadAccount(s: Session): Promise<void> {
     }
     state.mustChangePassword = Boolean(a?.must_change_password)
     state.nickChangedAt = a?.nick_changed_at ?? null
+    state.accountLoaded = true
+    writeAccountCache()
 }
 
 /** Код создан, но не подтверждён. Сбой чтения не должен закрывать сайт: тогда считаем, что ждать нечего. */
@@ -98,21 +163,36 @@ async function applySession(s: Session | null): Promise<void> {
         state.mustChangePassword = false
         state.recoveryPending = false
         state.nickChangedAt = null
+        state.accountLoaded = false
+        writeAccountCache()
         return
     }
     state.expired = false
     // Обновление токена не меняет профиль — не перечитываем.
     if (state.user?.id === s.user.id) {
         state.user.role = roleOf(s.user.app_metadata)
-        return
+        return loading?.id === s.user.id ? loading.promise : undefined
+    }
+    // Пока профиль грузится, сайт уже работает с токеном и копией на устройстве.
+    const cached = readAccountCache(s.user.id)
+    state.accountLoaded = false
+    state.mustChangePassword = Boolean(cached?.mustChangePassword)
+    state.recoveryPending = Boolean(cached?.recoveryPending)
+    state.nickChangedAt = cached?.nickChangedAt ?? null
+    state.user = {
+        id: s.user.id,
+        nick: cached?.nick ?? '',
+        role: roleOf(s.user.app_metadata),
+        avatar: cached?.avatar ?? 'initials:0',
+        bio: cached?.bio ?? '',
+        createdAt: cached?.createdAt || s.user.created_at
     }
     // При запуске сессию приносят и getSession(), и событие INITIAL_SESSION:
     // второй вызов ждёт ту же загрузку, а не начинает новую.
     if (loading?.id === s.user.id) return loading.promise
     const promise = loadAccount(s)
         .catch(() => {
-            // Профиль не прочитался (нет сети) — пускаем с тем, что есть в токене.
-            state.user = { id: s.user.id, nick: '', role: roleOf(s.user.app_metadata), avatar: 'initials:0', bio: '', createdAt: s.user.created_at }
+            // Профиль не прочитался (нет сети) — остаёмся с токеном и копией на устройстве.
         })
         .finally(() => {
             if (loading?.promise === promise) loading = null
@@ -126,10 +206,16 @@ let loading: { id: string; promise: Promise<void> } | null = null
 export function initSession(): Promise<void> {
     if (!initialized) {
         initialized = true
+        // Ждём только локальную сессию (она читается из хранилища, без сети).
+        // Профиль applySession догружает в фоне: каталог не ждёт базу.
         supabase.auth
             .getSession()
-            .then(({ data }) => applySession(data.session))
-            .catch(() => applySession(null))
+            .then(({ data }) => {
+                void applySession(data.session)
+            })
+            .catch(() => {
+                void applySession(null)
+            })
             .finally(() => {
                 state.ready = true
                 readyResolve()
@@ -262,10 +348,19 @@ export async function updateOwnProfile(patch: { avatar?: string; bio?: string })
 }
 
 /** Тестам: сбросить состояние модуля. */
-export function __setSessionForTests(user: SessionUser | null, extra: { mustChangePassword?: boolean } = {}): void {
+export function __setSessionForTests(user: SessionUser | null, extra: { mustChangePassword?: boolean; recoveryPending?: boolean; accountLoaded?: boolean } = {}): void {
     initialized = true
     state.user = user
+    state.accountLoaded = extra.accountLoaded ?? true
+    state.recoveryPending = Boolean(extra.recoveryPending)
     state.ready = true
     state.mustChangePassword = Boolean(extra.mustChangePassword)
     readyResolve()
+}
+
+/** Тестам: профиль «догрузился» с сервера — с этими флагами. */
+export function __finishAccountLoadForTests(flags: { mustChangePassword?: boolean; recoveryPending?: boolean } = {}): void {
+    state.mustChangePassword = Boolean(flags.mustChangePassword)
+    state.recoveryPending = Boolean(flags.recoveryPending)
+    state.accountLoaded = true
 }

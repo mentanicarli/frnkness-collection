@@ -16,11 +16,14 @@ import {
     createEndlessQueue,
     createListQueue,
     currentTrackId,
+    insertNext,
     jumpTo,
     nextInQueue,
     prevInQueue,
     setQueueShuffle
 } from './queue'
+import { installErrorLogging } from '../errorLog'
+import { type PlaybackGuard, createPlaybackGuard } from './playbackGuard'
 import { karaoke, player } from './state'
 
 /**
@@ -139,6 +142,22 @@ export function toggleShuffle(): void {
     if (player.queue && !player.queue.endless) player.queue = setQueueShuffle(player.queue, player.shuffle)
 }
 
+/** Есть очередь, в которую можно поставить трек следующим. */
+export function canPlayNext(): boolean {
+    return Boolean(player.queue && player.queue.controller === 'local' && player.currentTrackId)
+}
+
+/** «Играть следующим»: трек встаёт после текущего; true — получилось. */
+export function playNext(trackId: string): boolean {
+    if (guestBlocked()) return false
+    const queue = player.queue
+    if (!queue || !isTrackAvailable(trackId)) return false
+    const next = insertNext(queue, trackId)
+    if (!next) return false
+    setQueue(next)
+    return true
+}
+
 // ── Предзагрузка ────────────────────────────────────────────────────────
 
 const preloadedAudio = new Set<string>()
@@ -165,6 +184,37 @@ export function runWhenIdle(fn: () => void): void {
 }
 
 // ── Воспроизведение ─────────────────────────────────────────────────────
+
+// Сторож запуска (./playbackGuard.ts): повторы при обрыве, «Нажми, чтобы
+// играть», причины отказов — в журнал ошибок. Свой на каждый <audio>.
+let guard: { audio: HTMLAudioElement; guard: PlaybackGuard } | null = null
+
+function guardFor(audio: HTMLAudioElement): PlaybackGuard {
+    if (guard?.audio === audio) return guard.guard
+    guard?.guard.destroy()
+    const created = createPlaybackGuard({
+        audio,
+        getTrackKey: currentStatsKey,
+        report: (message) => {
+            try {
+                installErrorLogging().report({ message, stack: '' })
+            } catch {
+                /* журнал — не главное */
+            }
+        }
+    })
+    guard = { audio, guard: created }
+    return created
+}
+
+/**
+ * Запуск звука. Вызывать СИНХРОННО из обработчика нажатия (или конца
+ * трека): до audio.play() не должно быть ни одного await.
+ */
+function playNow(audio: HTMLAudioElement): Promise<boolean> {
+    player.isPlaying = true
+    return guardFor(audio).play()
+}
 
 // Трек релиза: треклист, поиск, чарт, страница трека. Очередь — этот
 // релиз; если играет Поток по каталогу — он продолжается с этого трека.
@@ -212,6 +262,7 @@ function startTrack(index: number, direction: Direction, options: { autoplay?: b
     player.trackCountPending = false
     karaoke.hardStart = true
 
+    guardFor(audio).reset()
     audio.src = buildAssetUrl(release.audioPath, track.file)
     setMiniPlayerVisible(true)
     player.trackStart = { n: ++trackStartSeq, cover: release.cover, direction }
@@ -233,17 +284,7 @@ function startTrack(index: number, direction: Direction, options: { autoplay?: b
         // applyRemotePlayback, когда он загрузится.
         player.isPlaying = false
     } else {
-        const playPromise = audio.play()
-        if (playPromise && typeof playPromise.then === 'function') {
-            playPromise
-                .then(() => { player.isPlaying = true })
-                .catch((err) => {
-                    player.isPlaying = false
-                    console.log('Play error:', err)
-                })
-        } else {
-            player.isPlaying = true
-        }
+        void playNow(audio)
     }
 
     void loadLyrics(index)
@@ -253,11 +294,11 @@ export function togglePlay(): void {
     if (guestBlocked()) return
     const audio = getAudio()
     if (!audio) return
-    if (audio.paused) {
-        void audio.play()
-        player.isPlaying = true
+    if (audio.paused || player.playback === 'tap') {
+        void playNow(audio)
         setMiniPlayerVisible(true)
     } else {
+        guardFor(audio).userPause()
         audio.pause()
         player.isPlaying = false
     }
@@ -299,14 +340,7 @@ export function seekTo(time: number): void {
     const applySeek = () => {
         audio.currentTime = time
         if (karaoke.mode === 'karaoke') updateKaraoke()
-        if (audio.paused) {
-            const resume = audio.play()
-            if (resume && typeof resume.then === 'function') {
-                resume.then(() => { player.isPlaying = true }).catch(() => { player.isPlaying = false })
-            } else {
-                player.isPlaying = true
-            }
-        }
+        if (audio.paused) void playNow(audio)
     }
 
     if (audio.readyState >= 1 || Number.isFinite(audio.duration)) {
@@ -385,7 +419,9 @@ function setMiniPlayerVisible(visible: boolean) {
 /** force — выход из аккаунта: закрыть плеер, даже если ты гость комнаты. */
 export function closeMiniPlayer(force = false): void {
     if (!force && guestBlocked()) return
-    getAudio()?.pause()
+    const audio = getAudio()
+    if (audio) guardFor(audio).userPause()
+    audio?.pause()
     player.isPlaying = false
     setMiniPlayerVisible(false)
 }
@@ -525,15 +561,10 @@ export function seekRemoteMs(ms: number): void {
 export async function playRemote(): Promise<boolean> {
     const audio = getAudio()
     if (!audio) return false
-    try {
-        await audio.play()
-        player.isPlaying = true
-        setMiniPlayerVisible(true)
-        return true
-    } catch {
-        player.isPlaying = false
-        return false
-    }
+    // Первый play() — синхронно (до await); дальше сторож сам ждёт результат и повторяет при обрыве.
+    const ok = await playNow(audio)
+    if (ok) setMiniPlayerVisible(true)
+    return ok
 }
 
 /** Гость вышел из комнаты: музыка хозяина замолкает, очередь чужая — убираем. */
@@ -545,6 +576,7 @@ export function releaseRemote(): void {
 export function pauseRemote(): void {
     const audio = getAudio()
     if (!audio) return
+    guardFor(audio).userPause()
     audio.pause()
     player.isPlaying = false
 }
@@ -612,7 +644,7 @@ export function attachAudio(audio: HTMLAudioElement): void {
             const track = release?.tracks[player.currentTrackIndex]
             return release && track ? { title: track.title, album: release.title, cover: release.cover } : null
         },
-        play: () => { if (audio.paused) togglePlay() },
+        play: () => { if (audio.paused || player.playback === 'tap') togglePlay() },
         pause: () => { if (!audio.paused) togglePlay() },
         next: nextTrack,
         prev: prevTrack,

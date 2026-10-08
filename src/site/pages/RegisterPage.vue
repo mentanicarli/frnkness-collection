@@ -95,13 +95,15 @@ async function submit() {
   if (error.value) return
   busy.value = true
   try {
+    // Адрес возврата запоминаем до входа: пока идёт вход, экран может смениться.
+    const next = route.query.next
     const message = await register(nick.value, password.value, captchaToken.value)
     if (message) {
       error.value = message
       captcha.value?.reset()
       return
     }
-    goAfterLogin(route.query.next)
+    goAfterLogin(next)
   } finally {
     busy.value = false
   }

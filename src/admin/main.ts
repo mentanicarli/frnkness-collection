@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import AdminApp from './AdminApp.vue'
+import '../assets/fonts.css'
 import './admin.css'
 import '../assets/user-tag.css'
 
