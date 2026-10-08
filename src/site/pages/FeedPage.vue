@@ -40,7 +40,7 @@
             <span class="feed-ago"> — {{ formatAgo(e.at, nowMs) }}</span>
           </p>
           <ul v-if="e.kind === 'top4'" class="feed-covers" aria-label="Топ-4">
-            <li v-for="id in e.trackIds" :key="id"><img v-if="info(id).cover" :src="info(id).cover!" :alt="info(id).title" :title="info(id).title" width="40" height="40" loading="lazy" decoding="async"></li>
+            <li v-for="id in e.trackIds" :key="id"><img v-if="info(id).cover" :src="info(id).cover!" :srcset="coverSrcset(info(id).cover)" sizes="40px" :alt="info(id).title" :title="info(id).title" width="40" height="40" loading="lazy" decoding="async"></li>
           </ul>
         </div>
         <RouterLink v-if="e.kind === 'room' && e.canJoin && e.room" class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'room', params: { id: e.room.id } }" data-testid="feed-join">Зайти</RouterLink>
@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 // Лента «Что слушают друзья»: события друзей за 7 дней. Данные — только из
 // RPC friends_feed (там проверка дружбы). Все тексты — интерполяцией, то есть
 // с экранированием. Обновляется не чаще раза в минуту; «Показать ещё»

@@ -11,7 +11,7 @@
   >
     <div class="flex flex-col sm:flex-row items-start sm:items-center" style="gap: clamp(1.125rem,3vw,2.5rem);">
       <div class="promo-cover-wrap aspect-square overflow-hidden bg-[var(--bg)] flex-shrink-0" style="border-radius: 0.5rem;">
-        <img :src="announce.cover" :alt="announce.title" class="card-image w-full h-full object-cover" loading="eager" decoding="async" @error="hideBrokenImage">
+        <img :src="announce.cover" :srcset="coverSrcset(announce.cover)" sizes="(max-width: 640px) 100vw, 480px" :alt="announce.title" class="card-image w-full h-full object-cover" loading="eager" decoding="async" @error="hideBrokenImage">
       </div>
       <div class="flex-1 min-w-0 flex flex-col" style="gap: 1rem;">
         <div class="promo-badge">{{ dated ? 'скоро' : 'анонс' }}</div>
@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Announce } from '@/types'
 import { formatCountdown, formatReleaseMoment, hasReleaseDate, releaseTime, safeAnnounceUrl } from '@/utils/announceCard'

@@ -15,12 +15,13 @@
       </div>
     </div>
     <div v-if="cover" class="welcome-cover">
-      <img :src="cover.src" :alt="cover.title" decoding="async" fetchpriority="high">
+      <img :src="cover.src" :srcset="coverSrcset(cover.src)" sizes="(max-width: 640px) 80vw, 420px" :alt="cover.title" decoding="async" fetchpriority="high">
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 // Заставка для гостя: логотип, обложка последнего релиза, вход и регистрация.
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'

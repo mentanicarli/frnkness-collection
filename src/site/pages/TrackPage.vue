@@ -9,7 +9,7 @@
 
       <div class="track-hero">
         <div class="track-hero-cover">
-          <img :key="view.release.cover" loading="eager" decoding="async" fetchpriority="high" :src="view.release.cover" :alt="view.release.title" @error="hideBrokenImage">
+          <img :key="view.release.cover" loading="eager" decoding="async" fetchpriority="high" :src="view.release.cover" :srcset="coverSrcset(view.release.cover)" sizes="(max-width: 640px) 60vw, 320px" :alt="view.release.title" @error="hideBrokenImage">
         </div>
         <div class="track-hero-main">
           <p class="track-hero-kind">{{ view.release.type === 'album' ? 'Альбом' : 'Сингл' }} • {{ view.release.releaseDate || view.release.year }}</p>
@@ -65,6 +65,7 @@
 </template>
 
 <script setup lang="ts">
+import { coverSrcset } from '@/utils/cover'
 import { computed, nextTick, ref, shallowRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { releases } from '@/config'

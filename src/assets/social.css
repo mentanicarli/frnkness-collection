@@ -276,3 +276,66 @@ button.top4-card.playing .top4-cover { outline: 2px solid var(--page-accent); }
 .pick-chip:hover:not(:disabled) { background: var(--bg-2); }
 .pick-chip:disabled { opacity: 0.5; }
 .pick-kicker { margin: 0.875rem 0 0; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-faint); }
+
+/* «⋯» у трека и нижняя панель действий (TrackMoreButton.vue, TrackMenuSheet.vue) */
+.track-more {
+  display: none; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 2.75rem; height: 2.75rem; border: 0; border-radius: var(--r-sm); background: transparent;
+  color: var(--fg-muted); touch-action: manipulation;
+}
+.track-more:hover { color: var(--fg); background: var(--bg-2); }
+.track-more:focus-visible { outline: 2px solid var(--fg-muted); outline-offset: 1px; }
+/* Телефон и любые экраны без наведения: вместо иконок — одна кнопка */
+@media (max-width: 640px), (hover: none) {
+  .track-more { display: inline-flex; }
+  .track-inline-actions { display: none !important; }
+}
+.tl-main { overflow: hidden; }
+
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 110; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, 0.6); overscroll-behavior: contain;
+}
+.sheet {
+  width: min(100%, 30rem); max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--r-lg, 1rem) var(--r-lg, 1rem) 0 0;
+  padding: 0.5rem 1rem calc(1rem + var(--safe-bottom)); box-shadow: var(--shadow-pop);
+}
+.sheet-grip { width: 2.5rem; height: 0.25rem; border-radius: 999px; background: var(--line-2); margin: 0.25rem auto 0.75rem; }
+.sheet-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.25rem 0 0.75rem; border-bottom: 1px solid var(--line); margin-bottom: 0.25rem; }
+.sheet-head .tl-text { min-width: 0; }
+.sheet-actions { display: flex; flex-direction: column; }
+.sheet-action {
+  display: flex; align-items: center; gap: 0.875rem; width: 100%; min-height: 3rem; padding: 0 0.25rem;
+  border: 0; background: transparent; color: var(--fg); font-size: 1rem; text-align: left; touch-action: manipulation;
+}
+.sheet-action:hover:not(:disabled) { background: var(--bg-3); }
+.sheet-action:disabled { opacity: 0.35; }
+.sheet-action.danger { color: #ff8a8d; }
+.sheet-ico { width: 1.5rem; text-align: center; color: var(--fg-muted); font-size: 1.125rem; }
+.sheet-ico.on { color: #ff5c7a; }
+.sheet-close {
+  width: 100%; min-height: 3rem; margin-top: 0.5rem; border: 1px solid var(--line-2); border-radius: var(--r-md);
+  background: transparent; color: var(--fg-muted); font-size: 0.9375rem; touch-action: manipulation;
+}
+.sheet-enter-active, .sheet-leave-active { transition: opacity var(--med); }
+.sheet-enter-active .sheet, .sheet-leave-active .sheet { transition: transform var(--med) var(--ease); }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; }
+.sheet-enter-from .sheet, .sheet-leave-to .sheet { transform: translateY(100%); }
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active .sheet, .sheet-leave-active .sheet { transition: none; }
+}
+@media (min-width: 641px) and (hover: hover) {
+  /* На компьютере панель — по центру окна */
+  .sheet-backdrop { align-items: center; }
+  .sheet { border-bottom: 1px solid var(--line-2); border-radius: var(--r-lg, 1rem); padding-bottom: 1rem; }
+}
+
+/* Заготовка страницы, пока данные грузятся */
+.profile-skeleton { display: flex; align-items: center; gap: 1rem; padding: 1.5rem 0; }
+.sk { background: linear-gradient(90deg, var(--bg-2), var(--bg-3), var(--bg-2)); background-size: 200% 100%; animation: sk-shimmer 1.4s linear infinite; border-radius: var(--r-sm); }
+.sk-avatar { width: 5.5rem; height: 5.5rem; border-radius: 50%; flex-shrink: 0; }
+.sk-lines { display: flex; flex-direction: column; gap: 0.625rem; flex: 1; min-width: 0; }
+.sk-line { height: 0.875rem; }
+@keyframes sk-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }

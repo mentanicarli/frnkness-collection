@@ -1,7 +1,15 @@
 <template>
   <div class="shell shell-narrow profile-page">
-    <p v-if="state === 'loading'" class="acc-hint">Загрузка…</p>
-    <p v-else-if="state === 'missing'" class="acc-alert acc-alert-info">Такого пользователя нет.</p>
+    <!-- Пока профиль грузится — заготовка страницы, а не «не найдено» -->
+    <div v-if="state === 'loading'" class="profile-skeleton" aria-busy="true" aria-label="Загрузка профиля" data-testid="profile-skeleton">
+      <div class="sk sk-avatar"></div>
+      <div class="sk-lines"><div class="sk sk-line" style="width: 55%;"></div><div class="sk sk-line" style="width: 35%;"></div><div class="sk sk-line" style="width: 75%;"></div></div>
+    </div>
+    <div v-else-if="state === 'error'" class="acc-alert acc-alert-info" data-testid="profile-error">
+      <p>Не удалось загрузить профиль — похоже, нет связи.</p>
+      <button class="acc-btn acc-btn-sm" type="button" style="margin-top: 0.5rem;" data-testid="profile-retry" @click="retry">Повторить</button>
+    </div>
+    <p v-else-if="state === 'missing'" class="acc-alert acc-alert-info" data-testid="profile-missing">Такого пользователя нет.</p>
     <template v-else-if="profile">
       <div class="profile-head">
         <UserAvatar :avatar="profile.avatar" :nick="profile.nick" :user-id="profile.id" :size="5.5" :cover-of="coverOf" />
@@ -85,6 +93,8 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
+import { session, refreshAccount } from '../session'
+import { cleanNick, nickKey } from '../../../supabase/functions/_shared/accounts.ts'
 import UserAvatar from '@/site/components/UserAvatar.vue'
 import { recapStore } from '@/site/recap/store'
 import { api, errorText, type PlaylistSummary, type Top4Row, type UserPage } from '../social/api'
@@ -105,7 +115,7 @@ import Top4Editor from '../components/Top4Editor.vue'
 const route = useRoute()
 const router = useRouter()
 const profile = ref<UserPage | null>(null)
-const state = ref<'loading' | 'ok' | 'missing'>('loading')
+const state = ref<'loading' | 'ok' | 'missing' | 'error'>('loading')
 const busy = ref(false)
 const playlists = ref<PlaylistSummary[] | null>(null)
 const favoriteIds = ref<string[] | null>(null)
@@ -120,12 +130,44 @@ const canSee = computed(() => profile.value?.relation === 'self' || profile.valu
 const favSource = computed<QueueSource>(() => ({ kind: 'favorites', ownerId: profile.value?.id ?? '' }))
 let seq = 0
 
+type Lookup = { kind: 'ok'; profile: UserPage } | { kind: 'missing' } | { kind: 'error' }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Ник из адреса — в том же виде, что при регистрации и входе (NFC, без пробелов по краям). */
+async function lookup(nick: string): Promise<Lookup> {
+  const clean = cleanNick(nick)
+  // Одна повторная попытка: сеть на телефоне, токен в момент обновления.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const p = await api.profileByNick(clean)
+      return p ? { kind: 'ok', profile: p } : { kind: 'missing' }
+    } catch {
+      if (attempt === 0) await sleep(700)
+    }
+  }
+  return { kind: 'error' }
+}
+
+/** Адрес ведёт на мой собственный ник (с любым регистром и похожими буквами). */
+const isOwnNick = (nick: string): boolean => Boolean(session.user?.nick) && nickKey(nick) === nickKey(session.user!.nick)
+
 async function load(nick: string) {
   const my = ++seq
-  const p = await api.profileByNick(nick).catch(() => null)
+  let found = await lookup(nick)
+  // Свой профиль всегда есть: «нет такого» по своему же нику значит, что ник
+  // в адресе или в копии на устройстве устарел (переименовали). Берём актуальный.
+  if (found.kind === 'missing' && isOwnNick(nick)) {
+    await refreshAccount().catch(() => undefined)
+    if (my !== seq) return
+    const fresh = session.user?.nick
+    found = fresh && nickKey(fresh) !== nickKey(nick) ? await lookup(fresh) : { kind: 'error' }
+    if (found.kind === 'missing') found = { kind: 'error' }
+  }
   if (my !== seq) return
+  const p = found.kind === 'ok' ? found.profile : null
   profile.value = p
-  state.value = p ? 'ok' : 'missing'
+  state.value = found.kind === 'ok' ? 'ok' : found.kind
   playlists.value = favoriteIds.value = top.value = null
   top4.value = null
   editing.value = false
@@ -164,10 +206,10 @@ watch(
     profile.value = null
     // Старая ссылка по id → ник.
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) {
-      const { data } = await supabase.from('profiles').select('nick').eq('id', raw).maybeSingle()
+      const { data, error } = await supabase.from('profiles').select('nick').eq('id', raw).maybeSingle()
       const nick = (data as { nick: string } | null)?.nick
       if (nick) void router.replace({ name: 'user', params: { nick } })
-      else state.value = 'missing'
+      else state.value = error ? 'error' : 'missing'
       return
     }
     if (!raw) {
@@ -178,6 +220,12 @@ watch(
   },
   { immediate: true }
 )
+
+function retry() {
+  const raw = String(route.params.nick ?? '')
+  state.value = 'loading'
+  void load(raw)
+}
 
 function onTop4Saved(rows: Top4Row[]) {
   top4.value = rows
