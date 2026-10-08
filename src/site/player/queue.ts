@@ -54,10 +54,6 @@ export function shuffledOrder(n: number, first: number | null, rng: Rng): number
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 
-export function isEndlessSource(source: QueueSource): boolean {
-    return source.kind === 'flow' || source.kind === 'favorites-flow'
-}
-
 export function sameSource(a: QueueSource | null | undefined, b: QueueSource | null | undefined): boolean {
     if (!a || !b || a.kind !== b.kind) return false
     switch (a.kind) {

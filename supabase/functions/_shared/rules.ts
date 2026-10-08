@@ -34,8 +34,6 @@ const IMAGE_RULES: Record<string, PathRule> = {
 const BOOK_RULES: Record<string, PathRule> = { '.pdf': { kind: 'binary', maxBytes: 30 * MB } }
 const CONTENT_RULES: Record<string, PathRule> = { '.json': { kind: 'text', maxBytes: 512 * 1024 } }
 
-export const STAGING_MIME_TYPES = ['audio/mpeg', 'image/jpeg', 'image/png', 'application/pdf']
-
 function matchExtension(name: string, rules: Record<string, PathRule>): PathRule | null {
     const lower = name.toLowerCase()
     // Длинные расширения раньше коротких: «.notes.json» не должен
@@ -492,10 +490,6 @@ export function checkRegistryChange(before: unknown, after: unknown): string[] {
 }
 
 // ── site.json ──────────────────────────────────────────────────────────
-
-export interface SiteSettingsData {
-    promo: { enabled: boolean; releaseId: string }
-}
 
 export function validateSiteSettings(value: unknown, registry: unknown): string[] {
     if (!isPlainObject(value)) return ['site.json должен быть объектом']

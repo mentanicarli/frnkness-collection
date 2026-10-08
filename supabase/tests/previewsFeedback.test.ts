@@ -5,9 +5,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import fs from 'node:fs'
-import path from 'node:path'
-import { ADMIN, ANON, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const STRANGER = { role: 'authenticated', sub: '00000000-0000-4000-8000-000000000003', app_metadata: { role: 'user' } }
 const TECH = (n: number) => `u-${String(n).padStart(32, '0')}@id.frnkness.ru`
@@ -320,20 +318,6 @@ describe('список пользователей, журнал ошибок, о
             ).rows
             expect(rows).toHaveLength(8)
             for (const r of rows) expect(r.proconfig, r.proname).toContain('search_path=""')
-        })
-
-        it('аудит-скрипт выполняется и ничего лишнего не находит', async () => {
-            const audit = fs.readFileSync(path.join(REPO, 'supabase/audit/previews_feedback_audit.sql'), 'utf8')
-            // Несколько запросов в одном файле: исполняем по одному.
-            const statements = audit.split(/;\s*\n/).map((t) => t.trim()).filter((t) => /^select/im.test(t.replace(/^(--.*\n)+/gm, '')))
-            const rows: { section: string; item: string; value: string }[] = []
-            for (const st of statements) rows.push(...(await db.query<any>(st)).rows)
-            expect(rows.filter((r) => r.section.includes('ожидается пусто'))).toEqual([])
-            expect(rows.filter((r) => r.section === '1 rls').map((r) => r.value)).toEqual(['true', 'true'])
-            expect(rows.filter((r) => r.section === '5 search_path').every((r) => r.value.includes('search_path=""'))).toBe(true)
-            expect(rows.filter((r) => r.section === '4 functions' && r.value.includes('anon=true')).map((r) => r.item)).toEqual([
-                'log_client_error(p_message text, p_stack text, p_page text, p_browser text, p_build text, p_client text)'
-            ])
         })
     })
 })

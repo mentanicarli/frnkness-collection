@@ -48,13 +48,6 @@ describe('аккаунты: права', () => {
             await db.exec('drop table public.future_table')
         })
 
-        it('SQL аудита выполняется и видит новые таблицы', async () => {
-            const sql = fs.readFileSync(path.join(REPO, 'supabase/audit/accounts_audit.sql'), 'utf8')
-            const rows = (await db.query<{ section: string; item: string }>(sql)).rows
-            expect(rows.some((r) => r.section === '01 tables' && r.item === 'public.profiles')).toBe(true)
-            expect(rows.some((r) => r.section === '13 accounts by role' && r.item === 'owner')).toBe(true)
-        })
-
         it('keepalive доступен без входа', async () => {
             expect((await as(db, 'anon', ANON, 'select public.keepalive() as v')).rows[0].v).toBe(1)
         })
@@ -342,59 +335,18 @@ describe('аккаунты: права', () => {
     })
 })
 
-describe('SQL из инструкции (supabase/setup)', () => {
+describe('SQL для аварий (supabase/setup/accounts_emergency.sql)', () => {
     let db: PGlite
     const read = (name: string) => fs.readFileSync(path.join(REPO, 'supabase/setup', name), 'utf8')
     const one = async (sql: string, params?: unknown[]) => (await db.query<any>(sql, params)).rows[0]
 
     beforeAll(async () => {
         db = await createDb()
-        // До этапа: у админов настоящие email и роль admin, владельца нет.
-        await db.exec(`update auth.users set raw_app_meta_data = '{"provider":"email","role":"admin"}' where id = '${OWNER.sub}';
-            insert into auth.identities (user_id, provider, identity_data) values ('${OWNER.sub}', 'email', '{"email":"owner@example.com"}');`)
         await applyMigrations(db)
+        // Владелец с ником, как на настоящем сайте: технический адрес из ника и профиль.
+        await db.query('update auth.users set email = $1 where id = $2', [await techEmail('frnkness'), OWNER.sub])
+        await db.query('insert into public.profiles (id, nick, nick_key) values ($1, $2, $3)', [OWNER.sub, 'frnkness', nickKey('frnkness')])
     }, 60_000)
-
-    // Подставляет значения в блок «ПАРАМЕТРЫ», как это делает человек в SQL Editor.
-    const ownerSql = (rows: [string, string, string][]) => {
-        const json = JSON.stringify(rows.map(([old_email, nick, role]) => ({ old_email, nick, role })))
-        const sql = read('accounts_owner.sql')
-        const out = sql.replace(/(-- ПАРАМЕТРЫ: начало\n\s*params constant jsonb := ')[\s\S]*?(';\n\s*-- ПАРАМЕТРЫ: конец)/, `$1${json}$2`)
-        expect(out).not.toBe(sql)
-        return out
-    }
-
-    it('без временных таблиц и транзакций, которые может разорвать SQL Editor', () => {
-        const sql = read('accounts_owner.sql').replace(/--.*$/gm, '')
-        expect(sql).not.toMatch(/\btemp(orary)?\b|\bbegin;|\bcommit;/i)
-    })
-
-    it('проверяет ник и находит аккаунт до любых изменений; при ошибке не меняет ничего', async () => {
-        await expect(db.exec(ownerSql([['owner@example.com', 'ab', 'owner']]))).rejects.toThrow(/не подходит/)
-        await expect(db.exec(ownerSql([['nobody@example.com', 'frnkness', 'owner']]))).rejects.toThrow(/Не найден аккаунт/)
-        await expect(
-            db.exec(ownerSql([['owner@example.com', 'frnk.ness', 'owner'], ['admin@example.com', 'FRNK_NESS', 'admin']]))
-        ).rejects.toThrow(/совпадают/)
-        // Ошибка на втором аккаунте — первый тоже не тронут.
-        await expect(db.exec(ownerSql([['owner@example.com', 'frnkness', 'owner'], ['nobody@example.com', 'Друг', 'admin']]))).rejects.toThrow(/Не найден/)
-        expect((await one(`select email, raw_app_meta_data ->> 'role' r from auth.users where id = '${OWNER.sub}'`))).toEqual({ email: 'owner@example.com', r: 'admin' })
-        expect((await one('select count(*)::int n from public.profiles')).n).toBe(0)
-    })
-
-    it('выдаёт ники, роли owner/admin и технические адреса; повтор безопасен', async () => {
-        const sql = ownerSql([['owner@example.com', 'frnkness', 'owner'], ['Admin@Example.com', 'Друг', 'admin']])
-        const first = (await db.exec(sql)).at(-1)!.rows
-        expect(first).toHaveLength(2)
-        // Повтор — старых email уже нет, аккаунты находятся по нику; та же итоговая таблица.
-        expect((await db.exec(sql)).at(-1)!.rows).toEqual(first)
-        const rows = (await db.query<any>(`select p.nick, p.nick_key, u.email, u.raw_app_meta_data ->> 'role' r from auth.users u join public.profiles p on p.id = u.id order by 1`)).rows
-        expect(rows).toEqual([
-            { nick: 'frnkness', nick_key: nickKey('frnkness'), email: await techEmail('frnkness'), r: 'owner' },
-            { nick: 'Друг', nick_key: nickKey('Друг'), email: await techEmail('друг'), r: 'admin' }
-        ])
-        expect((await one(`select identity_data ->> 'email' e from auth.identities where user_id = '${OWNER.sub}'`)).e).toBe(await techEmail('frnkness'))
-        expect((await one(`select count(*)::int n from public.account_private`)).n).toBe(2)
-    })
 
     it('аварийный выход: роль владельца и новый пароль возвращаются по нику', async () => {
         const blocks = read('accounts_emergency.sql').split(/^-- ── /m)

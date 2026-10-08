@@ -30,6 +30,6 @@ export function pluralDays(n: number): string {
     return 'дней'
 }
 
-/** Раздел про обновление токена в инструкции (на GitHub). */
+/** Раздел про обновление токена в docs/operations.md (на GitHub). */
 export const TOKEN_DOCS_URL =
-    'https://github.com/mentanicarli/frnkness-collection/blob/main/docs/admin-setup.md#срок-действия-и-обновление'
+    'https://github.com/mentanicarli/frnkness-collection/blob/main/docs/operations.md#обновление-токена-github'

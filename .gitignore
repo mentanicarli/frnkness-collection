@@ -1,26 +1,36 @@
+# Зависимости и сборка
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 
-# Environment variables
-.env.local
-.env.*.local
+# Переменные окружения: настоящие значения только локально (образец — .env.example)
+.env
+.env.*
+!.env.example
 
-# local migration temp artifacts
-*_temp.txt
-
-# Local Claude Code settings
-.claude/
-
-# Playwright
+# Отчёты и временное от тестов и инструментов
 test-results/
 playwright-report/
+coverage/
+backups/
+*.log
+*_temp.txt
+
+# Локальные настройки Claude Code
+.claude/
 
 # Deno (npm run check:function)
 deno.lock
 
 # Локальное состояние Supabase CLI (link, адрес пулера)
 supabase/.temp/
+supabase/.branches/
 
-# План обновления — только локально
+# Системные и редакторские файлы
+.DS_Store
+Thumbs.db
+.idea/
+
+# План обновления «Аккаунты и сообщество» — только локально, не в git
 docs/frnkness-accounts-update.md

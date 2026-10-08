@@ -31,7 +31,7 @@ test('меньше 30 дней — жёлтое предупреждение с�
     const alert = page.getByTestId('token-alert')
     await expect(alert).toHaveClass(/adm-alert-warn/)
     await expect(alert).toContainText('истекает через 18 дней (20.10.2026)')
-    await expect(alert.getByRole('link')).toHaveAttribute('href', /docs\/admin-setup\.md#срок-действия-и-обновление$/)
+    await expect(alert.getByRole('link')).toHaveAttribute('href', /docs\/operations\.md#обновление-токена-github$/)
 })
 
 test('истёк — красное предупреждение', async ({ page }) => {

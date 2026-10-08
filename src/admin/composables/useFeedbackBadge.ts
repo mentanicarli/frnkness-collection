@@ -26,8 +26,4 @@ export function stopFeedbackBadge(): void {
     timer = null
 }
 
-export function setFeedbackBadge(n: number): void {
-    count.value = Math.max(0, n)
-}
-
 export const feedbackNewCount = count
