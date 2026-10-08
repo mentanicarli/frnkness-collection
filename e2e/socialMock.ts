@@ -37,6 +37,8 @@ export const SOCIAL_RPCS = [
     'feed_prefs_get',
     'feed_prefs_set',
     'friends_feed',
+    // Статистика: засчёт прослушивания выполняет настоящая функция (user_id, play_events)
+    'increment_play_count',
     // Комнаты
     'server_now',
     'room_create',

@@ -1,6 +1,6 @@
 <template>
-  <div class="cropper-backdrop" @click.self="close">
-    <div class="cropper-box top4-editor" role="dialog" aria-modal="true" aria-labelledby="top4-editor-title" data-testid="top4-editor" @keydown.esc="close">
+  <ModalFrame open label="Изменить топ-4" testid="top4-editor" box-class="top4-editor" @close="close">
+    <div>
       <p id="top4-editor-title" class="acc-title" style="font-size: 1.125rem;">Изменить топ-4</p>
       <p class="acc-sub" style="margin-bottom: 0.875rem;">До четырёх самых значимых для тебя треков. Порядок задаётся перетаскиванием или кнопками ↑ ↓.</p>
 
@@ -68,13 +68,14 @@
         <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy || !changed" data-testid="top4-save" @click="save">Сохранить</button>
       </div>
     </div>
-  </div>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
 // Редактор «Мой топ-4»: поиск трека по каталогу, перетаскивание, удаление.
 // Сохраняет весь список одним вызовом (top4_set): порядок массива — порядок мест.
 import { computed, onMounted, ref } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { releases } from '@/config'
 import { api, errorText, type Top4Row } from '../social/api'
 import { TOP4_SIZE, addToDraft, draftFromRows, moveInDraft, removeFromDraft, sameDraft, searchTracks } from '../social/top4'

@@ -279,6 +279,7 @@ test('плейлист: чужой плейлист — кнопки «Доба�
     await owner.getByLabel('Название нового плейлиста').fill('Публичный')
     await owner.getByRole('button', { name: 'Создать', exact: true }).click()
     await expect(owner.getByTestId('playlist-add-tracks')).toBeVisible()
+    await owner.getByTestId('playlist-settings').click()
     await owner.getByTestId('playlist-public').check()
     await owner.getByRole('button', { name: 'Сохранить', exact: true }).click()
     await expect(owner.getByTestId('notice')).toHaveText('Сохранено')

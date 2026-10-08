@@ -4,24 +4,35 @@ import type { RoomApi, RoomInfo, RoomMember, RoomView } from './api'
 import type { ChannelEvents, ChannelFactory, PresenceEntry, RoomChannel } from './channel'
 import type { ServerClock } from './clock'
 import { rlog } from './log'
-import type { PlayerPort } from './port'
+import type { ChangeKind, PlayerPort } from './port'
 import { REACTION_EVENT, type ReactionEmoji, type ReactionItem, createReactionHub, isReactionEmoji, parseReaction, reactionTopic } from './reactions'
 import {
     CLOCK_RESYNC_MS,
     CONNECT_ATTEMPTS,
     CONNECT_BACKOFF_MS,
+    GUEST_CHECK_MS,
     LINK_DOWN_REOPEN_MS,
     HEARTBEAT_MS,
+    HOST_BEACON_MS,
     HOST_RESYNC_MS,
     HOST_STALE_MS,
+    SEEK_DETECT_MS,
+    type CommandStamp,
     type HostState,
     type HostWatch,
     type PlaybackTarget,
     type RoomPlayerState,
+    type StartPlan,
+    decideDrift,
     decideSeek,
     expectedPositionMs,
     hostOnline,
+    isNewerCommand,
+    msUntilStart,
+    parseBeacon,
     parseRoomState,
+    planStart,
+    resumeSeq,
     roomTopic,
     snapshotState,
     stepHostWatch,
@@ -82,7 +93,28 @@ export interface RoomUiState {
     reactions: readonly ReactionItem[]
     /** Канал реакций открыт: кнопки можно нажимать. */
     reactionsReady: boolean
+    /** Цифры синхронизации для отладочной панели (RoomDebug.vue). */
+    debug: SyncDebug
 }
+
+export interface SyncDebug {
+    /** Сдвиг часов устройства относительно сервера (serverNow = Date.now() + offsetMs). */
+    offsetMs: number
+    /** Задержка запрос-ответ до сервера (лучшая проба). */
+    rttMs: number
+    /** Гость: на сколько мс его позиция впереди (+) или позади (−) хозяина. null — не играет. */
+    driftMs: number | null
+    /** Текущая скорость звука (1 — обычная; подстройка — 0,96…1,04). */
+    rate: number
+    /** Гость: сколько шло последнее сообщение от хозяина (по часам сервера, приблизительно). */
+    netMs: number | null
+    /** Гость: на сколько мс запоздал последний назначенный старт (0 — вовремя). */
+    startLateMs: number | null
+    /** Номер последней команды хозяина. */
+    seq: number
+}
+
+const initialDebug = (): SyncDebug => ({ offsetMs: 0, rttMs: 0, driftMs: null, rate: 1, netMs: null, startLateMs: null, seq: 0 })
 
 const initialState = (): RoomUiState => ({
     status: 'idle',
@@ -104,16 +136,24 @@ const initialState = (): RoomUiState => ({
     nextTrackIds: [],
     nextRandom: false,
     reactions: [],
-    reactionsReady: false
+    reactionsReady: false,
+    debug: initialDebug()
 })
 
 export const createRoomState = (): RoomUiState => shallowReactive(initialState())
 
-const PUBLISH_DEBOUNCE_MS = 150
 const REFRESH_DEBOUNCE_MS = 1500
 const PLAY_RETRY_MS = 3000
-const TICK_MS = 1000
 const NEXT_SHOWN = 5
+
+/** Что хозяин сообщил гостям последним: положение трека в серверный момент at. */
+interface Announced {
+    trackId: string | null
+    playing: boolean
+    posMs: number
+    at: number
+    queueRef: unknown
+}
 
 interface Session {
     view: RoomView
@@ -121,8 +161,8 @@ interface Session {
     epoch: number
     channel: RoomChannel | null
     presence: Map<string, PresenceEntry>
-    /** Последний применённый номер состояния: старые и повторные команды отбрасываются. */
-    lastSeq: number
+    /** Последняя применённая команда хозяина: старые и повторные сообщения отбрасываются. */
+    applied: CommandStamp
     target: PlaybackTarget | null
     /** Состояние устарело (хозяин пропал): не играем, пока не придёт новое. */
     stale: boolean
@@ -134,9 +174,20 @@ interface Session {
     watch: HostWatch
     lastSeekAt: number | null
     lastPlayAttemptAt: number
-    publishTimer: ReturnType<typeof setTimeout> | null
-    publishing: boolean
-    dirty: boolean
+    /** Хозяин: номер последней команды (растёт сам, после перезагрузки — с сохранённого в базе). */
+    cmdSeq: number
+    /** Хозяин: сколько маячков отправлено в рамках последней команды. */
+    beat: number
+    /** Хозяин: что сказано гостям (для распознавания паузы, перемотки и смены трека). */
+    announced: Announced | null
+    /** Хозяин: назначенный старт, до которого звук держим на паузе. */
+    plan: (StartPlan & { trackId: string }) | null
+    planTimer: ReturnType<typeof setTimeout> | null
+    /** Гость: таймер назначенного старта. */
+    startTimer: ReturnType<typeof setTimeout> | null
+    /** Хозяин: запись в базу идёт параллельно рассылке; здесь последнее, что ещё не записано. */
+    persistPending: RoomPlayerState | null
+    persisting: boolean
     refreshTimer: ReturnType<typeof setTimeout> | null
     refreshing: boolean
     /** Пока шёл запрос, попросили обновить ещё раз: данные могли устареть. */
@@ -201,21 +252,29 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         s.closing = true
         s.timers.forEach((t) => clearInterval(t))
         s.offs.forEach((off) => off())
-        if (s.publishTimer) clearTimeout(s.publishTimer)
+        if (s.planTimer) clearTimeout(s.planTimer)
+        if (s.startTimer) clearTimeout(s.startTimer)
+        s.plan = null
         if (s.refreshTimer) clearTimeout(s.refreshTimer)
         if (s.downTimer) clearTimeout(s.downTimer)
+        port.setHostHook(null)
         port.setRole(null)
-        if (s.role === 'guest') port.release()
+        if (s.role === 'guest') port.reset()
         await stopReactions(s)
         hub.clear()
         await s.channel?.stop().catch(() => undefined)
         if (announce) deps.notify(announce)
     }
 
-    /** Выйти из комнаты на этой вкладке (в базе всё уже сделано или не нужно). */
+    /**
+     * Выйти из комнаты на этой вкладке (в базе всё уже сделано или не нужно):
+     * кнопка «Выйти», кик, закрытие хозяином или админом, закрытие по простою.
+     * Плеер сбрасывается полностью — и у гостя, и у хозяина.
+     */
     async function leaveLocal(announce?: string): Promise<void> {
         startToken++
         await stopSession(announce)
+        port.reset()
         resetState()
     }
 
@@ -226,7 +285,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             epoch: view.epoch,
             channel: null,
             presence: new Map(),
-            lastSeq: 0,
+            applied: { seq: 0, beat: -1 },
             target: null,
             stale: false,
             hostBye: false,
@@ -235,9 +294,14 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             watch: { absentSince: Date.now() },
             lastSeekAt: null,
             lastPlayAttemptAt: 0,
-            publishTimer: null,
-            publishing: false,
-            dirty: false,
+            cmdSeq: 0,
+            beat: 0,
+            announced: null,
+            plan: null,
+            planTimer: null,
+            startTimer: null,
+            persistPending: null,
+            persisting: false,
             refreshTimer: null,
             refreshing: false,
             refreshAgain: false,
@@ -336,6 +400,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         state.outdated = false
         state.online = []
         state.hostState = 'online'
+        state.debug = initialDebug()
         showPlayback(null)
         port.setRole(s.role)
         rlog('вход в комнату', view.id, s.role, `эпоха ${view.epoch}`)
@@ -435,13 +500,15 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
 
     function startTimers(s: Session): void {
         s.timers.push(setInterval(() => void heartbeat(s), HEARTBEAT_MS))
-        s.timers.push(setInterval(() => void clock.sync(), CLOCK_RESYNC_MS))
+        s.timers.push(setInterval(() => void clock.sync().then(() => showClock()), CLOCK_RESYNC_MS))
         if (s.role === 'host') {
-            s.timers.push(setInterval(() => schedulePublish(s, true), HOST_RESYNC_MS))
+            // Маячок «я здесь» — гостям, чтобы сверять звук; запись в базу — реже.
+            s.timers.push(setInterval(() => beacon(s), HOST_BEACON_MS))
+            s.timers.push(setInterval(() => persistSnapshot(s), HOST_RESYNC_MS))
             // Вкладку закрывают: гости не ждут, пока Presence заметит, а сразу начинают отсчёт.
             s.offs.push(deps.onHide(() => void s.channel?.send('bye', { epoch: s.epoch })))
         } else {
-            s.timers.push(setInterval(() => tick(s), TICK_MS))
+            s.timers.push(setInterval(() => tick(s), GUEST_CHECK_MS))
         }
         s.offs.push(deps.onVisible(() => void onVisible(s)))
     }
@@ -481,7 +548,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             if (s.role === 'guest') {
                 s.hostSeenMs = Math.max(s.hostSeenMs, view.owner_seen_ms)
                 const ps = parseRoomState(view.state)
-                if (ps && view.at_ms !== null) applyState(s, ps, view.seq, view.at_ms, false)
+                if (ps && view.at_ms !== null) applyState(s, ps, { seq: ps.cseq ?? view.seq, beat: 0 }, ps.at_ms ?? view.at_ms, false)
             }
         } catch (e) {
             if (current(s) && e instanceof SocialError && e.code === 'P0002') await leaveLocal('Комната закрыта')
@@ -507,7 +574,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         await clock.sync()
         await refresh(s)
         if (!current(s)) return
-        if (s.role === 'host') schedulePublish(s, true)
+        if (s.role === 'host') beacon(s)
         else reconcile(s, true)
     }
 
@@ -521,7 +588,8 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         }
         await s.channel?.track({ role: s.role }).catch(() => undefined)
         await refresh(s)
-        if (current(s) && s.role === 'host') schedulePublish(s, true)
+        // Канал вернулся: хозяин напоминает гостям полное состояние (они могли пропустить команду).
+        if (current(s) && s.role === 'host') announceNow(s)
     }
 
     /** Новая эпоха (кого-то выгнали): переезд на новый топик. */
@@ -561,13 +629,17 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         if (!current(s) || s.role !== 'guest' || !payload || typeof payload !== 'object') return
         const p = payload as Record<string, unknown>
         if (event === 'state') {
-            const seq = p.seq
-            const at = p.at
             const ps = parseRoomState(p.state)
+            const at = ps?.at_ms ?? p.at
+            const seq = ps?.cseq ?? p.seq
             if (typeof seq !== 'number' || typeof at !== 'number' || !ps) return
+            noteDelivery(s, p.sent)
             s.hostSeenMs = clock.now()
             s.hostBye = false
-            applyState(s, ps, seq, at, true)
+            applyState(s, ps, { seq, beat: 0 }, at, true)
+        } else if (event === 'hb') {
+            const b = parseBeacon(p)
+            if (b) applyBeacon(s, b)
         } else if (event === 'kick') {
             const epoch = Number(p.epoch)
             if (p.user_id === deps.me()?.id) void leaveLocal('Тебя выгнали из комнаты')
@@ -581,13 +653,23 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         }
     }
 
+    function showClock(): void {
+        state.debug = { ...state.debug, offsetMs: clock.offsetMs(), rttMs: clock.rttMs() }
+    }
+
+    /** Сколько шло сообщение хозяина (часы сервера у обоих, так что это честная оценка). */
+    function noteDelivery(s: Session, sent: unknown): void {
+        if (typeof sent !== 'number' || !Number.isFinite(sent)) return
+        state.debug = { ...state.debug, netMs: Math.round(clock.now() - sent), offsetMs: clock.offsetMs(), rttMs: clock.rttMs(), seq: s.applied.seq }
+    }
+
     // ── Гость ──────────────────────────────────────────────────────────
 
     function guestEnter(s: Session): void {
         // Хозяин молчит дольше минуты — не играем устаревшее состояние.
         s.stale = clock.now() - s.view.owner_seen_ms >= HOST_STALE_MS
         const ps = parseRoomState(s.view.state)
-        if (ps && s.view.at_ms !== null) applyState(s, ps, s.view.seq, s.view.at_ms, false)
+        if (ps && s.view.at_ms !== null) applyState(s, ps, { seq: ps.cseq ?? s.view.seq, beat: 0 }, ps.at_ms ?? s.view.at_ms, false)
         evaluateHost(s)
     }
 
@@ -601,29 +683,42 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         if (step.state === 'away') {
             // Хозяина давно нет: пауза всем, прежнее состояние не продолжаем.
             s.stale = true
+            cancelGuestStart(s)
             if (port.info().playing) port.pause()
             state.playing = false
         }
     }
 
-    /** Состояние от хозяина (broadcast или room_get). Старые номера отбрасываются. */
-    function applyState(s: Session, ps: RoomPlayerState, seq: number, atMs: number, fresh: boolean): void {
-        if (seq <= s.lastSeq) return
-        s.lastSeq = seq
+    function cancelGuestStart(s: Session): void {
+        if (s.startTimer) clearTimeout(s.startTimer)
+        s.startTimer = null
+    }
+
+    /**
+     * Команда хозяина (broadcast или room_get): трек, очередь, позиция и — если она
+     * в будущем — назначенный старт. Старые номера отбрасываются.
+     */
+    function applyState(s: Session, ps: RoomPlayerState, stamp: CommandStamp, atMs: number, fresh: boolean): void {
+        if (!isNewerCommand(stamp, s.applied)) return
+        s.applied = stamp
         s.target = { posMs: ps.pos_ms, atMs, playing: ps.playing }
+        state.debug = { ...state.debug, seq: stamp.seq }
         // Новое состояние пришло от хозяина лично — он вернулся.
         if (fresh) s.stale = false
         showPlayback(ps)
         if (!ps.queue || !ps.track_id) {
+            cancelGuestStart(s)
             port.pause()
             return
         }
         const queue = toPlayerQueue(ps.queue, 'remote')
+        const next = upcomingTrackIds(ps.queue, 1)[0]
+        if (next) port.preload(next)
         if (port.info().trackId !== ps.track_id) {
-            // Позицию считаем, когда трек загрузится, а не сейчас.
-            const result = port.apply(queue, ps.playing && !s.stale && state.hostState !== 'away', () =>
-                expectedPositionMs(s.target ?? { posMs: ps.pos_ms, atMs, playing: ps.playing }, clock.now(), port.info().durationMs)
-            )
+            cancelGuestStart(s)
+            // Позицию считаем, когда трек загрузится, а не сейчас; играть или ждать
+            // назначенного старта решает reconcile — он же вызывается, когда трек готов.
+            const result = port.apply(queue, false, () => expectedPositionMs(s.target ?? { posMs: ps.pos_ms, atMs, playing: ps.playing }, clock.now(), port.info().durationMs), () => reconcile(s, true))
             if (result === 'missing-track') {
                 if (!state.outdated) deps.notify('Обнови страницу: у хозяина трек, которого нет в твоей версии сайта')
                 state.outdated = true
@@ -637,19 +732,82 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         reconcile(s, true)
     }
 
+    /** Маячок хозяина: где он сейчас. Нужен, чтобы звук не расходился между командами. */
+    function applyBeacon(s: Session, b: ReturnType<typeof parseBeacon> & object): void {
+        if (!isNewerCommand(b, s.applied)) return
+        // Маячок про трек, о котором мы не знаем (команду потеряли): берём состояние из базы.
+        if (!s.target || b.track_id !== state.nowTrackId) {
+            scheduleRefresh(s)
+            return
+        }
+        s.applied = { seq: b.seq, beat: b.beat }
+        noteDelivery(s, b.sent)
+        s.hostSeenMs = clock.now()
+        s.hostBye = false
+        s.stale = false
+        s.target = { posMs: b.pos_ms, atMs: b.at, playing: b.playing }
+        reconcile(s, false)
+    }
+
     function tick(s: Session): void {
         evaluateHost(s)
         reconcile(s, false)
     }
 
-    /** Подогнать звук под состояние хозяина: играть/пауза и подкрутка позиции. */
+    /** Звук гостя начинается: позиция — на момент, когда звук реально пойдёт (с поправкой на запуск). */
+    function startPlayback(s: Session): void {
+        const target = s.target
+        if (!target) return
+        const info = port.info()
+        const latency = port.startLatencyMs()
+        const expected = expectedPositionMs(target, clock.now() + latency, info.durationMs)
+        if (Math.abs(info.positionMs - expected) > 40) {
+            port.seekMs(expected)
+            s.lastSeekAt = Date.now()
+        }
+        state.playing = true
+        s.lastPlayAttemptAt = Date.now()
+        void port.play().then((ok) => {
+            if (current(s)) state.needsGesture = !ok
+        })
+    }
+
+    /** Назначенный старт: ждём момент T (с запасом на запуск звука) и пускаем звук. */
+    function armGuestStart(s: Session): void {
+        if (!s.target) return
+        cancelGuestStart(s)
+        const wait = msUntilStart(s.target.atMs, clock.now(), port.startLatencyMs())
+        if (wait <= 0) {
+            fireGuestStart(s)
+            return
+        }
+        // Сначала грубое ожидание, в конце — точное: таймеры браузера неточны на длинных отрезках.
+        s.startTimer = setTimeout(() => {
+            s.startTimer = null
+            armGuestStart(s)
+        }, wait > 60 ? wait - 30 : wait)
+    }
+
+    function fireGuestStart(s: Session): void {
+        if (!current(s) || s.role !== 'guest' || !s.target?.playing || s.stale || state.hostState === 'away') return
+        const info = port.info()
+        if (info.trackId !== state.nowTrackId || !info.ready) return // трек ещё грузится: его готовность вызовет reconcile
+        const late = clock.now() + port.startLatencyMs() - s.target.atMs
+        state.debug = { ...state.debug, startLateMs: Math.max(0, Math.round(late)) }
+        startPlayback(s)
+    }
+
+    /** Подогнать звук под состояние хозяина: играть/пауза, ждать назначенного старта, выравнивать скорость. */
     function reconcile(s: Session, force: boolean): void {
         if (!current(s) || s.role !== 'guest' || !s.target) return
         const info = port.info()
         const target = s.target
         if (state.hostState === 'away' || s.stale || !target.playing) {
+            cancelGuestStart(s)
             if (info.playing) port.pause()
+            if (info.rate !== 1) port.setRate(1)
             state.playing = false
+            state.debug = { ...state.debug, driftMs: null, rate: 1 }
             // На паузе хозяина тоже стоим в той же точке.
             if (!target.playing && info.trackId === state.nowTrackId && !s.stale && state.hostState !== 'away') {
                 const verdict = decideSeek(info.positionMs, target.posMs, { now: Date.now(), lastSeekAt: s.lastSeekAt, force: true })
@@ -661,24 +819,42 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             return
         }
         if (info.trackId !== state.nowTrackId || !info.ready) return // трек ещё загружается
-        const expected = expectedPositionMs(target, clock.now(), info.durationMs)
+        const now = clock.now()
+        state.playing = true
+
+        // Старт назначен на будущее: до него стоим в начальной точке, в момент T пускаем звук.
+        if (now < target.atMs - port.startLatencyMs()) {
+            if (info.playing) port.pause()
+            if (info.rate !== 1) port.setRate(1)
+            if (Math.abs(info.positionMs - target.posMs) > 50) {
+                port.seekMs(target.posMs)
+                s.lastSeekAt = Date.now()
+            }
+            state.debug = { ...state.debug, driftMs: null, rate: 1 }
+            armGuestStart(s)
+            return
+        }
+
+        const expected = expectedPositionMs(target, now, info.durationMs)
         // Трек у хозяина уже доиграл, следующего ещё нет: стоим, а не начинаем заново.
         if (info.durationMs !== null && expected >= info.durationMs - 300) {
             if (info.playing) port.pause()
             return
         }
-        const verdict = decideSeek(info.positionMs, expected, { now: Date.now(), lastSeekAt: s.lastSeekAt, force })
-        if (verdict.seek) {
+        if (!info.playing) {
+            // Время пришло, а звука нет: запускаем (повторно — не чаще раза в PLAY_RETRY_MS).
+            if (Date.now() - s.lastPlayAttemptAt >= PLAY_RETRY_MS) startPlayback(s)
+            return
+        }
+        // Играем: выравниваем скоростью, а при большом расхождении перематываем.
+        const diff = info.positionMs - expected
+        const verdict = decideDrift(diff, expected, { now: Date.now(), lastSeekAt: s.lastSeekAt, currentRate: info.rate, force })
+        if (verdict.action === 'seek') {
             port.seekMs(verdict.toMs)
             s.lastSeekAt = Date.now()
         }
-        state.playing = true
-        if (!info.playing && Date.now() - s.lastPlayAttemptAt >= PLAY_RETRY_MS) {
-            s.lastPlayAttemptAt = Date.now()
-            void port.play().then((ok) => {
-                if (current(s)) state.needsGesture = !ok
-            })
-        }
+        if (verdict.rate !== info.rate) port.setRate(verdict.rate)
+        state.debug = { ...state.debug, driftMs: Math.round(diff), rate: verdict.rate, offsetMs: clock.offsetMs(), rttMs: clock.rttMs() }
     }
 
     // ── Хозяин ─────────────────────────────────────────────────────────
@@ -688,60 +864,161 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         const saved = parseRoomState(view.state)
         const info = port.info()
         const restoring = !info.trackId && Boolean(saved?.queue) && view.at_ms !== null
+        // Номера команд продолжаются с сохранённого в базе, а не с нуля: иначе гости, уже видевшие
+        // более поздние номера, отбросили бы всё, что хозяин пошлёт после перезагрузки.
+        s.cmdSeq = resumeSeq(view.seq, saved)
         if (restoring && saved?.queue && view.at_ms !== null) {
             // Перезагрузка хозяина: возвращаем то, что играло, но на паузе — с того
             // места, где он последний раз был на связи.
             const seenAt = Math.min(view.owner_seen_ms, view.server_ms)
-            const pos = expectedPositionMs({ posMs: saved.pos_ms, atMs: view.at_ms, playing: saved.playing }, Math.max(seenAt, view.at_ms))
+            const at = saved.at_ms ?? view.at_ms
+            const pos = expectedPositionMs({ posMs: saved.pos_ms, atMs: at, playing: saved.playing }, Math.max(seenAt, at))
             port.apply(toPlayerQueue(saved.queue, 'local'), false, () => pos)
         }
-        s.lastSeq = view.seq
-        s.offs.push(port.onChange(() => schedulePublish(s, false)))
-        // Восстановленный трек ещё грузится и стоит в начале: первое сохранение —
-        // когда плеер дойдёт до нужной позиции (по его событию), иначе гости
-        // на миг прыгнули бы к началу. Страховка — рассылка каждые 15 секунд.
-        if (!restoring) await publish(s)
+        port.setHostHook({
+            start: (opts) => scheduleStart(s, opts.gapless),
+            pending: () => Boolean(s.plan),
+            cancel: () => cancelPlan(s)
+        })
+        s.offs.push(port.onChange((kind) => onHostChange(s, kind)))
+        // Восстановленный трек ещё грузится и стоит в начале: первое сообщение — когда плеер
+        // дойдёт до нужной позиции (по его событию), иначе гости на миг прыгнули бы к началу.
+        if (!restoring) announceNow(s)
     }
 
-    function schedulePublish(s: Session, immediate: boolean): void {
-        if (!current(s) || s.role !== 'host') return
-        if (immediate) {
-            void publish(s)
-            return
-        }
-        if (s.publishTimer) return
-        s.publishTimer = setTimeout(() => {
-            s.publishTimer = null
-            void publish(s)
-        }, PUBLISH_DEBOUNCE_MS)
+    /** Разослать состояние гостям сразу, не дожидаясь базы; запись в базу идёт параллельно. */
+    function command(s: Session, ps: RoomPlayerState): void {
+        const at = ps.at_ms ?? clock.now()
+        s.announced = { trackId: ps.track_id, playing: ps.playing, posMs: ps.pos_ms, at, queueRef: port.queue() }
+        s.beat = 0
+        showPlayback(ps)
+        state.debug = { ...state.debug, seq: s.cmdSeq, offsetMs: clock.offsetMs(), rttMs: clock.rttMs() }
+        void s.channel?.send('state', { seq: ps.cseq, beat: 0, at, sent: clock.now(), epoch: s.epoch, state: ps })
+        persist(s, ps)
     }
 
-    /** Сохранить состояние в базе (seq и время выдаёт сервер) и разослать. Запросы идут по очереди. */
-    async function publish(s: Session): Promise<void> {
+    /** Сообщить гостям, что происходит у хозяина прямо сейчас (пауза, смена очереди, возврат связи). */
+    function announceNow(s: Session): void {
         if (!current(s) || s.role !== 'host') return
-        if (s.publishing) {
-            s.dirty = true
+        const info = port.info()
+        command(s, snapshotState(port.queue(), info.positionMs, info.playing, { atMs: clock.now(), cseq: ++s.cmdSeq }))
+    }
+
+    /**
+     * Хозяин запускает звук (трек, «играть», перемотка во время игры): всем, включая его
+     * самого, назначается общий момент старта — «сейчас + запас». До него звук держим на
+     * паузе, трек за это время успевает загрузиться.
+     */
+    function scheduleStart(s: Session, gapless: boolean): void {
+        if (!current(s) || s.role !== 'host') return
+        const info = port.info()
+        if (!info.trackId) return
+        cancelPlanTimer(s)
+        port.hold()
+        const plan = planStart(clock.now(), info.positionMs, { gapless, rttMs: clock.rttMs() })
+        s.plan = { ...plan, trackId: info.trackId }
+        command(s, snapshotState(port.queue(), plan.posMs, true, { atMs: plan.startAt, cseq: ++s.cmdSeq }))
+        armHostStart(s)
+    }
+
+    function cancelPlanTimer(s: Session): void {
+        if (s.planTimer) clearTimeout(s.planTimer)
+        s.planTimer = null
+    }
+
+    function armHostStart(s: Session): void {
+        cancelPlanTimer(s)
+        const plan = s.plan
+        if (!plan) return
+        const wait = msUntilStart(plan.startAt, clock.now(), port.startLatencyMs())
+        if (wait <= 0) {
+            fireHostStart(s)
             return
         }
-        s.publishing = true
-        try {
-            do {
-                s.dirty = false
-                const info = port.info()
-                // Пока запрос летит до сервера, трек уходит вперёд — прибавляем полпути.
-                const ps = snapshotState(port.queue(), info.positionMs + (info.playing ? clock.rttMs() / 2 : 0), info.playing)
-                const saved = await api.setState(s.view.id, ps)
-                if (!current(s)) return
-                s.lastSeq = saved.seq
-                showPlayback(ps)
-                await s.channel?.send('state', { seq: saved.seq, at: saved.at_ms, epoch: saved.epoch, state: ps })
-            } while (s.dirty && current(s))
-        } catch (e) {
-            if (current(s) && e instanceof SocialError && e.code === 'P0002') void leaveLocal('Комната закрыта')
-            // Прочие ошибки: следующее изменение или рассылка через 15 секунд попробует снова.
-        } finally {
-            s.publishing = false
+        s.planTimer = setTimeout(() => {
+            s.planTimer = null
+            armHostStart(s)
+        }, wait > 60 ? wait - 30 : wait)
+    }
+
+    function fireHostStart(s: Session): void {
+        const plan = s.plan
+        if (!plan || !current(s)) return
+        s.plan = null
+        const info = port.info()
+        if (info.trackId !== plan.trackId) return // трек успели сменить: новая команда уже идёт
+        const target = plan.posMs + Math.max(0, clock.now() + port.startLatencyMs() - plan.startAt)
+        if (Math.abs(info.positionMs - target) > 30) port.seekMs(target)
+        void port.play()
+    }
+
+    /** Хозяин нажал паузу, пока старт ещё не наступил: стоим у всех сразу. */
+    function cancelPlan(s: Session): void {
+        if (!s.plan) return
+        cancelPlanTimer(s)
+        s.plan = null
+        port.hold()
+        announceNow(s)
+    }
+
+    /**
+     * Что-то изменилось в плеере хозяина. Сверяем с тем, что сказано гостям: пауза,
+     * смена очереди — сообщаем сразу; перемотка или звук «мимо расписания» — снова назначаем старт.
+     */
+    function onHostChange(s: Session, kind: ChangeKind): void {
+        if (!current(s) || s.role !== 'host' || s.plan) return
+        const info = port.info()
+        const a = s.announced
+        if (!a) return announceNow(s)
+        if (info.trackId !== a.trackId || info.playing !== a.playing) {
+            if (info.playing) return scheduleStart(s, false)
+            return announceNow(s)
         }
+        if (kind === 'seeked') {
+            const expected = expectedPositionMs({ posMs: a.posMs, atMs: a.at, playing: a.playing }, clock.now(), info.durationMs)
+            if (Math.abs(info.positionMs - expected) > SEEK_DETECT_MS) return info.playing ? scheduleStart(s, false) : announceNow(s)
+        }
+        if (port.queue() !== a.queueRef) announceNow(s)
+    }
+
+    /** Маячок: где хозяин сейчас — по нему гости выравнивают звук между командами. */
+    function beacon(s: Session): void {
+        if (!current(s) || s.role !== 'host' || s.plan) return
+        const info = port.info()
+        const a = s.announced
+        if (!a || !info.trackId || info.trackId !== a.trackId) return
+        const now = clock.now()
+        s.announced = { ...a, playing: info.playing, posMs: info.positionMs, at: now }
+        state.debug = { ...state.debug, offsetMs: clock.offsetMs(), rttMs: clock.rttMs() }
+        void s.channel?.send('hb', { seq: s.cmdSeq, beat: ++s.beat, sent: now, at: now, epoch: s.epoch, track_id: info.trackId, pos_ms: Math.round(info.positionMs), playing: info.playing })
+    }
+
+    /** Раз в несколько секунд: записать текущее состояние в базу (для вошедших позже и признаков жизни). */
+    function persistSnapshot(s: Session): void {
+        if (!current(s) || s.role !== 'host' || s.plan) return
+        const info = port.info()
+        persist(s, snapshotState(port.queue(), info.positionMs, info.playing, { atMs: clock.now(), cseq: s.cmdSeq }))
+    }
+
+    /** Запись в базу идёт параллельно рассылке и по очереди: пока летит запрос, копится только последнее состояние. */
+    function persist(s: Session, ps: RoomPlayerState): void {
+        s.persistPending = ps
+        if (s.persisting) return
+        void (async () => {
+            s.persisting = true
+            try {
+                while (s.persistPending && current(s)) {
+                    const next = s.persistPending
+                    s.persistPending = null
+                    await api.setState(s.view.id, next)
+                }
+            } catch (e) {
+                if (current(s) && e instanceof SocialError && e.code === 'P0002') void leaveLocal('Комната закрыта')
+                // Прочие ошибки: следующая команда или запись через HOST_RESYNC_MS попробует снова.
+            } finally {
+                s.persisting = false
+            }
+        })()
     }
 
     // ── Действия человека ──────────────────────────────────────────────
@@ -834,7 +1111,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         await s.channel?.send('kick', { user_id: userId, epoch })
         await rekey(s, epoch)
         await refresh(s)
-        schedulePublish(s, true)
+        announceNow(s)
     }
 
     async function invite(userId: string): Promise<void> {
@@ -850,7 +1127,9 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
     /** Выход из аккаунта: просто всё забыть. */
     async function reset(): Promise<void> {
         startToken++
+        const wasIn = Boolean(session)
         await stopSession()
+        if (wasIn) port.reset()
         resetState()
     }
 

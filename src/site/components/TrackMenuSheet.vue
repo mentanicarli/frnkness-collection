@@ -1,8 +1,6 @@
 <template>
-  <Transition name="sheet">
-    <div v-if="trackMenu.trackId" class="sheet-backdrop" data-testid="track-sheet-backdrop" @click.self="closeTrackMenu">
-      <div ref="panel" class="sheet" role="dialog" aria-modal="true" :aria-label="`Действия: ${info.title}`" data-testid="track-sheet">
-        <div class="sheet-grip" aria-hidden="true"></div>
+  <ModalFrame :open="Boolean(trackMenu.trackId)" sheet :label="`Действия: ${info.title}`" testid="track-sheet" @close="closeTrackMenu">
+    <div ref="panel">
         <div class="sheet-head">
           <span class="tl-cover"><img v-if="info.cover" :src="info.cover" :srcset="coverSrcset(info.cover)" sizes="48px" alt="" decoding="async"></span>
           <span class="tl-text">
@@ -41,14 +39,14 @@
           >{{ a.label }}</button>
         </div>
         <button class="sheet-close" type="button" data-testid="sheet-close" @click="closeTrackMenu">Закрыть</button>
-      </div>
     </div>
-  </Transition>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
 // Нижняя панель действий трека («⋯» в любом списке треков).
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { coverSrcset } from '@/utils/cover'
 import { releases } from '@/config'
 import { trackShareUrl } from '@/utils/share'
@@ -107,20 +105,10 @@ function runExtra(a: MenuAction) {
   a.run()
 }
 
-function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeTrackMenu()
-}
-
 watch(
   () => trackMenu.trackId,
   (id) => {
-    if (id) {
-      document.addEventListener('keydown', onKey)
-      void nextTick(() => panel.value?.querySelector<HTMLElement>('button')?.focus())
-    } else {
-      document.removeEventListener('keydown', onKey)
-    }
+    if (id) void nextTick(() => panel.value?.querySelector<HTMLElement>('button')?.focus())
   }
 )
-onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>

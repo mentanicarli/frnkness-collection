@@ -622,4 +622,44 @@ describe('комнаты: права и лимиты', () => {
             ])
         })
     })
+
+    describe('прослушивания в комнате и поля синхронизации', () => {
+        it('состояние хозяина с полями расписания (at_ms, cseq) принимается и отдаётся гостю как есть', async () => {
+            const id = await mkRoom(USER)
+            await rpc(USER2, 'public.room_join($1)', [id])
+            const scheduled = { ...STATE, at_ms: 1_800_000_001_200, cseq: 41 }
+            await rpc(USER, 'public.room_set_state($1, $2)', [id, scheduled])
+            const seen = await rpc(USER2, 'public.room_get($1)', [id])
+            expect(seen.state).toEqual(scheduled)
+            await closeAllRooms()
+        })
+
+        it('комната на 3 человека: трек получает +3, у каждого своя запись с его user_id, «мой топ» у каждого', async () => {
+            const id = await mkRoom(USER)
+            const crowd1 = crowd(1)
+            const crowd2 = crowd(2)
+            await db.exec(`insert into auth.users (id, email, raw_app_meta_data) values ('${crowd1.sub}', '${TECH(1)}', '{"role":"user"}'), ('${crowd2.sub}', '${TECH(2)}', '{"role":"user"}') on conflict do nothing`)
+            await db.exec(`insert into public.profiles (id, nick, nick_key) values ('${crowd1.sub}', 'Гость1', 'гость1'), ('${crowd2.sub}', 'Гость2', 'гость2') on conflict do nothing`)
+            await rpc(crowd1, 'public.room_join($1)', [id])
+            await rpc(crowd2, 'public.room_join($1)', [id])
+            expect(await memberCount(id)).toBe(3)
+
+            await db.exec('delete from public.play_events')
+            const key = 'faaa-0'
+            const before = Number((await one('select coalesce(sum(plays), 0)::int n from public.play_counts where track_key = $1', [key])).n)
+            // Каждый участник засчитывает прослушивание у себя — тем же вызовом, что и вне комнаты.
+            for (const who of [USER, crowd1, crowd2]) await as(db, 'authenticated', who, `select public.increment_play_count('${key}')`)
+
+            expect(Number((await one('select plays::int n from public.play_counts where track_key = $1', [key])).n)).toBe(before + 3)
+            const events = (await db.query<{ user_id: string; track_key: string }>('select user_id, track_key from public.play_events order by id')).rows
+            expect(events.map((e) => e.track_key)).toEqual([key, key, key])
+            expect(events.map((e) => e.user_id).sort()).toEqual([USER.sub, crowd1.sub, crowd2.sub].sort())
+            // «Мой топ» (и итоги года, что строятся по тем же событиям) видит прослушивание у каждого.
+            for (const who of [USER, crowd1, crowd2]) {
+                const top = await rpc(who, 'public.user_top($1, null)', [who.sub])
+                expect(top).toEqual([{ track_key: key, plays: 1 }])
+            }
+            await closeAllRooms()
+        })
+    })
 })

@@ -1,6 +1,6 @@
 <template>
-  <div v-if="roomUi.createOpen" class="cropper-backdrop" @click.self="close">
-    <div class="cropper-box" role="dialog" aria-modal="true" aria-labelledby="create-room-title" data-testid="create-room" @keydown.esc="close">
+  <ModalFrame :open="roomUi.createOpen" label="Создать комнату" testid="create-room" @close="close">
+    <div>
       <p id="create-room-title" class="acc-title" style="font-size: 1.125rem;">Создать комнату</p>
       <p class="acc-sub" style="margin-bottom: 0.875rem;">Всё, что ты включишь в плеере, будет играть у тех, кто зайдёт по ссылке.</p>
       <form class="acc-form" @submit.prevent="create">
@@ -14,12 +14,13 @@
         </div>
       </form>
     </div>
-  </div>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
 // «Создать комнату»: название (можно пустым — будет «Комната <ник>»).
 import { computed, nextTick, ref, watch } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { useRouter } from 'vue-router'
 import { session } from '../session'
 import { errorText } from '../social/api'

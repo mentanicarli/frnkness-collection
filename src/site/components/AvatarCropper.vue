@@ -1,8 +1,6 @@
 <template>
-  <!-- В body: внутри страницы окно оказалось бы под мини-плеером. -->
-  <Teleport to="body">
-  <div class="cropper-backdrop" role="dialog" aria-modal="true" :aria-label="round ? 'Обрезка аватара' : 'Обрезка обложки'" @keydown.esc="$emit('cancel')">
-    <div class="cropper-box">
+  <ModalFrame open :label="round ? 'Обрезка аватара' : 'Обрезка обложки'" @close="$emit('cancel')">
+    <div>
       <p class="acc-title" style="font-size: 1.125rem;">{{ title }}</p>
       <p class="acc-sub" style="margin-bottom: 0.875rem;">{{ round ? 'Перетащи картинку и выбери масштаб — в аватар попадёт круг.' : 'Перетащи картинку и выбери масштаб — попадёт квадрат.' }}</p>
       <div
@@ -26,8 +24,7 @@
         </button>
       </div>
     </div>
-  </div>
-  </Teleport>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
@@ -35,6 +32,7 @@
 // (аватар — 256, обложка плейлиста — 512; webp, если браузер умеет,
 // иначе jpeg) — десятки килобайт.
 import { onMounted, ref, watch } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { AVATAR_SIZE, cropRect } from '@/site/auth/avatars'
 
 const props = withDefaults(

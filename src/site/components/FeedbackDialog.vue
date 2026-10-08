@@ -1,6 +1,6 @@
 <template>
-  <div v-if="feedbackUi.open" class="cropper-backdrop" @click.self="close">
-    <div class="cropper-box" role="dialog" aria-modal="true" aria-labelledby="feedback-title" data-testid="feedback-dialog" @keydown.esc="close">
+  <ModalFrame :open="feedbackUi.open" label="Сообщить о проблеме" testid="feedback-dialog" @close="close">
+    <div>
       <template v-if="sent">
         <p id="feedback-title" class="acc-title" style="font-size: 1.125rem;">Спасибо, получили</p>
         <p class="acc-sub" data-testid="feedback-thanks">Мы прочитаем и починим, что сможем.</p>
@@ -23,13 +23,14 @@
         </form>
       </template>
     </div>
-  </div>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
 // Окно «Сообщить о проблеме» из меню профиля: текст до 1000 символов.
 // Лимиты (5 в сутки) и вычистку личных данных держит база.
 import { nextTick, ref, watch } from 'vue'
+import ModalFrame from './ModalFrame.vue'
 import { api, errorText } from '../social/api'
 import { FEEDBACK_MAX, closeFeedback, feedbackUi } from '../feedback/store'
 

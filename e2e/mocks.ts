@@ -102,6 +102,11 @@ export interface MockOptions {
      * Без неё RPC базы отвечают пустыми заглушками.
      */
     social?: SocialBackend
+    /**
+     * Задержка «сети» до Supabase, мс на каждый запрос (половина — до сервера, половина — обратно).
+     * Для измерений синхронизации комнат; по умолчанию нет.
+     */
+    latencyMs?: () => number
 }
 
 // «Репозиторий» в тестах — фикстура tests/fixtures/catalog, а не настоящий
@@ -212,13 +217,18 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
     const accounts = new AccountsBackend(options.users ?? DEFAULT_USERS)
     if (options.social) accounts.social = options.social.hooks()
 
-    const json = (route: Route, status: number, body: unknown) =>
-        route.fulfill({
+    const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+    const backDelay = new WeakMap<Route, number>()
+    const json = async (route: Route, status: number, body: unknown) => {
+        const back = backDelay.get(route) ?? 0
+        if (back > 0) await sleep(back)
+        return route.fulfill({
             status,
             contentType: 'application/json',
             headers: { 'Access-Control-Allow-Origin': '*' },
             body: body === null ? '' : JSON.stringify(body)
         })
+    }
 
     await routeFixtureCatalog(page)
 
@@ -237,6 +247,11 @@ export async function installMocks(page: Page, options: MockOptions = {}) {
         const req = route.request()
         const url = new URL(req.url())
         const method = req.method()
+        if (options.latencyMs && url.pathname.startsWith('/rest/v1/rpc/')) {
+            const total = options.latencyMs()
+            backDelay.set(route, total / 2)
+            await sleep(total / 2)
+        }
         if (method === 'OPTIONS') {
             return route.fulfill({
                 status: 204,

@@ -4,10 +4,13 @@
     <p v-else-if="state === 'missing'" class="acc-alert acc-alert-info">Плейлист не найден или скрыт владельцем.</p>
     <template v-else-if="pl">
       <div class="pl-head">
-        <PlaylistCover class="pl-head-cover" :first-tracks="pl.tracks" :url="coverUrl" />
+        <PlaylistCover class="pl-head-cover" :first-tracks="pl.tracks.slice(0, COLLAGE_SOURCE_TRACKS)" :url="coverUrl" />
         <div class="min-w-0">
           <p class="social-kicker">Плейлист<template v-if="pl.is_public"> · публичный</template></p>
-          <h1 class="social-h1" data-testid="playlist-title">{{ pl.title }}</h1>
+          <div class="pl-title-row">
+            <h1 class="social-h1" data-testid="playlist-title">{{ pl.title }}</h1>
+            <button v-if="isOwner" class="pl-settings-btn" type="button" aria-label="Настройки плейлиста" title="Настройки" :aria-expanded="settingsOpen ? 'true' : 'false'" data-testid="playlist-settings" @click="settingsOpen = true">⋯</button>
+          </div>
           <p v-if="pl.description" class="profile-bio">{{ pl.description }}</p>
           <p class="social-meta">
             <NickWithTag v-if="pl.owner" :user-id="pl.owner.id"><RouterLink class="acc-link" :to="{ name: 'user', params: { nick: pl.owner.nick } }">{{ pl.owner.nick }}</RouterLink></NickWithTag>
@@ -18,19 +21,24 @@
               <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="playlist-play" @click="play(0)">Слушать</button>
               <button class="acc-btn acc-btn-sm" type="button" @click="shuffle">Перемешать</button>
             </template>
-            <button v-if="isOwner" class="acc-btn acc-btn-sm" :class="{ 'acc-btn-primary': !pl.tracks.length }" type="button" :aria-expanded="pickerOpen ? 'true' : 'false'" data-testid="playlist-add-tracks" @click="pickerOpen = !pickerOpen">Добавить треки</button>
+            <button v-if="isOwner" class="acc-btn acc-btn-sm" :class="{ 'acc-btn-primary': !pl.tracks.length }" type="button" :aria-expanded="pickerOpen ? 'true' : 'false'" data-testid="playlist-add-tracks" @click="pickerOpen = true">Добавить треки</button>
           </div>
         </div>
       </div>
 
-      <PlaylistTrackPicker v-if="isOwner && pickerOpen" :existing="pl.tracks" :busy="busy" :max="PLAYLIST_TRACKS_MAX" @add="addTrack" />
+      <ModalFrame v-if="isOwner" :open="pickerOpen" sheet wide label="Добавить треки" testid="playlist-picker-dialog" @close="pickerOpen = false">
+        <p class="acc-title" style="font-size: 1.125rem; margin-bottom: 0.5rem;">Добавить треки</p>
+        <PlaylistTrackPicker :existing="pl.tracks" :busy="busy" :max="PLAYLIST_TRACKS_MAX" @add="addTrack" />
+        <button class="sheet-close" type="button" data-testid="playlist-picker-done" @click="pickerOpen = false">Готово</button>
+      </ModalFrame>
 
       <p v-if="!pl.tracks.length" class="acc-alert acc-alert-info">В плейлисте пока нет треков.<template v-if="isOwner"> Нажми «Добавить треки» или кнопку «В плейлист» у любого трека.</template></p>
       <TrackList v-else :track-ids="pl.tracks" :source="source" :editable="isOwner" :busy="busy" label="Треки плейлиста" @play="play" @move="move" @remove="remove" />
 
-      <template v-if="isOwner">
-        <section class="settings-section" aria-labelledby="pl-s-edit" style="margin-top: 2rem;">
-          <h2 id="pl-s-edit">Настройки плейлиста</h2>
+      <ModalFrame v-if="isOwner" :open="settingsOpen" sheet wide label="Настройки плейлиста" testid="playlist-settings-dialog" @close="settingsOpen = false">
+        <p class="acc-title" style="font-size: 1.125rem; margin-bottom: 0.25rem;">Настройки плейлиста</p>
+        <section class="settings-section" aria-labelledby="pl-s-edit">
+          <h2 id="pl-s-edit" class="sr-only">Название и доступ</h2>
           <form class="acc-form" @submit.prevent="saveInfo">
             <div class="acc-field">
               <label class="acc-label" for="pl-title">Название</label>
@@ -61,7 +69,7 @@
           <h2 id="pl-s-del">Удалить плейлист</h2>
           <button class="acc-btn acc-btn-danger acc-btn-sm" type="button" :disabled="busy" @click="remove_">Удалить плейлист</button>
         </section>
-      </template>
+      </ModalFrame>
 
       <AvatarCropper v-if="cropImage" :image="cropImage" :busy="busy" :size="COVER_SIZE" :round="false" title="Обложка плейлиста" @cancel="closeCropper" @save="uploadCover" />
     </template>
@@ -78,10 +86,12 @@ import { checkAvatarSource } from '@/site/auth/avatars'
 import { api, errorText, type PlaylistFull } from '../social/api'
 import { COVER_SIZE, PLAYLIST_TRACKS_MAX, coverUrls, deletePlaylist, moveItem, rememberPlaylist, removePlaylistCover, uploadPlaylistCover } from '../social/playlists'
 import { showNotice } from '../social/notice'
+import { COLLAGE_SOURCE_TRACKS } from '../social/tracks'
 import { plural } from '../social/format'
 import { playList, playListShuffled } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
+import ModalFrame from '../components/ModalFrame.vue'
 import PlaylistCover from '../components/PlaylistCover.vue'
 import PlaylistTrackPicker from '../components/PlaylistTrackPicker.vue'
 import NickWithTag from '../components/NickWithTag.vue'
@@ -93,6 +103,8 @@ const router = useRouter()
 const pl = ref<PlaylistFull | null>(null)
 const state = ref<'loading' | 'ok' | 'missing'>('loading')
 const busy = ref(false)
+const pickerOpen = ref(false)
+const settingsOpen = ref(false)
 const coverUrl = ref<string | null>(null)
 const form = reactive({ title: '', description: '', isPublic: false })
 
@@ -124,6 +136,8 @@ watch(
     state.value = 'loading'
     pl.value = null
     coverUrl.value = null
+    pickerOpen.value = false
+    settingsOpen.value = false
     if (!/^[0-9a-f-]{36}$/i.test(id)) {
       state.value = 'missing'
       return
@@ -179,7 +193,6 @@ function remove(index: number) {
 
 // «Добавить треки»: в конец списка тем же RPC, что и «В плейлист» у трека.
 // Лимит и повторы проверяем до запроса (сервер проверяет их тоже).
-const pickerOpen = ref(false)
 
 function addTrack(trackId: string) {
   const p = pl.value
@@ -255,6 +268,7 @@ function remove_() {
   void guarded(async () => {
     await deletePlaylist(p)
     showNotice('Плейлист удалён')
+    settingsOpen.value = false
     void router.replace({ name: 'playlists' })
   })
 }

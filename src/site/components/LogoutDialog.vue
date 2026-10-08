@@ -1,13 +1,13 @@
 <template>
-  <div v-if="logoutUi.open" class="cropper-backdrop" @click.self="close">
-    <div class="cropper-box confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="logout-title" data-testid="logout-confirm" @keydown.esc="close">
+  <ModalFrame :open="logoutUi.open" label="Выйти из аккаунта?" alert testid="logout-confirm" @close="close">
+    <div class="confirm-box">
       <p id="logout-title" class="acc-title" style="font-size: 1.125rem;">Выйти из аккаунта?</p>
       <div class="acc-actions" style="justify-content: flex-end; margin-top: 1rem;">
         <button ref="cancelBtn" class="acc-btn acc-btn-sm" type="button" data-testid="logout-cancel" @click="close">Отмена</button>
         <button class="acc-btn acc-btn-danger acc-btn-sm" type="button" :disabled="busy" data-testid="logout-confirm-btn" @click="confirm">Выйти</button>
       </div>
     </div>
-  </div>
+  </ModalFrame>
 </template>
 
 <script setup lang="ts">
@@ -15,6 +15,7 @@
 import { nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { signOut } from '../session'
+import ModalFrame from './ModalFrame.vue'
 import { logoutUi } from '../logout'
 
 const router = useRouter()

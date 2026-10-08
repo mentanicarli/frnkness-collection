@@ -14,8 +14,8 @@ import { type Queue, type QueueSource, currentTrackId } from '../player/queue'
 export const ROOM_CAPACITY = 20
 export const ROOM_TITLE_MAX = 40
 
-/** Расхождение, больше которого гость подкручивает позицию. */
-export const DRIFT_THRESHOLD_MS = 1000
+/** Расхождение, больше которого гость перематывает трек (меньшее выравнивается скоростью). */
+export const DRIFT_THRESHOLD_MS = 1200
 /** Не перематывать чаще: каждая перемотка слышна как рывок. */
 export const SEEK_MIN_GAP_MS = 2000
 /** Первая выверка (вход, новый трек, возврат на вкладку): порог мягче. */
@@ -37,7 +37,24 @@ export const CONNECT_BACKOFF_MS = [0, 1000, 2000, 3500, 5000, 8000]
 export const LINK_DOWN_REOPEN_MS = 20_000
 /** Сердцебиение участника и повторная рассылка состояния хозяином. */
 export const HEARTBEAT_MS = 45_000
+/** Хозяин сохраняет состояние в базе не реже этого (для вошедших позже и признаков жизни). */
 export const HOST_RESYNC_MS = 15_000
+/** Хозяин рассылает «где я сейчас» гостям с этим интервалом: по нему гости сверяют звук. */
+export const HOST_BEACON_MS = 4_000
+/** Гость сверяет звук с хозяином раз в секунду. */
+export const GUEST_CHECK_MS = 1_000
+/** Запас на загрузку: через столько после команды все (и хозяин) начинают играть. */
+export const START_LEAD_MS = 1_200
+/** Переход к следующему треку сам по себе: гости уже загрузили его заранее, ждать не нужно. */
+export const AUTO_LEAD_MS = 350
+/** Хозяин считает перемоткой скачок позиции больше этого относительно сказанного гостям. */
+export const SEEK_DETECT_MS = 500
+/** Выравнивание скоростью: при таком расхождении (мс) и меньше звук не трогаем, при большем — подстраиваем. */
+export const RATE_DEADBAND_MS = 40
+export const RATE_RELEASE_MS = 25
+export const RATE_FAST_MS = 150
+export const RATE_SLOW_DELTA = 0.02
+export const RATE_FAST_DELTA = 0.04
 export const CLOCK_RESYNC_MS = 5 * 60_000
 /** Сколько треков очереди едет по сети: чуть назад и далеко вперёд. */
 export const QUEUE_BEFORE = 5
@@ -121,6 +138,88 @@ export function decideSeek(currentMs: number, expectedMs: number, ctx: { now: nu
     return { seek: true, toMs: expectedMs }
 }
 
+// ── Расписание старта ──────────────────────────────────────────────────
+
+export interface StartPlan {
+    /** Серверное время (мс), когда все начинают играть. */
+    startAt: number
+    /** Позиция трека (мс) в этот момент. */
+    posMs: number
+}
+
+/**
+ * Команда «начать с позиции P в серверное время T»: T — сейчас плюс запас
+ * (START_LEAD_MS для нажатия хозяина, AUTO_LEAD_MS для смены трека без нажатия).
+ * Медленная сеть хозяина (задержка запрос-ответ) запас увеличивает: гости должны
+ * успеть получить команду и загрузить трек, но не больше полутора секунд.
+ */
+export function planStart(serverNowMs: number, posMs: number, opts: { gapless?: boolean; rttMs?: number } = {}): StartPlan {
+    const lead = opts.gapless ? AUTO_LEAD_MS : Math.min(1_500, Math.max(START_LEAD_MS, 800 + (opts.rttMs ?? 0)))
+    return { startAt: Math.round(serverNowMs + lead), posMs: Math.max(0, Math.round(posMs)) }
+}
+
+/** Сколько ждать до старта (мс); 0 и меньше — время пришло. latencyMs — сколько звуку нужно, чтобы реально пойти. */
+export function msUntilStart(startAtMs: number, serverNowMs: number, latencyMs = 0): number {
+    return startAtMs - latencyMs - serverNowMs
+}
+
+// ── Порядок команд ─────────────────────────────────────────────────────
+
+export interface CommandStamp {
+    /** Номер команды хозяина: растёт на каждой команде, после перезагрузки продолжается с сохранённого в базе. */
+    seq: number
+    /** Номер «маячка» внутри команды: позиция хозяина раз в несколько секунд. 0 — сама команда. */
+    beat: number
+}
+
+/** Новее ли пришедшее сообщение уже применённого: по команде, а внутри команды — по маячку. */
+export function isNewerCommand(next: CommandStamp, applied: CommandStamp): boolean {
+    return next.seq > applied.seq || (next.seq === applied.seq && next.beat > applied.beat)
+}
+
+/** С какого номера хозяин продолжает после (пере)входа: после всего, что гости могли видеть. */
+export function resumeSeq(dbSeq: number, savedState: { cseq?: number } | null): number {
+    return Math.max(Number.isFinite(dbSeq) ? dbSeq : 0, savedState?.cseq ?? 0)
+}
+
+// ── Подстройка скоростью ───────────────────────────────────────────────
+
+export interface DriftDecision {
+    action: 'none' | 'rate' | 'seek'
+    /** Скорость воспроизведения после решения (1 — обычная). */
+    rate: number
+    /** Куда перемотать (только для seek). */
+    toMs: number
+}
+
+/**
+ * Решение гостя по расхождению diffMs (положительное — гость впереди хозяина):
+ *  — больше DRIFT_THRESHOLD_MS (или force-порог при первой выверке) — перемотка,
+ *    но не чаще SEEK_MIN_GAP_MS; скорость возвращается к обычной;
+ *  — до порога: ускоряем или замедляем звук на 2–4 % (высота тона не меняется,
+ *    preservesPitch), пока расхождение не станет меньше RATE_RELEASE_MS;
+ *  — внутри мёртвой зоны (RATE_DEADBAND_MS) скорость обычная; чтобы не дёргаться
+ *    на границе, уже включённая подстройка отпускается позже (гистерезис).
+ */
+export function decideDrift(
+    diffMs: number,
+    expectedMs: number,
+    ctx: { now: number; lastSeekAt: number | null; currentRate: number; force?: boolean; seekThresholdMs?: number }
+): DriftDecision {
+    const abs = Math.abs(diffMs)
+    const seekAt = ctx.force ? FORCE_THRESHOLD_MS : (ctx.seekThresholdMs ?? DRIFT_THRESHOLD_MS)
+    if (abs > seekAt) {
+        const gapOk = ctx.force || ctx.lastSeekAt === null || ctx.now - ctx.lastSeekAt >= SEEK_MIN_GAP_MS
+        if (gapOk) return { action: 'seek', rate: 1, toMs: expectedMs }
+    }
+    const adjusting = ctx.currentRate !== 1
+    if (abs < (adjusting ? RATE_RELEASE_MS : RATE_DEADBAND_MS)) return { action: adjusting ? 'rate' : 'none', rate: 1, toMs: expectedMs }
+    const delta = abs > RATE_FAST_MS ? RATE_FAST_DELTA : RATE_SLOW_DELTA
+    // Гость впереди — замедляемся, позади — догоняем.
+    const rate = diffMs > 0 ? 1 - delta : 1 + delta
+    return { action: rate === ctx.currentRate ? 'none' : 'rate', rate, toMs: expectedMs }
+}
+
 // ── Хозяин на месте? ───────────────────────────────────────────────────
 
 export type HostState = 'online' | 'grace' | 'away'
@@ -165,8 +264,17 @@ export interface WireQueue {
 export interface RoomPlayerState {
     queue: WireQueue | null
     track_id: string | null
+    /** Позиция трека (мс) в серверный момент at_ms. */
     pos_ms: number
     playing: boolean
+    /**
+     * Серверное время (мс), к которому относится pos_ms. Позже «сейчас» — это
+     * запланированный старт: до этого момента позиция стоит на месте.
+     * Нет поля (состояние из старой версии сайта) — берётся время сохранения в базе.
+     */
+    at_ms?: number
+    /** Номер команды хозяина (см. CommandStamp); у старых состояний нет. */
+    cseq?: number
 }
 
 export const TRACK_ID_RE = /^[a-z0-9]+(-[a-z0-9]+)*\/[a-z0-9]+(-[a-z0-9]+)*$/
@@ -208,13 +316,14 @@ export function toPlayerQueue(wire: WireQueue, controller: Queue['controller']):
 }
 
 /** Состояние плеера хозяина для сохранения и рассылки. */
-export function snapshotState(queue: Queue | null, positionMs: number, playing: boolean): RoomPlayerState {
+export function snapshotState(queue: Queue | null, positionMs: number, playing: boolean, stamp?: { atMs: number; cseq: number }): RoomPlayerState {
     const trackId = currentTrackId(queue)
     return {
         queue: queue && trackId ? compactQueue(queue) : null,
         track_id: trackId,
         pos_ms: Math.max(0, Math.min(MAX_POS_MS, Math.round(positionMs))),
-        playing: Boolean(trackId) && playing
+        playing: Boolean(trackId) && playing,
+        ...(stamp ? { at_ms: Math.round(stamp.atMs), cseq: stamp.cseq } : {})
     }
 }
 
@@ -272,7 +381,39 @@ export function parseRoomState(raw: unknown): RoomPlayerState | null {
     } else if (trackId !== null) {
         return null
     }
-    return { queue, track_id: trackId, pos_ms: s.pos_ms, playing: s.playing && trackId !== null }
+    const at = s.at_ms
+    if (at !== undefined && (typeof at !== 'number' || !Number.isFinite(at) || at < 0)) return null
+    const cseq = s.cseq
+    if (cseq !== undefined && (typeof cseq !== 'number' || !Number.isInteger(cseq) || cseq < 0)) return null
+    return {
+        queue,
+        track_id: trackId,
+        pos_ms: s.pos_ms,
+        playing: s.playing && trackId !== null,
+        ...(at !== undefined ? { at_ms: at } : {}),
+        ...(cseq !== undefined ? { cseq } : {})
+    }
+}
+
+/** Маячок хозяина: где он сейчас (без очереди — она не менялась). null — сообщение негодное. */
+export interface Beacon extends CommandStamp {
+    sent: number
+    at: number
+    track_id: string
+    pos_ms: number
+    playing: boolean
+    epoch?: number
+}
+
+export function parseBeacon(raw: unknown): Beacon | null {
+    if (!raw || typeof raw !== 'object') return null
+    const b = raw as Record<string, unknown>
+    const ints = [b.seq, b.beat]
+    if (!ints.every((n) => typeof n === 'number' && Number.isInteger(n) && n >= 0)) return null
+    if (![b.sent, b.at, b.pos_ms].every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0)) return null
+    if ((b.pos_ms as number) > MAX_POS_MS) return null
+    if (typeof b.track_id !== 'string' || !TRACK_ID_RE.test(b.track_id) || typeof b.playing !== 'boolean') return null
+    return { seq: b.seq as number, beat: b.beat as number, sent: b.sent as number, at: b.at as number, track_id: b.track_id, pos_ms: b.pos_ms as number, playing: b.playing, epoch: typeof b.epoch === 'number' ? b.epoch : undefined }
 }
 
 /** Что дальше: id следующих треков очереди (для бесконечной — неизвестно заранее). */
