@@ -1,4 +1,5 @@
 import { avatarUploadUrl } from '@/supabaseConfig'
+import { toActiveUrl } from '@/supabaseNet'
 
 /**
  * Аватар хранится в профиле строкой (формат проверяет база):
@@ -34,7 +35,7 @@ export function avatarView(avatar: string | null | undefined, nick: string, user
         const src = coverOf?.(value)
         return src ? { kind: 'img', src } : fallback
     }
-    if (kind === 'upload' && /^\d{1,15}$/.test(value) && userId) return { kind: 'img', src: avatarUploadUrl(userId, value) }
+    if (kind === 'upload' && /^\d{1,15}$/.test(value) && userId) return { kind: 'img', src: toActiveUrl(avatarUploadUrl(userId, value)) }
     return fallback
 }
 

@@ -1,4 +1,5 @@
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabase } from './supabase'
+import { routedFetch } from '@/supabaseNet'
 import { AdminApiError } from './content'
 import { useAuth } from '../composables/useAuth'
 import type { AppRole } from '../../../supabase/functions/_shared/accounts.ts'
@@ -200,7 +201,7 @@ export async function userAction(userId: string, payload: UserAction): Promise<R
     }
     let res: Response
     try {
-        res = await fetch(FUNCTION_URL, {
+        res = await routedFetch(FUNCTION_URL, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, ...payload })

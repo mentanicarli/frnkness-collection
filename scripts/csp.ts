@@ -16,9 +16,16 @@ export function inlineScriptHashes(html: string): string[] {
     return out
 }
 
-export function cspPolicy(supabaseUrl: string, scriptHashes: string[]): string {
+/**
+ * proxyUrl — адрес посредника (SUPABASE_PROXY_URL), пустой — без него. Его
+ * origin добавляется туда же, куда прямой адрес Supabase: запросы (https),
+ * realtime (wss) и подписанные ссылки Storage/аватары (img-src).
+ */
+export function cspPolicy(supabaseUrl: string, scriptHashes: string[], proxyUrl = ''): string {
     const supabase = new URL(supabaseUrl).origin
-    const supabaseWs = supabase.replace(/^http/, 'ws')
+    const proxy = proxyUrl ? new URL(proxyUrl).origin : ''
+    const origins = proxy && proxy !== supabase ? [supabase, proxy] : [supabase]
+    const wsOrigins = origins.map((o) => o.replace(/^http/, 'ws'))
     const directives: Record<string, string[]> = {
         'default-src': ["'self'"],
         'script-src': ["'self'", ...scriptHashes, TURNSTILE_ORIGIN],
@@ -27,9 +34,9 @@ export function cspPolicy(supabaseUrl: string, scriptHashes: string[]): string {
         // Шрифты лежат на сайте (public/fonts/), внешний хостинг шрифтов не нужен.
         'font-src': ["'self'"],
         // Аватары — из публичного бакета Supabase Storage.
-        'img-src': ["'self'", 'data:', 'blob:', supabase],
+        'img-src': ["'self'", 'data:', 'blob:', ...origins],
         'media-src': ["'self'", 'blob:'],
-        'connect-src': ["'self'", supabase, supabaseWs, TURNSTILE_ORIGIN],
+        'connect-src': ["'self'", ...origins, ...wsOrigins, TURNSTILE_ORIGIN],
         // Капча и встроенные клипы YouTube на странице релиза.
         'frame-src': [TURNSTILE_ORIGIN, 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
         'worker-src': ["'self'"],
@@ -43,8 +50,8 @@ export function cspPolicy(supabaseUrl: string, scriptHashes: string[]): string {
         .join('; ')
 }
 
-export function injectCsp(html: string, supabaseUrl: string): string {
-    const policy = cspPolicy(supabaseUrl, inlineScriptHashes(html))
+export function injectCsp(html: string, supabaseUrl: string, proxyUrl = ''): string {
+    const policy = cspPolicy(supabaseUrl, inlineScriptHashes(html), proxyUrl)
     const tag = `<meta http-equiv="Content-Security-Policy" content="${policy.replace(/"/g, '&quot;')}">`
     // Сразу после <meta charset>: политика должна действовать до первого скрипта.
     return html.replace(/(<meta charset="[^"]*">)/i, `$1\n    ${tag}`)

@@ -1,5 +1,6 @@
 import { shallowReactive } from 'vue'
 import { supabase } from '@/supabaseClient'
+import { toActiveUrl } from '@/supabaseNet'
 import { SocialError, api, errorText, type PlaylistSummary } from './api'
 import { showNotice } from './notice'
 
@@ -110,7 +111,9 @@ export async function deletePlaylist(p: PlaylistSummary): Promise<void> {
     forgetPlaylist(p.id)
 }
 
-// Подписанная ссылка живёт час; держим 50 минут на путь+версию.
+// Подписанная ссылка живёт час; держим 50 минут на путь+версию. В кэше ссылка
+// с прямым адресом Supabase; наружу отдаём через рабочий маршрут (toActiveUrl),
+// чтобы смена маршрута не оставляла картинки на неработающем адресе.
 const SIGNED_TTL_SEC = 3600
 const signedCache = new Map<string, { version: number; url: string; until: number }>()
 
@@ -122,7 +125,7 @@ export async function coverUrls(list: readonly PlaylistSummary[]): Promise<Recor
     for (const p of list) {
         if (!p.cover_version) continue
         const cached = signedCache.get(coverPath(p))
-        if (cached && cached.version === p.cover_version && cached.until > now) out[p.id] = cached.url
+        if (cached && cached.version === p.cover_version && cached.until > now) out[p.id] = toActiveUrl(cached.url)
         else missing.push(p)
     }
     if (!missing.length) return out
@@ -133,7 +136,7 @@ export async function coverUrls(list: readonly PlaylistSummary[]): Promise<Recor
             if (!p || !item.signedUrl || item.error) continue
             const url = `${item.signedUrl}&v=${p.cover_version}`
             signedCache.set(coverPath(p), { version: p.cover_version!, url, until: now + (SIGNED_TTL_SEC - 600) * 1000 })
-            out[p.id] = url
+            out[p.id] = toActiveUrl(url)
         }
     } catch {
         // Без ссылки покажется коллаж.

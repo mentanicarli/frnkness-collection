@@ -218,6 +218,13 @@ describe('отправка', () => {
         vi.unstubAllGlobals()
     })
 
+    it('отправляет через переданный fetch (маршрут до Supabase)', () => {
+        const doFetch = vi.fn((_url: string, _init?: RequestInit) => Promise.resolve(new Response()))
+        createListenSender('https://x.supabase.co/', 'k', () => 'tok', doFetch as unknown as typeof fetch)(payload)
+        expect(doFetch).toHaveBeenCalledTimes(1)
+        expect(doFetch.mock.calls[0][0]).toBe('https://x.supabase.co/rest/v1/rpc/record_listen_session')
+    })
+
     it('без входа ничего не отправляется', () => {
         const calls: unknown[] = []
         vi.stubGlobal('fetch', (...args: unknown[]) => {
