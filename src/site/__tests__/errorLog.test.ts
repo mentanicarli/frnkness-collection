@@ -27,7 +27,7 @@ describe('журнал ошибок сайта', () => {
         expect(sent).toHaveLength(1)
         expect(sent[0].message).toBe('boom')
         expect(sent[0].stack.split('\n')).toHaveLength(8)
-        expect(sent[0].build).toBe('dev')
+        expect(sent[0].build).toBe(__BUILD_ID__)
         expect(sent[0].page).toMatch(/^\//)
         expect(sent[0].client).toMatch(/^[a-z0-9]{8,40}$/)
     })
