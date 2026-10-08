@@ -6,7 +6,7 @@
       <div class="profile-head">
         <UserAvatar :avatar="profile.avatar" :nick="profile.nick" :user-id="profile.id" :size="5.5" :cover-of="coverOf" />
         <div class="min-w-0">
-          <h1 class="profile-nick">{{ profile.nick }}<UserTag :user-id="profile.id" /></h1>
+          <h1 class="profile-nick"><NickWithTag :user-id="profile.id" :nick="profile.nick" /></h1>
           <p class="profile-meta">С нами с {{ formatDate(profile.created_at) }} · <span data-testid="friends-count">{{ profile.friends_count }} {{ plural(profile.friends_count, 'друг', 'друга', 'друзей') }}</span></p>
           <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
           <div class="social-actions" style="margin-top: 1rem;">
@@ -98,7 +98,7 @@ import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
 import PlaylistGrid from '../components/PlaylistGrid.vue'
 import EmptyHint from '../components/EmptyHint.vue'
-import UserTag from '../components/UserTag.vue'
+import NickWithTag from '../components/NickWithTag.vue'
 import Top4Block from '../components/Top4Block.vue'
 import Top4Editor from '../components/Top4Editor.vue'
 

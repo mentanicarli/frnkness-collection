@@ -67,13 +67,32 @@ test('не-админ видит «Нет доступа» и не получа�
     await expect(page.getByRole('navigation')).toHaveCount(0)
     expect(mocks.calls).toEqual([])
     await page.getByRole('button', { name: 'Выйти' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible()
+})
+
+test('выход в админке: без подтверждения сессия остаётся, «Отмена» её не трогает', async ({ page }) => {
+    await installMocks(page)
+    await loginAs(page, ADMIN_USER)
+    await page.getByTestId('admin-logout').click()
+    const dialog = page.getByTestId('logout-confirm')
+    await expect(dialog).toContainText('Выйти из аккаунта?')
+    await dialog.getByTestId('logout-cancel').click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByTestId('admin-nick')).toBeVisible()
+    expect(await page.evaluate((k) => localStorage.getItem(k), STORAGE_KEY)).not.toBeNull()
+    // Esc тоже закрывает окно, не выходя.
+    await page.getByTestId('admin-logout').click()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByTestId('admin-nick')).toBeVisible()
 })
 
 test('выход очищает сессию', async ({ page }) => {
     await installMocks(page)
     await loginAs(page, ADMIN_USER)
     await page.getByRole('button', { name: 'Выйти' }).click()
+    await page.getByTestId('logout-confirm-btn').click()
     await expect(page.getByRole('button', { name: 'Войти' })).toBeVisible()
     await expect(page.getByRole('status')).toHaveCount(0)
     expect(await page.evaluate((k) => localStorage.getItem(k), STORAGE_KEY)).toBeNull()

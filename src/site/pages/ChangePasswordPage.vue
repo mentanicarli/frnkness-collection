@@ -22,7 +22,7 @@
         </button>
       </form>
       <div class="acc-links">
-        <button class="acc-link" type="button" @click="logout">Выйти</button>
+        <button class="acc-link" type="button" @click="askLogout">Выйти</button>
       </div>
     </div>
   </div>
@@ -30,13 +30,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { callFunction, refreshAccount, session, signOut } from '@/site/session'
+import { useRoute } from 'vue-router'
+import { callFunction, refreshAccount, session } from '@/site/session'
+import { askLogout } from '@/site/logout'
 import { goAfterLogin } from '@/site/router'
 import { validatePassword } from '../../../supabase/functions/_shared/accounts.ts'
 
 const route = useRoute()
-const router = useRouter()
 const password = ref('')
 const password2 = ref('')
 const error = ref('')
@@ -60,8 +60,4 @@ async function submit() {
   }
 }
 
-async function logout() {
-  await signOut()
-  void router.replace({ name: 'welcome' })
-}
 </script>

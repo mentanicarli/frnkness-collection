@@ -188,7 +188,6 @@ main { position: relative; z-index: 5; padding-top: calc(3.875rem + var(--safe-t
 
 /* Hero */
 .hero-title { font-family: 'Unbounded'; font-weight: 800; font-size: clamp(2.75rem, 10.5vw, 9.375rem); line-height: 0.92; letter-spacing: -0.04em; }
-.hero-accent { color: #8b8b93; transition: none; }
 .flow-btn {
   background: var(--fg); color: var(--accent-ink); border: 1px solid transparent;
   border-radius: var(--r-md) !important; text-transform: none; letter-spacing: 0;

@@ -2,7 +2,7 @@
   <div class="welcome" data-testid="welcome">
     <div>
       <p class="acc-brand"><b>frnk ness</b><small>collection</small></p>
-      <h1 class="welcome-title">Pupsiks<br><span>Saga</span></h1>
+      <h1 class="welcome-title">Pupsiks<br>Saga</h1>
       <p class="welcome-text">Коллекция релизов frnk ness для своих. Войди или зарегистрируйся, чтобы слушать музыку, читать тексты и разборы.</p>
       <div v-if="session.expired" class="acc-alert acc-alert-info" style="margin-bottom: 1rem;" role="status">Сессия закончилась — войди снова.</div>
       <div class="acc-actions">

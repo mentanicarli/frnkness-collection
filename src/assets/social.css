@@ -108,9 +108,19 @@
 /* Комнаты */
 .room-now { display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0; }
 .room-now > .min-w-0 { display: flex; flex-direction: column; flex: 1 1 auto; }
-.room-now-cover { width: 4rem; height: 4rem; border-radius: var(--r-xs); object-fit: cover; flex-shrink: 0; background: var(--bg-3); }
+.room-now-art { position: relative; flex-shrink: 0; width: 4rem; height: 4rem; border-radius: var(--r-xs); background: var(--bg-3); }
+.room-now-cover { width: 100%; height: 100%; border-radius: var(--r-xs); object-fit: cover; display: block; }
+.room-now-badge {
+  position: absolute; right: -0.25rem; bottom: -0.25rem; width: 1.375rem; height: 1.375rem; display: grid; place-items: center;
+  border-radius: 50%; background: var(--bg-1); border: 1px solid var(--line-2); color: var(--fg);
+}
+.eq { display: flex; align-items: flex-end; gap: 1.5px; width: 0.75rem; height: 0.625rem; }
+.eq i { flex: 1; height: 100%; background: currentColor; border-radius: 1px; transform-origin: bottom; animation: eq-bar 0.9s ease-in-out infinite; }
+.eq i:nth-child(2) { animation-delay: -0.3s; }
+.eq i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes eq-bar { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .eq i { animation: none; transform: scaleY(0.7); } }
 .room-now-title { font-weight: 700; font-size: 1.0625rem; word-break: break-word; }
-.room-next-list { margin: 0.25rem 0 0; padding-left: 1.25rem; color: var(--fg-muted); font-size: 0.875rem; line-height: 1.6; }
 .room-invite { margin-top: 0.75rem; max-width: 32rem; }
 .room-chip {
   display: inline-flex; align-items: center; gap: 0.375rem; max-width: 12rem; min-width: 0; height: 1.75rem; padding: 0 0.625rem;
@@ -137,19 +147,29 @@
 .room-guest [data-testid="shuffle-btn"],
 .room-guest .close-player-btn { opacity: 0.4; cursor: not-allowed; }
 
+/* В комнате, пока ничего не играет, мини-плеер — только метка «Ты в комнате»:
+   ни полноэкранного режима, ни текста, ни управления. */
+#player.mini-idle .player-main { cursor: default; }
+#player.mini-idle .progress-container,
+#player.mini-idle .play-btn,
+#player.mini-idle .lyrics-action-btn,
+#player.mini-idle .fullscreen-trigger-btn { opacity: 0.35; pointer-events: none; }
+#player.mini-idle #player-cover { pointer-events: none; }
+
 /* Реакции в комнате: ряд эмодзи под плеером и летящие вверх эмодзи с ником.
    Анимируются только transform и opacity (слой на видеокарте), на экране не
    больше ~15 штук — на телефоне не тормозит. Время жизни 2.6 с = REACTION_LIFETIME_MS. */
-.rx { margin: 1rem 0 0; }
+.rx { margin: 1.25rem 0 1.5rem; }
 .rx-wrap { position: relative; max-width: 40rem; }
-.rx-bar { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+/* Лёгкая «пилюля» в одну строку: на телефоне кнопки сжимаются, а не переносятся. */
+.rx-bar { display: flex; flex-wrap: nowrap; gap: 0.125rem; width: fit-content; max-width: 100%; padding: 0.25rem; border-radius: 999px; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); }
 .rx-btn {
-  min-width: 2.75rem; height: 2.75rem; padding: 0 0.5rem; border-radius: 999px; border: 1px solid var(--line-2);
-  background: var(--bg-2); font-size: 1.375rem; line-height: 1; transition: transform var(--fast), background var(--fast);
+  flex: 0 1 2.5rem; min-width: 0; width: 2.5rem; height: 2.5rem; padding: 0; border-radius: 999px; border: 0;
+  background: transparent; font-size: 1.125rem; line-height: 1; transition: transform var(--fast), background var(--fast);
   touch-action: manipulation;
 }
-.rx-btn:hover:not(:disabled) { background: var(--bg-3); }
-.rx-btn:active:not(:disabled) { transform: scale(0.9); }
+.rx-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); transform: scale(1.18); }
+.rx-btn:active:not(:disabled) { transform: scale(1.3); background: rgba(255, 255, 255, 0.14); }
 .rx-btn:disabled { opacity: 0.4; cursor: default; }
 .rx-btn:focus-visible { outline: 2px solid var(--fg-muted); outline-offset: 2px; }
 .rx-layer { position: absolute; left: 0; right: 0; bottom: 100%; height: 11rem; pointer-events: none; z-index: 20; }
@@ -238,9 +258,21 @@ button.top4-card.playing .top4-cover { outline: 2px solid var(--page-accent); }
 .empty-hint-text { color: var(--fg-muted); font-size: 0.875rem; line-height: 1.5; max-width: 52ch; }
 .empty-hint-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem; }
 
-/* Тег пользователя: значок рядом с ником, цвет текста подбирается по контрасту */
-.user-tag {
-  display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px;
-  font-family: 'Golos Text'; font-size: 0.6875rem; font-weight: 700; line-height: 1.4; letter-spacing: 0.02em;
-  vertical-align: middle; white-space: nowrap; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
-}
+
+/* Выбор треков из каталога: «Добавить треки» в плейлисте, «Включить» в комнате */
+.pick-panel { margin: 1rem 0 1.5rem; padding: 0.75rem; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--bg-1); max-width: 40rem; }
+.pick-list { list-style: none; padding: 0; margin: 0.5rem 0 0; max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 0.125rem; }
+.pick-row { display: flex; align-items: center; gap: 0.75rem; width: 100%; min-height: 3rem; padding: 0.375rem 0.5rem; border: 0; border-radius: var(--r-md); background: none; color: var(--fg); text-align: left; touch-action: manipulation; }
+.pick-row:hover:not(:disabled) { background: var(--bg-2); }
+.pick-row:disabled { cursor: default; }
+.pick-row.added { opacity: 0.55; }
+.pick-cover { width: 2.5rem; height: 2.5rem; border-radius: var(--r-xs); object-fit: cover; flex-shrink: 0; background: var(--bg-3); }
+.pick-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.pick-title { font-weight: 600; font-size: 0.9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-sub { font-size: 0.75rem; color: var(--fg-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-mark { font-size: 0.75rem; color: var(--fg-muted); white-space: nowrap; flex-shrink: 0; }
+.pick-quick { display: flex; flex-wrap: wrap; gap: 0.375rem; margin: 0.625rem 0 0; }
+.pick-chip { height: 2.25rem; padding: 0 0.875rem; border-radius: 999px; border: 1px solid var(--line-2); background: transparent; color: var(--fg); font-size: 0.8125rem; touch-action: manipulation; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-chip:hover:not(:disabled) { background: var(--bg-2); }
+.pick-chip:disabled { opacity: 0.5; }
+.pick-kicker { margin: 0.875rem 0 0; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-faint); }

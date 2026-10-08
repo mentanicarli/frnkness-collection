@@ -1,0 +1,11 @@
+/* Значок-тег и «ник + тег»: один вид на сайте и в админке.
+   Значок всегда по ширине текста (никогда не растягивается во flex-колонке
+   или строке), одной высоты и с одинаковым радиусом; от ника не отрывается. */
+.user-tag {
+  display: inline-flex; align-items: center; flex: 0 0 auto; align-self: center; width: fit-content; max-width: 10rem;
+  box-sizing: border-box; height: 1.125rem; padding: 0 0.5rem; border-radius: 999px;
+  font-family: inherit; font-size: 0.6875rem; font-weight: 700; line-height: 1; letter-spacing: 0.02em; white-space: nowrap;
+}
+.user-tag-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nick-tag { display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%; min-width: 0; vertical-align: middle; }
+.nick-tag-name { min-width: 0; overflow-wrap: anywhere; }

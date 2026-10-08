@@ -3,7 +3,7 @@
     <div class="profile-head">
       <UserAvatar :avatar="me.avatar" :nick="me.nick" :user-id="me.id" :size="5.5" :cover-of="coverOf" />
       <div class="min-w-0">
-        <h1 class="profile-nick">{{ me.nick || 'Без ника' }}<UserTag :user-id="me.id" /></h1>
+        <h1 class="profile-nick"><NickWithTag :user-id="me.id" :nick="me.nick || 'Без ника'" /></h1>
         <p class="profile-meta">С нами с {{ formatDate(me.createdAt) }}<template v-if="friendsCount !== null"> · {{ friendsCount }} {{ plural(friendsCount, 'друг', 'друга', 'друзей') }}</template><template v-if="me.role !== 'user'"> · {{ me.role === 'owner' ? 'владелец' : 'админ' }}</template></p>
         <RouterLink v-if="me.nick" class="acc-link" :to="{ name: 'user', params: { nick: me.nick } }">Мой профиль — как его видят другие</RouterLink>
         <RouterLink v-if="recapStore.state" class="acc-link" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="me-recap">Итоги {{ recapStore.state.year }}</RouterLink>
@@ -121,7 +121,7 @@
     <section class="settings-section" aria-labelledby="s-exit">
       <h2 id="s-exit">Аккаунт</h2>
       <div class="acc-actions" style="margin-bottom: 1.25rem;">
-        <button class="acc-btn acc-btn-sm" type="button" @click="logout">Выйти на этом устройстве</button>
+        <button class="acc-btn acc-btn-sm" type="button" @click="askLogout">Выйти на этом устройстве</button>
         <RouterLink class="acc-btn acc-btn-sm" :to="{ name: 'privacy' }">Какие данные мы храним</RouterLink>
       </div>
       <template v-if="me.role !== 'owner'">
@@ -157,7 +157,8 @@ import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
 import { callFunction, confirmRecoveryCode, createRecoveryCode, refreshAccount, session, signOut, updateOwnProfile } from '@/site/session'
 import RecoveryCodeBox from '../components/RecoveryCodeBox.vue'
-import UserTag from '../components/UserTag.vue'
+import NickWithTag from '../components/NickWithTag.vue'
+import { askLogout } from '../logout'
 import { EMOJIS, INITIALS_COLORS, checkAvatarSource } from '@/site/auth/avatars'
 import UserAvatar from '@/site/components/UserAvatar.vue'
 import { recapStore } from '@/site/recap/store'
@@ -417,11 +418,6 @@ async function recoverySaved() {
 }
 
 // ── Выход и удаление ──
-async function logout() {
-  await signOut()
-  void router.replace({ name: 'welcome' })
-}
-
 const deleteOpen = ref(false)
 const deletePassword = ref('')
 const deleteBusy = ref(false)

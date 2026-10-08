@@ -22,7 +22,7 @@
                     <button type="button" class="adm-user-row" :class="{ active: selectedId === u.id }" :data-testid="`user-row-${u.nick ?? u.id}`" @click="select(u.id)">
                         <UserAvatar :avatar="u.avatar" :nick="u.nick ?? '?'" :user-id="u.id" :size="2" />
                         <span class="adm-user-row-main">
-                            <span class="adm-user-row-nick">{{ u.nick ?? 'без профиля' }}<UserTag :user-id="u.id" /></span>
+                            <NickWithTag class="adm-user-row-nick" :user-id="u.id" :nick="u.nick ?? 'без профиля'" />
                             <span class="adm-faint adm-small">с {{ formatDate(u.created_at) }} · вход {{ u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—' }}</span>
                         </span>
                         <span v-if="u.role !== 'user'" class="adm-badge">{{ ROLE_LABEL[u.role] }}</span>
@@ -38,7 +38,7 @@
                 <div class="adm-row" style="align-items: flex-start">
                     <UserAvatar :avatar="card.avatar" :nick="card.nick ?? '?'" :user-id="card.id" :size="3.5" />
                     <div style="min-width: 0; flex: 1">
-                        <h2 class="adm-h2" style="margin: 0; word-break: break-word">{{ card.nick ?? 'без профиля' }}<UserTag :user-id="card.id" /></h2>
+                        <h2 class="adm-h2" style="margin: 0; word-break: break-word"><NickWithTag :user-id="card.id" :nick="card.nick ?? 'без профиля'" /></h2>
                         <p class="adm-small adm-muted" style="margin: 0.25rem 0 0">
                             {{ ROLE_LABEL[card.role] }}<template v-if="card.banned_until"> · <b style="color: #ff8a80">забанен</b></template>
                             <template v-if="card.must_change_password"> · сменит пароль при входе</template>
@@ -192,7 +192,7 @@
 // действия. Ник, «о себе» и контакты выводятся только текстом.
 import { computed, onMounted, ref, watch } from 'vue'
 import UserAvatar from '@/site/components/UserAvatar.vue'
-import UserTag from '@/site/components/UserTag.vue'
+import NickWithTag from '@/site/components/NickWithTag.vue'
 import { applyTags, tagOf, tagsStore } from '@/site/social/tags'
 import { fetchTagsPayload, setUserTag } from '../api/tags'
 import { parseTrackKey } from '@/utils/lyrics'

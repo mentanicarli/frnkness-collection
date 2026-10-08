@@ -2,7 +2,7 @@
   <div id="page-home" class="page active">
     <div class="shell px-6" style="padding-top: clamp(1.75rem,5vw,4rem); padding-bottom: 0.5rem;">
       <section class="stagger-item" :class="{ visible: shown > 0 }" style="margin-bottom: clamp(1.625rem,4vw,3.25rem);">
-        <h1 class="hero-title">Pupsiks<br><span class="hero-accent">Saga</span></h1>
+        <h1 class="hero-title">Pupsiks<br>Saga</h1>
         <p class="text-[var(--fg-muted)] max-w-xl leading-relaxed" style="margin-top: 1.5rem; font-size: clamp(0.9375rem,1.4vw,1.0625rem);">Полная коллекция релизов frnk ness про компанию Пупсиков. Альбомы, синглы и тексты песен в одном месте.</p>
         <div class="mt-8 flex flex-wrap items-center gap-3">
           <button

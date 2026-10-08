@@ -15,6 +15,7 @@
       <AddToPlaylistDialog />
       <CreateRoomDialog />
       <FeedbackDialog />
+      <LogoutDialog />
       <NoticeToast />
       <RecapBanner />
     </template>
@@ -37,6 +38,7 @@ import MiniPlayer from '@/site/components/MiniPlayer.vue'
 import AddToPlaylistDialog from '@/site/components/AddToPlaylistDialog.vue'
 import CreateRoomDialog from '@/site/components/CreateRoomDialog.vue'
 import FeedbackDialog from '@/site/components/FeedbackDialog.vue'
+import LogoutDialog from '@/site/components/LogoutDialog.vue'
 import NoticeToast from '@/site/components/NoticeToast.vue'
 import RecapBanner from '@/site/recap/RecapBanner.vue'
 import { bindRoomsToSession } from '@/site/rooms'

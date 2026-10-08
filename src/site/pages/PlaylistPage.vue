@@ -10,17 +10,22 @@
           <h1 class="social-h1" data-testid="playlist-title">{{ pl.title }}</h1>
           <p v-if="pl.description" class="profile-bio">{{ pl.description }}</p>
           <p class="social-meta">
-            <RouterLink v-if="pl.owner" class="acc-link" :to="{ name: 'user', params: { nick: pl.owner.nick } }">{{ pl.owner.nick }}</RouterLink><UserTag :user-id="pl.owner.id" />
+            <NickWithTag v-if="pl.owner" :user-id="pl.owner.id"><RouterLink class="acc-link" :to="{ name: 'user', params: { nick: pl.owner.nick } }">{{ pl.owner.nick }}</RouterLink></NickWithTag>
             · {{ pl.tracks.length }} {{ plural(pl.tracks.length, 'трек', 'трека', 'треков') }}
           </p>
-          <div v-if="pl.tracks.length" class="social-actions">
-            <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="playlist-play" @click="play(0)">Слушать</button>
-            <button class="acc-btn acc-btn-sm" type="button" @click="shuffle">Перемешать</button>
+          <div v-if="pl.tracks.length || isOwner" class="social-actions">
+            <template v-if="pl.tracks.length">
+              <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="playlist-play" @click="play(0)">Слушать</button>
+              <button class="acc-btn acc-btn-sm" type="button" @click="shuffle">Перемешать</button>
+            </template>
+            <button v-if="isOwner" class="acc-btn acc-btn-sm" :class="{ 'acc-btn-primary': !pl.tracks.length }" type="button" :aria-expanded="pickerOpen ? 'true' : 'false'" data-testid="playlist-add-tracks" @click="pickerOpen = !pickerOpen">Добавить треки</button>
           </div>
         </div>
       </div>
 
-      <p v-if="!pl.tracks.length" class="acc-alert acc-alert-info">В плейлисте пока нет треков. Добавляй их кнопкой «В плейлист» у любого трека.</p>
+      <PlaylistTrackPicker v-if="isOwner && pickerOpen" :existing="pl.tracks" :busy="busy" :max="PLAYLIST_TRACKS_MAX" @add="addTrack" />
+
+      <p v-if="!pl.tracks.length" class="acc-alert acc-alert-info">В плейлисте пока нет треков.<template v-if="isOwner"> Нажми «Добавить треки» или кнопку «В плейлист» у любого трека.</template></p>
       <TrackList v-else :track-ids="pl.tracks" :source="source" :editable="isOwner" :busy="busy" label="Треки плейлиста" @play="play" @move="move" @remove="remove" />
 
       <template v-if="isOwner">
@@ -71,14 +76,15 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { session } from '@/site/session'
 import { checkAvatarSource } from '@/site/auth/avatars'
 import { api, errorText, type PlaylistFull } from '../social/api'
-import { COVER_SIZE, coverUrls, deletePlaylist, moveItem, rememberPlaylist, removePlaylistCover, uploadPlaylistCover } from '../social/playlists'
+import { COVER_SIZE, PLAYLIST_TRACKS_MAX, coverUrls, deletePlaylist, moveItem, rememberPlaylist, removePlaylistCover, uploadPlaylistCover } from '../social/playlists'
 import { showNotice } from '../social/notice'
 import { plural } from '../social/format'
 import { playList, playListShuffled } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
 import PlaylistCover from '../components/PlaylistCover.vue'
-import UserTag from '../components/UserTag.vue'
+import PlaylistTrackPicker from '../components/PlaylistTrackPicker.vue'
+import NickWithTag from '../components/NickWithTag.vue'
 import AvatarCropper from '../components/AvatarCropper.vue'
 import { PLAYLIST_DESCRIPTION_MAX, PLAYLIST_TITLE_MAX, cleanPlaylistTitle, validatePlaylistTitle } from '../../../supabase/functions/_shared/accounts.ts'
 
@@ -168,6 +174,20 @@ function remove(index: number) {
   void guarded(async () => {
     const summary = await api.playlistRemoveTrack(p.id, trackId)
     merge({ ...summary, tracks: p.tracks.filter((t) => t !== trackId) })
+  })
+}
+
+// «Добавить треки»: в конец списка тем же RPC, что и «В плейлист» у трека.
+// Лимит и повторы проверяем до запроса (сервер проверяет их тоже).
+const pickerOpen = ref(false)
+
+function addTrack(trackId: string) {
+  const p = pl.value
+  if (!p || p.tracks.includes(trackId) || p.tracks.length >= PLAYLIST_TRACKS_MAX) return
+  void guarded(async () => {
+    const summary = await api.playlistAddTrack(p.id, trackId)
+    // Ответ RPC без списка: добавляем к тому, что на экране сейчас.
+    merge({ ...summary, tracks: [...(pl.value?.tracks ?? p.tracks), trackId] })
   })
 }
 
