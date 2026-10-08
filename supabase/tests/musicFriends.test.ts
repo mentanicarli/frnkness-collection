@@ -367,6 +367,11 @@ describe('музыка и друзья: права', () => {
             await expect(as(db, 'anon', ANON, `select public.admin_user_social('${USER.sub}')`)).rejects.toThrow(/permission denied/)
         })
 
+        it('по are_friends нельзя узнать чужие дружбы', async () => {
+            expect(await rpc(USER2, 'public.are_friends($1, $2)', [USER2.sub, USER.sub])).toBe(true)
+            expect(await rpc(STRANGER, 'public.are_friends($1, $2)', [USER2.sub, USER.sub])).toBe(false)
+        })
+
         it('внутренние помощники недоступны сайту', async () => {
             for (const sql of [`public.relation_to('${USER.sub}')`, `public.friends_count('${USER.sub}')`, `public.fresh_now_playing('${USER.sub}')`, 'public.require_active_user()']) {
                 await expect(rpc(USER, sql)).rejects.toThrow(/permission denied/)

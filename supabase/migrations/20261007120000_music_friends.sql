@@ -70,6 +70,8 @@ create table if not exists public.now_playing (
 );
 
 -- ── 2. Помощники ───────────────────────────────────────────────────────
+-- Дружат ли a и b. Отвечает только одному из них: функция открыта
+-- сайту (её вызывают политики RLS), и чужие дружбы по ней узнать нельзя.
 create or replace function public.are_friends(a uuid, b uuid)
 returns boolean
 language sql
@@ -77,7 +79,7 @@ stable
 security definer
 set search_path = ''
 as $$
-    select a is not null and b is not null and exists (
+    select a is not null and b is not null and auth.uid() in (a, b) and exists (
         select 1 from public.friendships f
         where f.status = 'accepted'
           and least(f.requester, f.addressee) = least(a, b)
