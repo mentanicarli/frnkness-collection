@@ -1,11 +1,16 @@
 <template>
     <div class="adm-top">
         <div class="adm-top-inner">
+            <button
+                class="adm-menu-btn"
+                type="button"
+                aria-controls="adm-sidebar"
+                :aria-expanded="menuOpen ? 'true' : 'false'"
+                :aria-label="menuOpen ? 'Закрыть меню разделов' : 'Открыть меню разделов'"
+                data-testid="admin-menu-btn"
+                @click="menuOpen = !menuOpen"
+            >☰</button>
             <a class="adm-brand" href="#/">frnk ness<small>админка</small></a>
-            <nav class="adm-nav" aria-label="Разделы">
-                <a v-for="item in nav" :key="item.id" :href="item.id === 'home' ? '#/' : '#/' + item.id"
-                   :class="{ active: route.section.value === item.id }">{{ item.label }}</a>
-            </nav>
             <div class="adm-user">
                 <a class="adm-small adm-faint" href="./">На сайт</a>
                 <span class="adm-user-email" data-testid="admin-nick">{{ auth.name.value }}</span>
@@ -13,38 +18,56 @@
             </div>
         </div>
     </div>
-    <main class="adm-shell">
-        <component :is="current" :key="route.section.value" />
-    </main>
+    <div class="adm-layout">
+        <div v-if="menuOpen" class="adm-backdrop" data-testid="admin-backdrop" @click="menuOpen = false"></div>
+        <aside id="adm-sidebar" class="adm-side" :class="{ open: menuOpen }" data-testid="admin-sidebar">
+            <nav aria-label="Разделы">
+                <div v-for="group in groups" :key="group.id" class="adm-nav-group" role="group" :aria-label="group.title || undefined">
+                    <p v-if="group.title" class="adm-nav-title" aria-hidden="true">{{ group.title }}</p>
+                    <a
+                        v-for="item in group.items"
+                        :key="item.id"
+                        class="adm-nav-link"
+                        :href="item.id === 'home' ? '#/' : '#/' + item.id"
+                        :class="{ active: isActive(route.section.value, item.id) }"
+                        :aria-current="isActive(route.section.value, item.id) ? 'page' : undefined"
+                        :data-testid="`nav-${item.id}`"
+                    >{{ item.label }}</a>
+                </div>
+            </nav>
+        </aside>
+        <main class="adm-shell">
+            <component :is="current" :key="route.section.value" />
+        </main>
+    </div>
     <PublishToast />
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, type Component } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { useAuth } from './composables/useAuth'
 import { useRoute } from './composables/useRoute'
+import { isActive, visibleGroups } from './lib/nav'
 import HomeView from './views/HomeView.vue'
 import PublishToast from './components/PublishToast.vue'
 
 const auth = useAuth()
 const route = useRoute()
 
-const NAV = [
-    { id: 'home', label: 'Обзор' },
-    { id: 'users', label: 'Пользователи' },
-    { id: 'recovery', label: 'Заявки', ownerOnly: true },
-    { id: 'stats', label: 'Статистика' },
-    { id: 'lyrics', label: 'Тексты' },
-    { id: 'lrc', label: 'Караоке' },
-    { id: 'promo', label: 'Промо' },
-    { id: 'catalog', label: 'Каталог' },
-    { id: 'releases', label: 'Релизы' },
-    { id: 'history', label: 'История' },
-    { id: 'new-release', label: 'Новый релиз' }
-] as { id: string; label: string; ownerOnly?: boolean }[]
-
 // «Заявки на восстановление» — только владельцу (база тоже не отдаст их админу).
-const nav = computed(() => NAV.filter((item) => !item.ownerOnly || auth.isOwner.value))
+const groups = computed(() => visibleGroups(auth.isOwner.value))
+
+// На телефоне панель прячется за кнопкой ☰: закрывается выбором раздела,
+// нажатием мимо и клавишей Esc.
+const menuOpen = ref(false)
+watch(() => route.segments.value.join('/'), () => {
+    menuOpen.value = false
+})
+const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') menuOpen.value = false
+}
+onMounted(() => document.addEventListener('keydown', onKey))
+onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 
 const placeholder = defineAsyncComponent(() => import('./views/PlaceholderView.vue'))
 

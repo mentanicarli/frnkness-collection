@@ -73,6 +73,12 @@
                         </ol>
                     </details>
 
+                    <h3 class="adm-label" style="margin-top: 0.75rem">Топ-4 · {{ social.top4.length }}</h3>
+                    <p v-if="!social.top4.length" class="adm-small adm-faint" data-testid="user-top4-empty">Не заполнен.</p>
+                    <ol v-else class="adm-small" style="margin: 0.25rem 0 0.75rem; padding-left: 1.25rem" data-testid="user-top4">
+                        <li v-for="t in social.top4" :key="t.position" :value="t.position">{{ trackTitleById(t.track_id) }}</li>
+                    </ol>
+
                     <h3 class="adm-label" style="margin-top: 0.75rem">Плейлисты · {{ social.playlists.length }}</h3>
                     <p v-if="!social.playlists.length" class="adm-small adm-faint">Нет.</p>
                     <ul class="adm-pl-list">

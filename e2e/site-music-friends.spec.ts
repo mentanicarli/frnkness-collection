@@ -233,7 +233,8 @@ test('мой топ: заглушка, пока прослушиваний не�
     await installMocks(page, { social })
     await signInSite(page)
     await page.goto(`/#/u/${encodeURIComponent(PLAIN_USER.nick)}`)
-    await expect(page.getByRole('heading', { name: 'Мой топ' })).toBeVisible()
+    // «Мой топ» (по прослушиваниям) — не путать с «Мой топ-4» (выбор самого человека).
+    await expect(page.getByRole('heading', { name: 'Мой топ', exact: true })).toBeVisible()
     await expect(page.getByTestId('top-empty')).toContainText('после 10 секунд')
 })
 

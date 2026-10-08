@@ -77,7 +77,7 @@ describe('стена: без входа — только заставка и э�
         expect(await open('#/')).toEqual({ name: 'welcome', hash: '#/welcome' })
     })
 
-    it.each(['chart', 'me'])('гость не открывает #/%s', async (path) => {
+    it.each(['chart', 'me', 'feed'])('гость не открывает #/%s', async (path) => {
         __setSessionForTests(null)
         expect((await open(`#/${path}`)).name).toBe('welcome')
     })

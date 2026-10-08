@@ -46,6 +46,8 @@
         </div>
       </section>
 
+      <ReactionBar />
+
       <section class="settings-section" aria-labelledby="room-people">
         <h2 id="room-people">Участники · {{ room.members.length }}</h2>
         <ul class="user-list">
@@ -128,6 +130,7 @@ import { room, rooms, roomLink } from '../rooms'
 import type { RoomInfo, RoomMember } from '../rooms/api'
 import { ROOM_CAPACITY, isRoomId } from '../rooms/sync'
 import UserRow from '../components/UserRow.vue'
+import ReactionBar from '../components/ReactionBar.vue'
 
 const route = useRoute()
 const router = useRouter()

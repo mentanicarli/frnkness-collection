@@ -5,6 +5,7 @@ import type { ChannelEvents, ChannelFactory, PresenceEntry, RoomChannel } from '
 import type { ServerClock } from './clock'
 import { rlog } from './log'
 import type { PlayerPort } from './port'
+import { REACTION_EVENT, type ReactionEmoji, type ReactionItem, createReactionHub, isReactionEmoji, parseReaction, reactionTopic } from './reactions'
 import {
     CLOCK_RESYNC_MS,
     CONNECT_ATTEMPTS,
@@ -77,6 +78,10 @@ export interface RoomUiState {
     nextTrackIds: string[]
     /** Следующий трек неизвестен заранее (Поток). */
     nextRandom: boolean
+    /** Летящие сейчас реакции (не больше REACTIONS_ON_SCREEN). */
+    reactions: readonly ReactionItem[]
+    /** Канал реакций открыт: кнопки можно нажимать. */
+    reactionsReady: boolean
 }
 
 const initialState = (): RoomUiState => ({
@@ -97,7 +102,9 @@ const initialState = (): RoomUiState => ({
     playing: false,
     nowTrackId: null,
     nextTrackIds: [],
-    nextRandom: false
+    nextRandom: false,
+    reactions: [],
+    reactionsReady: false
 })
 
 export const createRoomState = (): RoomUiState => shallowReactive(initialState())
@@ -137,6 +144,10 @@ interface Session {
     timers: ReturnType<typeof setInterval>[]
     offs: (() => void)[]
     closing: boolean
+    /** Канал реакций (топик roomfx:…): отдельный от канала команд, лучшее из возможного — комнате не мешает. */
+    fx: RoomChannel | null
+    fxTimer: ReturnType<typeof setTimeout> | null
+    fxAttempt: number
 }
 
 export function createRoomController(deps: RoomDeps, state: RoomUiState = createRoomState()) {
@@ -145,6 +156,19 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
     /** Номер попытки подключения: устаревшие (человек успел нажать другое) бросаются. */
     let startToken = 0
     let restoring = false
+
+    // Реакции: что летит на экране и кого пускать (частота, потолок, участник).
+    const hub = createReactionHub({
+        now: () => Date.now(),
+        random: () => Math.random(),
+        setTimeout: (fn, ms) => setTimeout(fn, ms),
+        clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+        // Ник берём из списка участников, а не из сообщения: чужому тексту не верим.
+        nickOf: (userId) => state.members.find((m) => m.id === userId)?.nick ?? null,
+        onChange: (items) => {
+            state.reactions = items
+        }
+    })
 
     // ── Состояние для экранов ──────────────────────────────────────────
 
@@ -182,6 +206,8 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         if (s.downTimer) clearTimeout(s.downTimer)
         port.setRole(null)
         if (s.role === 'guest') port.release()
+        await stopReactions(s)
+        hub.clear()
         await s.channel?.stop().catch(() => undefined)
         if (announce) deps.notify(announce)
     }
@@ -217,11 +243,84 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
             refreshAgain: false,
             timers: [],
             offs: [],
-            closing: false
+            closing: false,
+            fx: null,
+            fxTimer: null,
+            fxAttempt: 0
         }
     }
 
     const current = (s: Session): boolean => session === s && !s.closing
+
+    // ── Реакции ────────────────────────────────────────────────────────
+    // Отдельный канал (топик roomfx:…): в него пишут все участники. Он не
+    // влияет на комнату: не открылся — просто нет реакций, остальное работает.
+
+    const FX_RETRY_MS = 8000
+    const FX_ATTEMPTS = 5
+
+    async function stopReactions(s: Session): Promise<void> {
+        if (s.fxTimer) clearTimeout(s.fxTimer)
+        s.fxTimer = null
+        const ch = s.fx
+        s.fx = null
+        if (session === s || !session) state.reactionsReady = false
+        await ch?.stop().catch(() => undefined)
+    }
+
+    function onReaction(s: Session, event: string, payload: unknown): void {
+        if (!current(s) || event !== REACTION_EVENT) return
+        const reaction = parseReaction(payload)
+        // Свои реакции приходят только локально (self: false), ещё раз — не показываем.
+        if (!reaction || reaction.from === deps.me()?.id) return
+        // Отправителя ещё нет в нашем списке (только что вошёл): эту реакцию
+        // отбрасываем, но список обновляем — следующие уже покажутся.
+        if (!state.members.some((m) => m.id === reaction.from)) return scheduleRefresh(s)
+        hub.show(reaction.from, reaction.emoji)
+    }
+
+    async function startReactions(s: Session): Promise<void> {
+        const me = deps.me()
+        if (!current(s) || !me) return
+        await stopReactions(s)
+        if (!current(s)) return
+        const channel = deps.channel(reactionTopic(s.view.id, s.epoch), me.id, {
+            onBroadcast: (event, payload) => onReaction(s, event, payload),
+            onPresence: () => undefined,
+            onReconnect: () => undefined,
+            onDown: () => undefined
+        })
+        try {
+            await channel.start()
+        } catch (e) {
+            rlog('реакции: канал не открылся', String(e instanceof Error ? e.message : e))
+            await channel.stop().catch(() => undefined)
+            if (current(s) && s.fxAttempt < FX_ATTEMPTS) {
+                s.fxAttempt++
+                s.fxTimer = setTimeout(() => {
+                    s.fxTimer = null
+                    void startReactions(s)
+                }, FX_RETRY_MS)
+            }
+            return
+        }
+        if (!current(s)) {
+            await channel.stop().catch(() => undefined)
+            return
+        }
+        s.fx = channel
+        s.fxAttempt = 0
+        state.reactionsReady = true
+    }
+
+    /** Нажатие на эмодзи. Лишние нажатия (частота, потолок на экране) молча игнорируются. */
+    function react(emoji: ReactionEmoji): void {
+        const s = session
+        const me = deps.me()
+        if (!s || !current(s) || !me || !s.fx || state.status !== 'live' || !isReactionEmoji(emoji)) return
+        if (!hub.show(me.id, emoji)) return
+        void s.fx.send(REACTION_EVENT, { from: me.id, emoji })
+    }
 
     async function startSession(view: RoomView): Promise<void> {
         const token = ++startToken
@@ -257,6 +356,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         state.status = 'live'
         state.attempt = 0
         rlog('в комнате', view.id, s.role)
+        void startReactions(s)
         startTimers(s)
         if (s.role === 'host') await hostEnter(s)
         else guestEnter(s)
@@ -440,6 +540,9 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         } catch {
             deps.notify('Не удалось переподключиться к комнате', true)
         }
+        // Реакции переезжают на топик новой эпохи вместе с комнатой.
+        s.fxAttempt = 0
+        void startReactions(s)
     }
 
     // ── Presence и сообщения ───────────────────────────────────────────
@@ -755,7 +858,7 @@ export function createRoomController(deps: RoomDeps, state: RoomUiState = create
         return api.info(roomId)
     }
 
-    return { state, restore, create, join, connect, enableSound, leave, close, kick, invite, reload, reset, info }
+    return { state, restore, create, join, connect, enableSound, leave, close, kick, invite, reload, reset, info, react }
 }
 
 export type RoomController = ReturnType<typeof createRoomController>

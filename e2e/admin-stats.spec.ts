@@ -89,6 +89,10 @@ function statsRpc(mock: StatsMock): MockOptions['rpc'] {
 async function openStats(page: Page, mock: StatsMock) {
     const mocks = await installMocks(page, { rpc: statsRpc(mock) })
     await loginAs(page, ADMIN_USER)
+    // На телефоне разделы спрятаны за кнопкой ☰ (боковая панель): дождаться шапки и открыть.
+    await page.getByTestId('admin-nick').waitFor({ state: 'attached' })
+    const menu = page.getByTestId('admin-menu-btn')
+    if (await menu.isVisible()) await menu.click()
     await page.getByRole('link', { name: 'Статистика' }).click()
     await expect(page.getByTestId('tiles')).toBeVisible()
     return mocks

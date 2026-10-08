@@ -22,6 +22,10 @@
         </div>
       </div>
 
+      <!-- Топ-4: видят все вошедшие, не только друзья -->
+      <Top4Block :rows="top4" :own="profile.relation === 'self'" @edit="editing = true" />
+      <Top4Editor v-if="editing" :rows="top4" @close="editing = false" @saved="onTop4Saved" />
+
       <section v-if="profile.now_playing" class="settings-section" aria-labelledby="u-now" data-testid="now-playing">
         <h2 id="u-now">Сейчас слушает</h2>
         <TrackList :track-ids="[profile.now_playing.track_id]" :numbered="false" label="Сейчас слушает" @play="playOne(profile.now_playing.track_id)" />
@@ -75,7 +79,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
 import UserAvatar from '@/site/components/UserAvatar.vue'
-import { api, errorText, type PlaylistSummary, type UserPage } from '../social/api'
+import { api, errorText, type PlaylistSummary, type Top4Row, type UserPage } from '../social/api'
 import { refreshFriendRequests } from '../social/friends'
 import { showNotice } from '../social/notice'
 import { formatDate, plural } from '../social/format'
@@ -85,6 +89,8 @@ import { playList, playTrackByRef, startFavoritesFlow } from '../player/engine'
 import type { QueueSource } from '../player/queue'
 import TrackList from '../components/TrackList.vue'
 import PlaylistGrid from '../components/PlaylistGrid.vue'
+import Top4Block from '../components/Top4Block.vue'
+import Top4Editor from '../components/Top4Editor.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,6 +101,9 @@ const playlists = ref<PlaylistSummary[] | null>(null)
 const favoriteIds = ref<string[] | null>(null)
 const top = ref<TopItem[] | null>(null)
 const topDays = ref<TopPeriod>(30)
+// «Мой топ-4» (выбранные самим человеком треки) — отдельно от «Топа» по прослушиваниям.
+const top4 = ref<Top4Row[] | null>(null)
+const editing = ref(false)
 const coverOf = (id: string) => releases[id]?.cover ?? null
 
 const canSee = computed(() => profile.value?.relation === 'self' || profile.value?.relation === 'friend')
@@ -108,7 +117,10 @@ async function load(nick: string) {
   profile.value = p
   state.value = p ? 'ok' : 'missing'
   playlists.value = favoriteIds.value = top.value = null
+  top4.value = null
+  editing.value = false
   if (!p) return
+  void api.userTop4(p.id).then((rows) => { if (my === seq) top4.value = rows ?? [] }).catch(() => { if (my === seq) top4.value = [] })
   // Ник в адресе — как его записал владелец (регистр, ё).
   if (p.nick !== nick) void router.replace({ name: 'user', params: { nick: p.nick } })
   void api.userPlaylists(p.id).then((rows) => { if (my === seq) playlists.value = rows ?? [] }).catch(() => { if (my === seq) playlists.value = [] })
@@ -156,6 +168,12 @@ watch(
   },
   { immediate: true }
 )
+
+function onTop4Saved(rows: Top4Row[]) {
+  top4.value = rows
+  editing.value = false
+  showNotice('Топ-4 сохранён')
+}
 
 function playOne(trackId: string) {
   const info = trackInfo(trackId)

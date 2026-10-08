@@ -156,8 +156,13 @@ class FakeChannel implements RoomChannel {
         readonly events: ChannelEvents
     ) {}
 
+    /** Топик реакций (roomfx:…): пишут и слушают все участники текущей эпохи. */
+    private get reactions(): boolean {
+        return this.topic.startsWith('roomfx:')
+    }
+
     private room(): FakeRoom | undefined {
-        const m = /^room:([0-9a-f-]{36}):(\d+)$/.exec(this.topic)
+        const m = /^(?:room|roomfx):([0-9a-f-]{36}):(\d+)$/.exec(this.topic)
         const r = m ? this.backend.rooms.get(m[1]) : undefined
         return r && !r.closed && r.members.has(this.userId) && r.epoch === Number(m![2]) ? r : undefined
     }
@@ -185,6 +190,12 @@ class FakeChannel implements RoomChannel {
     }
 
     async send(event: string, payload: unknown): Promise<boolean> {
+        if (this.reactions) {
+            if (!this.room()) return false
+            const wire = JSON.parse(JSON.stringify(payload))
+            for (const c of this.peers()) if (c !== this) c.events.onBroadcast(event, wire)
+            return true
+        }
         const m = /^room:([0-9a-f-]{36}):(\d+)$/.exec(this.topic)
         const r = m ? this.backend.rooms.get(m[1]) : undefined
         // Политика: команды — только хозяин, в текущую или прошлую эпоху.
@@ -693,6 +704,8 @@ describe('комнаты: хозяин и гости', () => {
     function flaky(backend: FakeBackend, failures: number, calls: { n: number }): ChannelFactory {
         return (topic, userId, events) => {
             const inner = new FakeChannel(backend, topic, userId, events)
+            // Канал реакций — отдельный, в счёт попыток входа в комнату не идёт.
+            if (topic.startsWith('roomfx:')) return inner
             calls.n++
             if (calls.n <= failures) {
                 inner.start = async () => {
@@ -854,7 +867,7 @@ describe('комнаты: хозяин и гости', () => {
         await hostRoom()
         const calls = { n: 0 }
         const counting: ChannelFactory = (t, u, e) => {
-            calls.n++
+            if (!t.startsWith('roomfx:')) calls.n++
             return backend.channelFactory(t, u, e)
         }
         const guest = openWindow(backend, 'guest', 0, { channel: counting })
@@ -876,5 +889,169 @@ describe('комнаты: хозяин и гости', () => {
         expect(calls.n).toBe(2)
         expect(guest.state.linkDown).toBe(false)
         expect(guest.state.status).toBe('live')
+    })
+})
+
+describe('комнаты: реакции', () => {
+    let backend: FakeBackend
+    beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(1_800_000_000_000)
+        backend = new FakeBackend()
+    })
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    async function roomWith(guests: string[] = ['guest']) {
+        const host = openWindow(backend, 'host', 0)
+        host.player.start(0, 30_000)
+        const creating = host.room.create('Реакции')
+        await settle(1500)
+        await creating
+        const wins: Win[] = []
+        for (const g of guests) {
+            const w = openWindow(backend, g, 0)
+            void w.room.join(ROOM_ID)
+            await settle(3000)
+            wins.push(w)
+        }
+        await settle(3000)
+        return { host, guests: wins }
+    }
+
+    const fxPeer = (uid: string, epoch = 0) => [...(backend.channels.get(`roomfx:${ROOM_ID}:${epoch}`) ?? [])].find((c) => c.userId === uid)!
+    const shown = (w: Win) => w.state.reactions.map((r) => `${r.emoji} ${r.nick}`)
+
+    it('реакцию шлёт любой участник — не только хозяин; ник берётся из списка участников', async () => {
+        const { host, guests: [guest] } = await roomWith()
+        expect(host.state.reactionsReady).toBe(true)
+        expect(guest.state.reactionsReady).toBe(true)
+
+        guest.room.react('🔥')
+        await settle(50)
+        // У отправителя и у хозяина — один и тот же ник из списка участников.
+        expect(shown(guest)).toEqual(['🔥 ник-guest'])
+        expect(shown(host)).toEqual(['🔥 ник-guest'])
+
+        await settle(1000)
+        host.room.react('❤️')
+        await settle(50)
+        expect(shown(guest)).toContain('❤️ ник-host')
+        expect(shown(host)).toContain('❤️ ник-host')
+    })
+
+    it('не больше 2 в секунду на человека: лишние нажатия молча игнорируются, ничего не уходит в канал', async () => {
+        const { host, guests: [guest] } = await roomWith()
+        for (let i = 0; i < 6; i++) guest.room.react('😂')
+        await settle(50)
+        expect(guest.state.reactions).toHaveLength(2)
+        expect(host.state.reactions).toHaveLength(2)
+        expect(guest.notices.filter((n) => n.error)).toEqual([])
+        // Через секунду окно освободилось.
+        await settle(1000)
+        guest.room.react('👏')
+        await settle(50)
+        expect(host.state.reactions).toHaveLength(3)
+    })
+
+    it('фильтр есть и у получателя: поток от «изменённого» клиента режется до 2 в секунду', async () => {
+        const { host } = await roomWith()
+        const hostFx = fxPeer('host')
+        for (let i = 0; i < 20; i++) hostFx.events.onBroadcast('reaction', { from: 'guest', emoji: '💀' })
+        expect(host.state.reactions).toHaveLength(2)
+    })
+
+    it('чужой payload не принимается: не эмодзи из набора, разметка, неизвестный участник, чужое событие', async () => {
+        const { host, guests: [guest] } = await roomWith()
+        const hostFx = fxPeer('host')
+        const id = '00000000-0000-4000-8000-000000000001'
+        for (const payload of [null, 'x', 5, {}, { from: id, emoji: '<img src=x onerror=alert(1)>' }, { from: id, emoji: '🔥🔥' }, { from: 'не-id', emoji: '🔥' }, { from: id, emoji: '🍕' }]) {
+            hostFx.events.onBroadcast('reaction', payload)
+        }
+        // Правильный формат, но такого участника в комнате нет.
+        hostFx.events.onBroadcast('reaction', { from: id, emoji: '🔥' })
+        // Другое событие по тому же каналу.
+        hostFx.events.onBroadcast('state', { from: id, emoji: '🔥' })
+        expect(host.state.reactions).toHaveLength(0)
+        expect(guest.state.reactions).toHaveLength(0)
+    })
+
+    it('на экране не больше 15 эмодзи; лишние отбрасываются, через время места освобождаются', async () => {
+        const { host, guests } = await roomWith(['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8'])
+        const all = [host, ...guests]
+        // 9 человек × 2 нажатия = 18 попыток за одну секунду.
+        for (const w of all) {
+            w.room.react('🔥')
+            w.room.react('🫶')
+        }
+        await settle(50)
+        expect(host.state.reactions.length).toBeLessThanOrEqual(15)
+        expect(host.state.reactions.length).toBeGreaterThan(10)
+        // Они улетают, и место освобождается.
+        await settle(3000)
+        expect(host.state.reactions).toHaveLength(0)
+        host.room.react('🤯')
+        await settle(50)
+        expect(host.state.reactions).toHaveLength(1)
+    })
+
+    it('реакции нигде не сохраняются: после выхода пусто, в базе и состоянии комнаты их нет', async () => {
+        const { host, guests: [guest] } = await roomWith()
+        guest.room.react('😭')
+        await settle(50)
+        expect(host.state.reactions).toHaveLength(1)
+        expect(JSON.stringify(backend.rooms.get(ROOM_ID))).not.toContain('😭')
+        await guest.room.leave()
+        expect(guest.state.reactions).toEqual([])
+        expect(guest.state.reactionsReady).toBe(false)
+        // Новый гость, вошедший позже, прошлых реакций не видит.
+        const late = openWindow(backend, 'late', 0)
+        void late.room.join(ROOM_ID)
+        await settle(3000)
+        expect(late.state.reactions).toEqual([])
+    })
+
+    it('исключение: реакции переезжают на новую эпоху у оставшихся, выгнанный их больше не получает', async () => {
+        const { host, guests: [stay, gone] } = await roomWith(['stay', 'gone'])
+        await host.room.kick('gone')
+        await settle(5000)
+        expect(gone.state.roomId).toBeNull()
+        expect(gone.state.reactionsReady).toBe(false)
+        expect(stay.state.epoch).toBe(1)
+        expect(stay.state.reactionsReady).toBe(true)
+        stay.room.react('🔥')
+        await settle(50)
+        expect(shown(host)).toEqual(['🔥 ник-stay'])
+        expect(gone.state.reactions).toEqual([])
+        // На старом топике реакций больше нет никого.
+        expect(backend.channels.get(`roomfx:${ROOM_ID}:0`)?.size ?? 0).toBe(0)
+    })
+
+    it('канал реакций не открылся — комната работает как прежде, нажатия игнорируются без ошибок', async () => {
+        const host = await (async () => {
+            const h = openWindow(backend, 'host', 0)
+            h.player.start(0, 30_000)
+            const creating = h.room.create('Без реакций')
+            await settle(1500)
+            await creating
+            return h
+        })()
+        const broken: ChannelFactory = (topic, userId, events) => {
+            const ch = backend.channelFactory(topic, userId, events)
+            if (topic.startsWith('roomfx:')) ch.start = async () => { throw new Error('Unauthorized') }
+            return ch
+        }
+        const guest = openWindow(backend, 'guest', 0, { channel: broken })
+        void guest.room.join(ROOM_ID)
+        await settle(3000)
+        expect(guest.state.status).toBe('live')
+        expect(guest.state.reactionsReady).toBe(false)
+        guest.room.react('🔥')
+        await settle(50)
+        expect(guest.state.reactions).toEqual([])
+        expect(host.state.reactions).toEqual([])
+        expect(guest.notices.filter((n) => n.error)).toEqual([])
+        expect(guest.player.trackId).toBe('album-one/first-track')
     })
 })
