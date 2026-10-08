@@ -8,7 +8,7 @@
     </form>
     <p v-if="!myPlaylists.loaded" class="acc-hint">Загрузка…</p>
     <EmptyHint v-else-if="!myPlaylists.items.length" title="Плейлистов пока нет" text="Плейлист — твоя подборка треков. Назови его выше и создай, а потом добавляй треки кнопкой «В плейлист» на странице трека.">
-      <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-create-playlist" @click="titleInput?.focus()">Создать плейлист</button>
+      <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" data-testid="hint-create-playlist" @click="titleInput?.focus()">Придумать название</button>
       <RouterLink class="acc-btn acc-btn-sm" :to="{ name: 'home' }">Выбрать треки</RouterLink>
     </EmptyHint>
     <PlaylistGrid v-else :playlists="myPlaylists.items" />

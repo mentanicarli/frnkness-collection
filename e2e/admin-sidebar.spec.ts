@@ -19,10 +19,10 @@ test('компьютер: слева все разделы по группам, 
     await expect(nav.getByRole('group', { name: 'Статистика' })).toBeVisible()
     await expect(nav.getByRole('group', { name: 'Люди' })).toBeVisible()
     await expect(nav.getByRole('group', { name: 'Контент' }).getByRole('link')).toHaveText(['Тексты', 'Караоке', 'Промо', 'Каталог', 'Релизы', 'История', 'Новый релиз'])
-    await expect(nav.getByRole('group', { name: 'Люди' }).getByRole('link')).toHaveText(['Пользователи', 'Заявки'])
-    await expect(nav.getByRole('group', { name: 'Статистика' }).getByRole('link')).toHaveText(['Статистика', 'Итоги года'])
-    // Все 12 разделов видны сразу, без прокрутки панели.
-    await expect(nav.getByRole('link')).toHaveCount(12)
+    await expect(nav.getByRole('group', { name: 'Люди' }).getByRole('link')).toHaveText(['Пользователи', 'Заявки', 'Обращения'])
+    await expect(nav.getByRole('group', { name: 'Статистика' }).getByRole('link')).toHaveText(['Статистика', 'Итоги года', 'Ошибки'])
+    // Все 14 разделов видны сразу, без прокрутки панели.
+    await expect(nav.getByRole('link')).toHaveCount(14)
     for (const link of await nav.getByRole('link').all()) await expect(link).toBeInViewport()
     expect(await noSideScroll(page)).toBe(true)
 
@@ -52,8 +52,8 @@ test('«Заявки» только у владельца; у админа ос�
     await loginAs(page, ADMIN_USER)
     const nav = page.getByRole('navigation', { name: 'Разделы' })
     await expect(nav.getByRole('link', { name: 'Заявки' })).toHaveCount(0)
-    await expect(nav.getByRole('group', { name: 'Люди' }).getByRole('link')).toHaveText(['Пользователи'])
-    await expect(nav.getByRole('link')).toHaveCount(11)
+    await expect(nav.getByRole('group', { name: 'Люди' }).getByRole('link')).toHaveText(['Пользователи', 'Обращения'])
+    await expect(nav.getByRole('link')).toHaveCount(13)
 })
 
 test.describe('телефон', () => {
