@@ -374,3 +374,11 @@ button.top4-card.playing .top4-cover { outline: 2px solid var(--page-accent); }
 .room-debug-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.25rem 1rem; max-width: 26rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; }
 .room-debug-grid dt { color: var(--fg-muted); }
 .room-debug-grid dd { margin: 0; text-align: right; color: var(--fg); }
+
+/* Нижняя панель «⋯» у трека: тот же вид, что у меню профиля (account.css: .menu-item) */
+.sheet.menu-sheet { background: var(--bg-1); border-color: var(--line-2); padding: 0.5rem 0.5rem calc(0.5rem + var(--safe-bottom)); }
+.menu-sheet .sheet-head { padding: 0.25rem 0.75rem 0.5rem; border-bottom: 1px solid var(--line); margin-bottom: 0; }
+.menu-sheet .menu-group { padding: 0.375rem 0 0; }
+.menu-sheet .menu-item:disabled { opacity: 0.35; }
+.menu-icon.filled { fill: currentColor; }
+.menu-item .menu-icon.fav-on { color: var(--fg); }

@@ -1,44 +1,33 @@
 <template>
-  <ModalFrame :open="Boolean(trackMenu.trackId)" sheet :label="`Действия: ${info.title}`" testid="track-sheet" @close="closeTrackMenu">
+  <ModalFrame :open="Boolean(trackMenu.trackId)" sheet box-class="menu-sheet" :label="`Действия: ${info.title}`" testid="track-sheet" @close="closeTrackMenu">
     <div ref="panel">
-        <div class="sheet-head">
-          <span class="tl-cover"><img v-if="info.cover" :src="info.cover" :srcset="coverSrcset(info.cover)" sizes="48px" alt="" decoding="async"></span>
-          <span class="tl-text">
-            <span class="tl-title">{{ info.title }}</span>
-            <span class="tl-sub">{{ info.releaseTitle }}</span>
-          </span>
-        </div>
-        <div class="sheet-actions">
-          <template v-if="info.available">
-            <button class="sheet-action" type="button" data-testid="sheet-favorite" @click="toggleFav">
-              <span class="sheet-ico" :class="{ on: favorite }" aria-hidden="true">{{ favorite ? '♥' : '♡' }}</span>
-              {{ favorite ? 'Убрать из избранного' : 'В избранное' }}
-            </button>
-            <button class="sheet-action" type="button" data-testid="sheet-playlist" @click="toPlaylist">
-              <span class="sheet-ico" aria-hidden="true">＋</span>В плейлист
-            </button>
-            <button class="sheet-action" type="button" data-testid="sheet-lyrics" @click="toLyrics">
-              <span class="sheet-ico" aria-hidden="true">≡</span>Текст
-            </button>
-            <button class="sheet-action" type="button" data-testid="sheet-share" @click="share">
-              <span class="sheet-ico" aria-hidden="true">↗</span>Поделиться
-            </button>
-            <button v-if="nextAvailable" class="sheet-action" type="button" data-testid="sheet-play-next" @click="playAfterCurrent">
-              <span class="sheet-ico" aria-hidden="true">⏭</span>Играть следующим
-            </button>
-          </template>
-          <button
-            v-for="a in trackMenu.extras"
-            :key="a.id"
-            class="sheet-action"
-            :class="{ danger: a.danger }"
-            type="button"
-            :disabled="a.disabled"
-            :data-testid="`sheet-${a.id}`"
-            @click="runExtra(a)"
-          >{{ a.label }}</button>
-        </div>
-        <button class="sheet-close" type="button" data-testid="sheet-close" @click="closeTrackMenu">Закрыть</button>
+      <div class="sheet-head">
+        <span class="tl-cover"><img v-if="info.cover" :src="info.cover" :srcset="coverSrcset(info.cover)" sizes="48px" alt="" decoding="async"></span>
+        <span class="tl-text">
+          <span class="tl-title">{{ info.title }}</span>
+          <span class="tl-sub">{{ info.releaseTitle }}</span>
+        </span>
+      </div>
+      <div class="menu-group" role="group">
+        <template v-if="info.available">
+          <button class="menu-item" type="button" data-testid="sheet-favorite" @click="toggleFav">
+            <MenuIcon name="heart" :filled="favorite" :class="{ 'fav-on': favorite }" />{{ favorite ? 'Убрать из избранного' : 'В избранное' }}
+          </button>
+          <button class="menu-item" type="button" data-testid="sheet-lyrics" @click="toLyrics"><MenuIcon name="text" />Текст</button>
+          <button class="menu-item" type="button" data-testid="sheet-playlist" @click="toPlaylist"><MenuIcon name="playlist" />В плейлист</button>
+          <button class="menu-item" type="button" data-testid="sheet-share" @click="share"><MenuIcon name="share" />Поделиться</button>
+        </template>
+        <button
+          v-for="a in trackMenu.extras"
+          :key="a.id"
+          class="menu-item"
+          :class="{ 'menu-item-danger': a.danger }"
+          type="button"
+          :disabled="a.disabled"
+          :data-testid="`sheet-${a.id}`"
+          @click="runExtra(a)"
+        >{{ a.label }}</button>
+      </div>
     </div>
   </ModalFrame>
 </template>
@@ -47,11 +36,10 @@
 // Нижняя панель действий трека («⋯» в любом списке треков).
 import { computed, nextTick, ref, watch } from 'vue'
 import ModalFrame from './ModalFrame.vue'
+import MenuIcon from './MenuIcon.vue'
 import { coverSrcset } from '@/utils/cover'
 import { releases } from '@/config'
 import { trackShareUrl } from '@/utils/share'
-import { canPlayNext, playNext } from '../player/engine'
-import { player } from '../player/state'
 import { goTrack } from '../router'
 import { canNativeShare, copyToClipboard, nativeShare } from '../share'
 import { openAddToPlaylist } from '../social/addDialog'
@@ -63,8 +51,6 @@ import { closeTrackMenu, trackMenu, type MenuAction } from '../social/trackMenu'
 const panel = ref<HTMLElement | null>(null)
 const info = computed(() => trackInfo(trackMenu.trackId ?? ''))
 const favorite = computed(() => isFavorite(trackMenu.trackId))
-// Очередь «играет сейчас» — от неё зависит, есть ли «Играть следующим».
-const nextAvailable = computed(() => player.visible && canPlayNext())
 
 function toggleFav() {
   const id = trackMenu.trackId
@@ -92,12 +78,6 @@ async function share() {
   const url = trackShareUrl(releaseId, track)
   if (canNativeShare()) await nativeShare(title, url)
   else showNotice((await copyToClipboard(url)) ? 'Ссылка скопирована' : 'Не удалось скопировать ссылку', false)
-}
-
-function playAfterCurrent() {
-  const id = trackMenu.trackId
-  closeTrackMenu()
-  if (id) showNotice(playNext(id) ? 'Сыграет следующим' : 'Не получилось добавить в очередь', false)
 }
 
 function runExtra(a: MenuAction) {
