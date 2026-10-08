@@ -399,6 +399,23 @@ describe('комнаты: права и лимиты', () => {
         })
     })
 
+    describe('статистика', () => {
+        it('каждый участник засчитывается отдельно: трек попадает в «мой топ» гостя со своим user_id', async () => {
+            const id = await mkRoom(USER)
+            await rpc(USER2, 'public.room_join($1)', [id])
+            // Хозяин и гость слушают один трек в комнате: обычное прослушивание у каждого.
+            await as(db, 'authenticated', USER, "select public.increment_play_count('album-one-2')")
+            await as(db, 'authenticated', USER2, "select public.increment_play_count('album-one-2')")
+            await as(db, 'authenticated', USER2, "select public.increment_play_count('album-one-2')")
+            expect(await rpc(USER2, 'public.user_top($1, null)', [USER2.sub])).toEqual([{ track_key: 'album-one-2', plays: 2 }])
+            expect(await rpc(USER, 'public.user_top($1, null)', [USER.sub])).toEqual([{ track_key: 'album-one-2', plays: 1 }])
+            // Чужой топ гость не видит (если они не друзья).
+            await expect(rpc(USER2, 'public.user_top($1, null)', [USER.sub])).rejects.toThrow(/Нет доступа/)
+            const rows = (await db.query<any>("select user_id from public.play_events where track_key = 'album-one-2' order by user_id")).rows
+            expect(rows.map((r) => r.user_id).sort()).toEqual([USER.sub, USER2.sub, USER2.sub].sort())
+        })
+    })
+
     describe('закрытие', () => {
         it('хозяин закрывает: все выходят и могут войти в другую комнату', async () => {
             const a = await mkRoom(USER, 'А')
@@ -559,8 +576,17 @@ describe('комнаты: права и лимиты', () => {
             expect(await canListen(USER2, topic(id, 1))).toBe(true)
             // Старый топик закрыт и для оставшихся: переезд на новый обязателен.
             expect(await canListen(USER2, topic(id, 0))).toBe(false)
+            // Хозяин может сообщить «тебя выгнали» по старому топику (одна эпоха назад)…
+            expect(await canSend(USER, topic(id, 0), 'broadcast')).toBe(true)
+            expect(await canSend(USER2, topic(id, 0), 'broadcast')).toBe(false)
+            expect(await canSend(STRANGER, topic(id, 0), 'broadcast')).toBe(false)
+            expect(await canSend(USER, topic(id, 1), 'broadcast')).toBe(true)
+            // …а позже — нет: через две эпохи старый топик закрыт и для хозяина.
+            await rpc(USER2, 'public.room_join($1)', [id]).catch(() => undefined)
+            await rpc(USER, 'public.room_kick($1, $2)', [id, USER2.sub])
             expect(await canSend(USER, topic(id, 0), 'broadcast')).toBe(false)
             expect(await canSend(USER, topic(id, 1), 'broadcast')).toBe(true)
+            expect(await canSend(USER, topic(id, 2), 'broadcast')).toBe(true)
             // Вернуться по ссылке выгнанный тоже не может.
             await expect(rpc(STRANGER, 'public.room_join($1)', [id])).rejects.toThrow(/выгнали/)
             expect(await canListen(STRANGER, topic(id, 1))).toBe(false)

@@ -189,7 +189,9 @@ $$;
 -- Доступ к приватному каналу комнаты (политики realtime.messages).
 -- Топик: room:<uuid>:<эпоха>. p_owner_only — только хозяин. Участник
 -- должен быть в комнате сейчас, комната — открыта, эпоха — текущей, аккаунт —
--- не забанен и не удалён.
+-- не забанен и не удалён. Исключение одно: хозяин ещё может написать в
+-- топик прошлой эпохи — сообщение «тебя выгнали» уходит по старому каналу,
+-- где выгнанный ещё подключён, а остальные из него переезжают.
 create or replace function public.room_topic_access(p_topic text, p_owner_only boolean)
 returns boolean
 language plpgsql
@@ -208,7 +210,7 @@ begin
         from public.rooms r
         join public.room_members mm on mm.room_id = r.id and mm.user_id = auth.uid()
         where r.id = m[1]::uuid
-          and r.epoch = m[2]::integer
+          and (r.epoch = m[2]::integer or (p_owner_only and r.epoch = m[2]::integer + 1))
           and r.closed_at is null
           and (not p_owner_only or r.owner_id = auth.uid())
     );

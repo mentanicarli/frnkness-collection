@@ -3,7 +3,7 @@
   <div
     id="fullscreen-player"
     class="fullscreen-player"
-    :class="{ open: karaoke.fsOpen, 'lyrics-open': karaoke.fsLyricsOpen, 'karaoke-open': karaokeOpen, 'no-karaoke-transition': noKaraokeTransition }"
+    :class="{ open: karaoke.fsOpen, 'lyrics-open': karaoke.fsLyricsOpen, 'karaoke-open': karaokeOpen, 'no-karaoke-transition': noKaraokeTransition, 'room-guest': player.roomRole === 'guest' }"
   >
     <div id="fs-bg" class="fullscreen-bg"></div>
     <div class="fs-track-info">

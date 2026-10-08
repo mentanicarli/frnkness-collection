@@ -5,12 +5,12 @@
       type="button"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="menu"
-      :aria-label="friendRequests.incoming ? `Меню профиля, новых заявок в друзья: ${friendRequests.incoming}` : 'Меню профиля'"
+      :aria-label="pending ? `Меню профиля, ждут ответа: ${pending}` : 'Меню профиля'"
       data-testid="user-menu"
       @click.stop="open = !open"
     >
       <UserAvatar :avatar="session.user.avatar" :nick="session.user.nick" :user-id="session.user.id" :size="2.25" :cover-of="coverOf" />
-      <span v-if="friendRequests.incoming" class="user-menu-badge" data-testid="friend-requests-badge">{{ friendRequests.incoming > 9 ? '9+' : friendRequests.incoming }}</span>
+      <span v-if="pending" class="user-menu-badge" data-testid="friend-requests-badge">{{ pending > 9 ? '9+' : pending }}</span>
     </button>
     <div v-if="open" class="user-menu-list" role="menu" @click="open = false">
       <p class="nick">{{ session.user.nick || 'Профиль' }}</p>
@@ -18,8 +18,10 @@
       <RouterLink role="menuitem" :to="{ name: 'favorites' }">Избранное</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'playlists' }">Мои плейлисты</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'friends' }">
-        Друзья<span v-if="friendRequests.incoming" class="badge" style="margin-left: 0.5rem;">{{ friendRequests.incoming }}</span>
+        Друзья<span v-if="pending" class="badge" style="margin-left: 0.5rem;">{{ pending }}</span>
       </RouterLink>
+      <RouterLink v-if="room.roomId" role="menuitem" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="menu-room">Комната «{{ room.title }}»</RouterLink>
+      <button v-if="!room.isOwner" role="menuitem" type="button" data-testid="menu-create-room" @click="openCreateRoom">Создать комнату</button>
       <RouterLink role="menuitem" :to="{ name: 'me' }">Настройки</RouterLink>
       <a v-if="isAdminRole(session.user.role)" role="menuitem" href="./admin.html">Админка</a>
       <button role="menuitem" type="button" @click="logout">Выйти</button>
@@ -28,15 +30,17 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { session, signOut } from '@/site/session'
-import { friendRequests } from '@/site/social/friends'
+import { pendingCount } from '@/site/social/friends'
+import { openCreateRoom, room } from '@/site/rooms'
 import UserAvatar from './UserAvatar.vue'
 import { isAdminRole } from '../../../supabase/functions/_shared/accounts.ts'
 
 const router = useRouter()
+const pending = computed(() => pendingCount())
 const open = ref(false)
 const root = ref<HTMLElement | null>(null)
 const coverOf = (id: string) => releases[id]?.cover ?? null

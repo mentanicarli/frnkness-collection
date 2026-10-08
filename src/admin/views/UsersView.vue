@@ -103,6 +103,17 @@
                     </ul>
                 </div>
 
+                <!-- Комната (этап 4): открытая комната пользователя и кнопка «Закрыть комнату». -->
+                <div v-if="userRoom" class="adm-user-room" data-testid="user-room">
+                    <h3 class="adm-label" style="margin-top: 0.75rem">Открытая комната</h3>
+                    <div class="adm-row" style="justify-content: space-between; align-items: center">
+                        <span style="min-width: 0; word-break: break-word"><b data-testid="user-room-title">{{ userRoom.title }}</b>
+                            <span class="adm-faint adm-small"> · {{ userRoom.members }} чел. · с {{ formatDate(userRoom.created_at) }}</span>
+                        </span>
+                        <button class="adm-btn adm-btn-sm adm-btn-danger" type="button" :disabled="busy" data-testid="user-room-close" @click="closeRoom">Закрыть комнату</button>
+                    </div>
+                </div>
+
                 <div v-if="notice" class="adm-alert" :class="noticeOk ? 'adm-alert-ok' : 'adm-alert-error'" role="status" data-testid="user-notice">{{ notice }}</div>
 
                 <div class="adm-user-actions">
@@ -175,8 +186,11 @@ import {
     type UserCard,
     type UserRow,
     type UserSocial,
+    closeUserRoom,
     fetchUserCard,
+    fetchUserRoom,
     fetchUserSocial,
+    type UserRoom,
     fetchUsers,
     generateTempPassword,
     userAction
@@ -198,6 +212,7 @@ const error = ref('')
 const selectedId = ref<string | null>(null)
 const card = ref<UserCard | null>(null)
 const social = ref<UserSocial | null>(null)
+const userRoom = ref<UserRoom | null>(null)
 const playlistTitles = ref<Record<string, string>>({})
 const busy = ref(false)
 const notice = ref('')
@@ -256,16 +271,36 @@ async function loadCard() {
     if (!selectedId.value) return
     const id = selectedId.value
     try {
-        const [c, s] = await Promise.all([fetchUserCard(id), fetchUserSocial(id).catch(() => null)])
+        const [c, s, r] = await Promise.all([fetchUserCard(id), fetchUserSocial(id).catch(() => null), fetchUserRoom(id).catch(() => null)])
         if (selectedId.value !== id) return
         card.value = c
         social.value = s
+        userRoom.value = r
         playlistTitles.value = Object.fromEntries((s?.playlists ?? []).map((p) => [p.id, p.title]))
         newNick.value = c.nick ?? ''
         newBio.value = c.bio ?? ''
     } catch (e) {
         noticeOk.value = false
         notice.value = message(e)
+    }
+}
+
+async function closeRoom() {
+    const room = userRoom.value
+    if (!room || !window.confirm(`Закрыть комнату «${room.title}»? Все участники выйдут.`)) return
+    busy.value = true
+    notice.value = ''
+    try {
+        await closeUserRoom(room.id)
+        noticeOk.value = true
+        notice.value = 'Комната закрыта'
+        await loadCard()
+        notice.value = 'Комната закрыта'
+    } catch (e) {
+        noticeOk.value = false
+        notice.value = message(e)
+    } finally {
+        busy.value = false
     }
 }
 
@@ -285,6 +320,7 @@ function select(id: string) {
     selectedId.value = id
     card.value = null
     social.value = null
+    userRoom.value = null
     notice.value = ''
     deleteConfirm.value = ''
     tempPassword.value = generateTempPassword()

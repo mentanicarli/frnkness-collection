@@ -6,6 +6,7 @@ import { createListenSender, setupListenTracker } from '@/runtime/listenTracker'
 import { currentAccessToken } from '../session'
 import { updatePageAccent, updatePlayerAccent } from '../services/colors'
 import { incrementPlayCount } from '../services/stats'
+import { showNotice } from '../social/notice'
 import { view } from '../stores/view'
 import { getAudio, setAudio } from './audio'
 import { loadLyrics, updateKaraoke } from './karaoke'
@@ -31,6 +32,18 @@ import { karaoke, player } from './state'
 type Direction = 'next' | 'prev' | 'fade' | null
 
 const COUNT_AFTER_SEC = 10
+
+/**
+ * Гость комнаты: плеером управляет хозяин. Кнопки гостя ничего не делают,
+ * а показывают короткую подсказку; громкость и «Выйти» — его.
+ */
+export const GUEST_HINT = 'Музыкой управляет хозяин комнаты'
+
+function guestBlocked(): boolean {
+    if (player.roomRole !== 'guest') return false
+    showNotice(GUEST_HINT)
+    return true
+}
 
 /** Трек есть в каталоге (иначе — «недоступен», очередь его пропускает). */
 export const isTrackAvailable = (trackId: string): boolean => findTrackById(releases, trackId) !== null
@@ -68,6 +81,7 @@ export function replaceQueue(queue: Queue, direction: Direction = 'fade'): void 
  * перемешиванием — если оно включено или передано явно.
  */
 export function playList(source: QueueSource, trackIds: readonly string[], startIndex = 0, options: { shuffle?: boolean } = {}): void {
+    if (guestBlocked()) return
     const shuffle = options.shuffle ?? player.shuffle
     if (options.shuffle !== undefined) player.shuffle = options.shuffle
     const queue = createListQueue(source, trackIds, startIndex, isTrackAvailable, { shuffle })
@@ -76,6 +90,7 @@ export function playList(source: QueueSource, trackIds: readonly string[], start
 
 /** Перемешать список и начать со случайного трека. */
 export function playListShuffled(source: QueueSource, trackIds: readonly string[]): void {
+    if (guestBlocked()) return
     const available = trackIds.map((id, i) => (isTrackAvailable(id) ? i : -1)).filter((i) => i >= 0)
     if (!available.length) return
     playList(source, trackIds, available[Math.floor(Math.random() * available.length)], { shuffle: true })
@@ -90,16 +105,19 @@ function startEndless(source: QueueSource, pool: readonly string[]): void {
 }
 
 export function startFlowMode(): void {
+    if (guestBlocked()) return
     startEndless({ kind: 'flow' }, catalogTrackIds())
 }
 
 /** Поток по избранному (своему или друга). */
 export function startFavoritesFlow(ownerId: string, trackIds: readonly string[]): void {
+    if (guestBlocked()) return
     startEndless({ kind: 'favorites-flow', ownerId }, trackIds)
 }
 
 /** Выключить Поток: трек доигрывает, дальше — по его релизу. */
 export function stopFlowMode(): void {
+    if (guestBlocked()) return
     const queue = player.queue
     if (!queue?.endless || !player.currentReleaseId) {
         player.flowModeActive = false
@@ -115,6 +133,7 @@ export function toggleFlowMode(): void {
 
 /** Перемешивание: для списков — сразу, для Потока смысла нет (и так случайно). */
 export function toggleShuffle(): void {
+    if (guestBlocked()) return
     if (player.queue?.controller === 'remote') return
     player.shuffle = !player.shuffle
     if (player.queue && !player.queue.endless) player.queue = setQueueShuffle(player.queue, player.shuffle)
@@ -150,6 +169,7 @@ export function runWhenIdle(fn: () => void): void {
 // Трек релиза: треклист, поиск, чарт, страница трека. Очередь — этот
 // релиз; если играет Поток по каталогу — он продолжается с этого трека.
 export function playTrackByRef(releaseId: string, trackIndex: number, direction: Direction = 'fade'): void {
+    if (guestBlocked()) return
     const release = releases[releaseId]
     const track = release?.tracks[trackIndex]
     if (!release || !track) return
@@ -164,6 +184,7 @@ export function playTrackByRef(releaseId: string, trackIndex: number, direction:
 
 // Трек index ИГРАЮЩЕГО релиза — в той же очереди, если это очередь релиза.
 export function playTrack(index: number, direction: Direction = null): void {
+    if (guestBlocked()) return
     const releaseId = player.currentReleaseId
     const queue = player.queue
     if (!releaseId) return
@@ -178,7 +199,7 @@ let trackStartSeq = 0
 
 // Запуск трека index играющего релиза (player.currentRelease уже выставлен
 // очередью).
-function startTrack(index: number, direction: Direction): void {
+function startTrack(index: number, direction: Direction, options: { autoplay?: boolean } = {}): void {
     const release = player.currentRelease
     const audio = getAudio()
     const track = release?.tracks[index]
@@ -207,22 +228,29 @@ function startTrack(index: number, direction: Direction): void {
     const upcomingRef = upcoming ? findTrackById(releases, currentTrackId(upcoming) ?? '') : null
     if (upcomingRef) preloadTrackMetadata(upcomingRef.releaseId, upcomingRef.trackIndex)
 
-    const playPromise = audio.play()
-    if (playPromise && typeof playPromise.then === 'function') {
-        playPromise
-            .then(() => { player.isPlaying = true })
-            .catch((err) => {
-                player.isPlaying = false
-                console.log('Play error:', err)
-            })
+    if (options.autoplay === false) {
+        // Комната: трек загружается на паузе, играть и перематывать будет
+        // applyRemotePlayback, когда он загрузится.
+        player.isPlaying = false
     } else {
-        player.isPlaying = true
+        const playPromise = audio.play()
+        if (playPromise && typeof playPromise.then === 'function') {
+            playPromise
+                .then(() => { player.isPlaying = true })
+                .catch((err) => {
+                    player.isPlaying = false
+                    console.log('Play error:', err)
+                })
+        } else {
+            player.isPlaying = true
+        }
     }
 
     void loadLyrics(index)
 }
 
 export function togglePlay(): void {
+    if (guestBlocked()) return
     const audio = getAudio()
     if (!audio) return
     if (audio.paused) {
@@ -238,6 +266,7 @@ export function togglePlay(): void {
 // «Вперёд/назад», конец трека, экран блокировки — по очереди любого
 // источника. Очередь хозяина комнаты (controller 'remote') гость не двигает.
 export function nextTrack(): void {
+    if (guestBlocked()) return
     const queue = player.queue
     if (!queue || queue.controller === 'remote') return
     const next = nextInQueue(queue, isTrackAvailable)
@@ -245,6 +274,7 @@ export function nextTrack(): void {
 }
 
 export function prevTrack(): void {
+    if (guestBlocked()) return
     const queue = player.queue
     if (!queue || queue.controller === 'remote') return
     const prev = prevInQueue(queue, isTrackAvailable)
@@ -254,6 +284,7 @@ export function prevTrack(): void {
 
 /** Перемотка по клику на полосе прогресса: fraction — доля от 0 до 1. */
 export function seekToFraction(fraction: number): void {
+    if (guestBlocked()) return
     const audio = getAudio()
     if (!audio || !audio.duration) return
     audio.currentTime = fraction * audio.duration
@@ -261,6 +292,7 @@ export function seekToFraction(fraction: number): void {
 
 /** Перемотка к времени со старта воспроизведения (клик по строке караоке, поиск). */
 export function seekTo(time: number): void {
+    if (guestBlocked()) return
     const audio = getAudio()
     if (!audio || !Number.isFinite(time) || time < 0) return
 
@@ -350,7 +382,9 @@ function setMiniPlayerVisible(visible: boolean) {
     player.visible = visible
 }
 
-export function closeMiniPlayer(): void {
+/** force — выход из аккаунта: закрыть плеер, даже если ты гость комнаты. */
+export function closeMiniPlayer(force = false): void {
+    if (!force && guestBlocked()) return
     getAudio()?.pause()
     player.isPlaying = false
     setMiniPlayerVisible(false)
@@ -373,6 +407,159 @@ export function toggleMute(): void {
     player.sliderValue = audio.muted ? 0 : (audio.volume || 0.5)
 }
 
+// ── Комната: воспроизведение по команде хозяина ─────────────────────────
+// Эти функции вызывает только модуль комнат (src/site/rooms): кнопки гостя
+// заблокированы выше, а здесь управление идёт «мимо» блокировки.
+
+/** Что сейчас делает плеер — для хозяина (снимок состояния) и гостя (выверка). */
+export interface PlaybackInfo {
+    trackId: string | null
+    positionMs: number
+    durationMs: number | null
+    playing: boolean
+    /** Трек загружен настолько, что его можно перематывать и играть без заминки. */
+    ready: boolean
+}
+
+export function getPlaybackInfo(): PlaybackInfo {
+    const audio = getAudio()
+    const trackId = player.currentTrackId
+    const duration = audio && Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration * 1000 : null
+    return {
+        trackId,
+        positionMs: audio ? Math.max(0, audio.currentTime * 1000) : 0,
+        durationMs: duration,
+        playing: Boolean(audio && trackId && !audio.paused && !audio.ended),
+        ready: Boolean(audio && audio.readyState >= 3)
+    }
+}
+
+let silentWavUrl: string | null = null
+
+// Тишина в 0,1 с (WAV, 8 кГц, моно): нужна только для «разблокировки» звука.
+function silentWav(): string {
+    if (silentWavUrl) return silentWavUrl
+    const samples = 800
+    const buf = new ArrayBuffer(44 + samples)
+    const v = new DataView(buf)
+    const text = (at: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(at + i, s.charCodeAt(i)) }
+    text(0, 'RIFF'); v.setUint32(4, 36 + samples, true); text(8, 'WAVE'); text(12, 'fmt ')
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true)
+    text(36, 'data'); v.setUint32(40, samples, true)
+    new Uint8Array(buf, 44).fill(128)
+    silentWavUrl = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }))
+    return silentWavUrl
+}
+
+/**
+ * Вызывать СРАЗУ в обработчике нажатия «Подключиться», до любых await:
+ * браузер включает звук только по жесту пользователя. Проигрываем
+ * короткую тишину тем же <audio>, дальше команды хозяина запускают звук сами.
+ */
+export function unlockAudio(): void {
+    const audio = getAudio()
+    if (!audio || !audio.paused) return
+    try {
+        audio.src = silentWav()
+        // Загруженный трек сброшен: комната включит нужный заново.
+        player.currentTrackId = null
+        player.isPlaying = false
+        const p = audio.play()
+        if (p && typeof p.catch === 'function') p.catch(() => undefined)
+    } catch {
+        // Без разблокировки гость увидит кнопку «Включить звук».
+    }
+}
+
+export type RemoteApplyResult = 'ok' | 'missing-track'
+
+function whenTrackReady(audio: HTMLAudioElement, run: () => void): void {
+    const token = trackStartSeq
+    const once = () => {
+        if (token === trackStartSeq) run()
+    }
+    if (audio.readyState >= 3) once()
+    else audio.addEventListener('canplay', once, { once: true })
+}
+
+/**
+ * Включить то, что играет в комнате: очередь целиком, трек, позиция. Позицию
+ * считает targetMs() в момент, когда трек загрузился (canplay), а не в момент
+ * команды — иначе загрузка сдвинула бы гостя назад. Трека нет в каталоге
+ * этого сайта (устаревшая версия в кэше) — 'missing-track', без ошибки.
+ */
+export function applyRemotePlayback(queue: Queue, playing: boolean, targetMs: () => number): RemoteApplyResult {
+    const trackId = currentTrackId(queue)
+    const ref = trackId ? findTrackById(releases, trackId) : null
+    const audio = getAudio()
+    if (!ref || !audio) return ref ? 'ok' : 'missing-track'
+    setQueue(queue)
+    if (player.currentTrackId === trackId && audio.src) {
+        // Тот же трек: очередь обновлена, перематывает и запускает вызывающий.
+        return 'ok'
+    }
+    player.currentRelease = releases[ref.releaseId]
+    player.currentReleaseId = ref.releaseId
+    startTrack(ref.trackIndex, 'fade', { autoplay: false })
+    whenTrackReady(audio, () => {
+        seekRemoteMs(targetMs())
+        if (playing) void playRemote()
+    })
+    return 'ok'
+}
+
+/** Очередь комнаты обновилась, трек прежний. */
+export function setRemoteQueue(queue: Queue): void {
+    setQueue(queue)
+}
+
+export function seekRemoteMs(ms: number): void {
+    const audio = getAudio()
+    if (!audio || !Number.isFinite(ms) || ms < 0) return
+    audio.currentTime = ms / 1000
+    if (karaoke.mode === 'karaoke') updateKaraoke()
+}
+
+/** true — звук пошёл; false — браузер не разрешил (нужно нажатие). */
+export async function playRemote(): Promise<boolean> {
+    const audio = getAudio()
+    if (!audio) return false
+    try {
+        await audio.play()
+        player.isPlaying = true
+        setMiniPlayerVisible(true)
+        return true
+    } catch {
+        player.isPlaying = false
+        return false
+    }
+}
+
+/** Гость вышел из комнаты: музыка хозяина замолкает, очередь чужая — убираем. */
+export function releaseRemote(): void {
+    pauseRemote()
+    if (player.queue?.controller === 'remote') setQueue(null)
+}
+
+export function pauseRemote(): void {
+    const audio = getAudio()
+    if (!audio) return
+    audio.pause()
+    player.isPlaying = false
+}
+
+// Хозяину комнаты нужно знать о перемотке и паузе: <audio> появляется
+// после входа, поэтому подписка ждёт его.
+const audioHooks = new Set<(audio: HTMLAudioElement) => void>()
+
+export function onAudioAttached(hook: (audio: HTMLAudioElement) => void): () => void {
+    const audio = getAudio()
+    if (audio) hook(audio)
+    else audioHooks.add(hook)
+    return () => audioHooks.delete(hook)
+}
+
 // ── Подключение <audio> ─────────────────────────────────────────────────
 
 /** Ключ играющего трека в статистике: «<releaseId>-<индекс>». */
@@ -386,6 +573,8 @@ export function currentStatsKey(): string | null {
 /** Вызывает MiniPlayer.vue при монтировании, один раз за жизнь страницы. */
 export function attachAudio(audio: HTMLAudioElement): void {
     setAudio(audio)
+    audioHooks.forEach((hook) => hook(audio))
+    audioHooks.clear()
     audio.preload = 'auto'
     audio.volume = player.sliderValue
 
@@ -409,7 +598,10 @@ export function attachAudio(audio: HTMLAudioElement): void {
         if (currentTime >= COUNT_AFTER_SEC && !player.trackCounted && !player.trackCountPending) void countPlay()
     })
     audio.addEventListener('loadedmetadata', () => { player.duration = audio.duration })
-    audio.addEventListener('ended', nextTrack)
+    // Трек гостя доигрывает и ждёт: следующий включит хозяин.
+    audio.addEventListener('ended', () => {
+        if (player.roomRole !== 'guest') nextTrack()
+    })
 
     // Кнопки на экране блокировки, в шторке и на наушниках делают то же, что
     // кнопки плеера: «следующий» в Потоке — случайный трек.
@@ -424,7 +616,7 @@ export function attachAudio(audio: HTMLAudioElement): void {
         pause: () => { if (!audio.paused) togglePlay() },
         next: nextTrack,
         prev: prevTrack,
-        seek: (time) => { audio.currentTime = time }
+        seek: (time) => { if (!guestBlocked()) audio.currentTime = time }
     })
 
     // Сессии прослушивания (дослушивают или пропускают).

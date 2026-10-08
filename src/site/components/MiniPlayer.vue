@@ -1,6 +1,6 @@
 <template>
   <!-- Мини-плеер (плавающий) -->
-  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: player.visible }">
+  <div id="player" class="player fixed bottom-0 left-0 right-0 z-30" :class="{ visible: player.visible, 'room-guest': player.roomRole === 'guest' }">
     <div class="progress-container" @click="seekByClick">
       <div id="progress-bar" class="progress-bar" :style="{ width: `${player.progress}%` }"></div>
     </div>
@@ -41,6 +41,19 @@
               <span>Текст</span>
             </button>
             <FavoriteButton v-if="player.currentTrackId" class="mini-fav" :track-id="player.currentTrackId" :size="18" />
+            <!-- Ты в комнате: по нажатию — переход в неё. -->
+            <RouterLink
+              v-if="room.roomId"
+              class="room-chip"
+              :to="{ name: 'room', params: { id: room.roomId } }"
+              :title="`Комната «${room.title}»`"
+              data-testid="room-chip"
+              @click.stop
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              <span class="room-chip-text">{{ room.status === 'live' ? 'В комнате' : 'Комната' }} · {{ room.title }}</span>
+            </RouterLink>
+            <span v-if="room.roomId && room.hostState === 'away' && !room.isOwner" class="room-chip-wait" data-testid="room-chip-wait">Ждём хозяина</span>
           </div>
         </div>
         <div class="flex items-center flex-shrink-0" style="gap: clamp(0.375rem, 1.2vw, 0.75rem);">
@@ -71,12 +84,13 @@
             </button>
             <input type="range" id="volume-slider" min="0" max="1" step="0.01" :value="player.sliderValue" @input="onVolumeInput">
           </div>
-          <button @click="closeMiniPlayer" class="close-player-btn p-1" aria-label="Закрыть плеер">
+          <button v-if="room.roomId && !room.isOwner && room.status === 'live'" class="room-leave-btn" type="button" data-testid="room-leave-mini" @click="leaveRoom">Выйти</button>
+          <button @click="closeMiniPlayer()" class="close-player-btn p-1" aria-label="Закрыть плеер">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
         <div class="flex sm:hidden items-center">
-          <button @click="closeMiniPlayer" class="close-player-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Закрыть плеер">
+          <button @click="closeMiniPlayer()" class="close-player-btn p-2 text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors" aria-label="Закрыть плеер">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
           </button>
         </div>
@@ -96,6 +110,10 @@ import { player } from '../player/state'
 import { openFsPlayer } from '../player/karaoke'
 import { attachAudio, closeMiniPlayer, nextTrack, prevTrack, seekToFraction, setVolume, toggleMute, togglePlay } from '../player/engine'
 import { volumeWavesFor } from '../player/volume'
+import { RouterLink } from 'vue-router'
+import { room, rooms } from '../rooms'
+import { errorText } from '../social/api'
+import { showNotice } from '../social/notice'
 import FavoriteButton from './FavoriteButton.vue'
 
 const audioEl = ref<HTMLAudioElement | null>(null)
@@ -121,6 +139,15 @@ function onVolumeInput(e: Event) {
 // Кнопка «Текст» — страница играющего трека.
 function goCurrentTrack() {
   if (player.currentReleaseId) goTrack(player.currentReleaseId, player.currentTrackIndex)
+}
+
+async function leaveRoom() {
+  try {
+    await rooms.leave()
+    showNotice('Ты вышел из комнаты')
+  } catch (e) {
+    showNotice(errorText(e), true)
+  }
 }
 
 // На мобиле обложка и название в мини-плеере открывают полноэкранный плеер
