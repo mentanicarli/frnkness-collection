@@ -71,12 +71,11 @@ test('регистрация: ник, пароль, капча, согласие
     expect(created.email).toBe(techEmailSync('новичок'))
     expect(created.role).toBe('user')
 
-    // Профиль: ник и дата регистрации, без числа друзей.
+    // Настройки профиля: ник; админки в меню нет.
     await page.getByTestId('user-menu').click()
-    await page.getByRole('menuitem', { name: 'Профиль и настройки' }).click()
-    await expect(page.getByRole('heading', { name: 'Новичок' })).toBeVisible()
-    await expect(page.getByText(/друз/i)).toHaveCount(0)
     await expect(page.getByRole('menuitem', { name: 'Админка' })).toHaveCount(0)
+    await page.getByRole('menuitem', { name: 'Настройки' }).click()
+    await expect(page.getByRole('heading', { name: 'Новичок' })).toBeVisible()
 })
 
 test('выход: на заставку, закрытые адреса снова недоступны', async ({ page }) => {

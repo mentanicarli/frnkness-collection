@@ -1,5 +1,7 @@
 <template>
-  <div class="cropper-backdrop" role="dialog" aria-modal="true" :aria-label="`Обрезка: ${title}`" @keydown.esc="$emit('cancel')">
+  <!-- В body: внутри страницы окно оказалось бы под мини-плеером. -->
+  <Teleport to="body">
+  <div class="cropper-backdrop" role="dialog" aria-modal="true" :aria-label="round ? 'Обрезка аватара' : 'Обрезка обложки'" @keydown.esc="$emit('cancel')">
     <div class="cropper-box">
       <p class="acc-title" style="font-size: 1.125rem;">{{ title }}</p>
       <p class="acc-sub" style="margin-bottom: 0.875rem;">{{ round ? 'Перетащи картинку и выбери масштаб — в аватар попадёт круг.' : 'Перетащи картинку и выбери масштаб — попадёт квадрат.' }}</p>
@@ -25,6 +27,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
