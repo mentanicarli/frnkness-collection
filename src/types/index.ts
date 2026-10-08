@@ -34,16 +34,6 @@ export interface LyricLine {
     text: string
 }
 
-export interface SearchResult {
-    type: 'release' | 'track' | 'lyric'
-    releaseId: string
-    title: string
-    trackTitle?: string
-    trackIndex: number
-    line: string
-    time: number
-}
-
 export interface TrackRef {
     releaseId: string
     trackIndex: number
@@ -53,11 +43,6 @@ export interface ColorSet {
     hex: string
     glow: string
     soft: string
-}
-
-export interface PlayCountItem {
-    track_key: string
-    plays: number
 }
 
 export interface ChartTrack {

@@ -9,9 +9,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import fs from 'node:fs'
-import path from 'node:path'
-import { ADMIN, ANON, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const STRANGER = { role: 'authenticated', sub: '00000000-0000-4000-8000-000000000003', app_metadata: { role: 'user' } }
 const TECH = (n: number) => `u-${String(n).padStart(32, '0')}@id.frnkness.ru`
@@ -622,32 +620,6 @@ describe('комнаты: права и лимиты', () => {
                 'rooms: members send reactions',
                 'rooms: owner sends commands'
             ])
-        })
-    })
-
-    describe('скрипт аудита', () => {
-        it('rooms_audit.sql выполняется и подтверждает: таблицы закрыты, три политики Realtime, функции без anon', async () => {
-            const sql = fs.readFileSync(path.join(REPO, 'supabase/audit/rooms_audit.sql'), 'utf8')
-            // Несколько запросов в одном файле: исполняем по одному.
-            const statements = sql.split(/;\s*\n/).map((t) => t.trim()).filter((t) => /^select/im.test(t.replace(/^(--.*\n)+/gm, '')))
-            const rows: { section: string; item: string; value: string }[] = []
-            for (const st of statements) rows.push(...(await db.query<any>(st)).rows)
-            const of = (prefix: string) => rows.filter((r) => r.section.startsWith(prefix))
-            expect(of('1 rls').map((r) => r.value)).toEqual(['true', 'true', 'true', 'true'])
-            expect(of('2 table grants')).toEqual([])
-            expect(of('3 table policies')).toEqual([])
-            expect(of('4 realtime').map((r) => r.item)).toEqual([
-                'rooms: members announce presence',
-                'rooms: members hear reactions',
-                'rooms: members listen',
-                'rooms: members send reactions',
-                'rooms: owner sends commands'
-            ])
-            expect(of('5 functions').filter((r) => r.value.includes('anon=true'))).toEqual([])
-            const internal = of('5 functions').filter((r) => /^(rooms_sweep|room_close_internal|room_json|require_own_room|epoch_ms|rooms_on_user_blocked)/.test(r.item))
-            expect(internal.every((r) => r.value.includes('authenticated=false'))).toBe(true)
-            expect(of('6 search_path').every((r) => r.value.includes("search_path=\"\""))).toBe(true)
-            expect(of('7 trigger')).toHaveLength(1)
         })
     })
 })

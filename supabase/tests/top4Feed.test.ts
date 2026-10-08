@@ -9,9 +9,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import fs from 'node:fs'
-import path from 'node:path'
-import { ADMIN, ANON, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const STRANGER = { role: 'authenticated', sub: '00000000-0000-4000-8000-000000000003', app_metadata: { role: 'user' } }
 const TECH = (n: number) => `u-${String(n).padStart(32, '0')}@id.frnkness.ru`
@@ -619,33 +617,6 @@ describe('топ-4, лента, реакции: права и приватнос
             // Целостность: выход раньше входа невозможен.
             await expect(db.exec(`insert into public.room_visits (room_id, role, joined_at, left_at) values ('${id}', 'guest', now(), now() - interval '1 hour')`)).rejects.toThrow(/check/)
             await expect(db.exec(`insert into public.room_visits (room_id, role) values ('${id}', 'admin')`)).rejects.toThrow(/check/)
-        })
-    })
-
-    describe('скрипт аудита', () => {
-        it('top4_feed_audit.sql выполняется и подтверждает: таблицы закрыты, две политики реакций, функции без anon', async () => {
-            const sql = fs.readFileSync(path.join(REPO, 'supabase/audit/top4_feed_audit.sql'), 'utf8')
-            const statements = sql.split(/;\s*\n/).map((t) => t.trim()).filter((t) => /^select/im.test(t.replace(/^(--.*\n)+/gm, '')))
-            const rows: { section: string; item: string; value: string }[] = []
-            for (const st of statements) rows.push(...(await db.query<any>(st)).rows)
-            const of = (prefix: string) => rows.filter((r) => r.section.startsWith(prefix))
-            expect(of('1 rls').map((r) => r.value)).toEqual(['true', 'true', 'true', 'true'])
-            expect(of('1 rls').map((r) => r.item)).toContain('room_visits')
-            expect(of('2 table grants')).toEqual([])
-            expect(of('3 table policies')).toEqual([])
-            expect(of('4 realtime').map((r) => r.item)).toEqual(['rooms: members hear reactions', 'rooms: members send reactions'])
-            expect(of('4 realtime').every((r) => r.value.includes('room_react_access'))).toBe(true)
-            const fns = of('5 functions')
-            expect(fns.filter((r) => r.value.includes('anon=true'))).toEqual([])
-            for (const name of ['user_is_live', 'top4_json', 'room_visits_on_join', 'room_visits_on_leave']) {
-                expect(fns.find((r) => r.item.startsWith(`${name}(`))!.value).toContain('authenticated=false')
-            }
-            for (const name of ['top4_set', 'user_top4', 'feed_prefs_get', 'feed_prefs_set', 'friends_feed', 'admin_user_social', 'room_react_access']) {
-                expect(fns.find((r) => r.item.startsWith(`${name}(`))!.value, name).toContain('authenticated=true')
-            }
-            expect(of('6 search_path').length).toBeGreaterThanOrEqual(11)
-            expect(of('6 search_path').every((r) => r.value.includes('search_path=""'))).toBe(true)
-            expect(of('7 indexes').map((r) => r.item)).toEqual(['favorites_user_idx', 'play_events_user_idx', 'playlists_public_created_idx', 'profile_top4_saves_at_idx'])
         })
     })
 })

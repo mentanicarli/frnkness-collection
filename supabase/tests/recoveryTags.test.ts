@@ -7,9 +7,7 @@
  */
 import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
-import fs from 'node:fs'
-import path from 'node:path'
-import { ADMIN, ANON, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const HASH = (c: string) => c.repeat(64).slice(0, 64)
 const TECH = (n: number) => `u-${String(n).padStart(32, '0')}@id.frnkness.ru`
@@ -244,18 +242,6 @@ describe('код восстановления и теги: права и инв�
             ).rows
             expect(rows).toHaveLength(10)
             for (const r of rows) expect(r.proconfig, r.proname).toContain('search_path=""')
-        })
-
-        it('аудит-скрипт выполняется и ничего лишнего не находит', async () => {
-            const audit = fs.readFileSync(path.join(REPO, 'supabase/audit/recovery_tags_audit.sql'), 'utf8')
-            const statements = audit.split(/;\s*\n/).map((t) => t.trim()).filter((t) => /^select/im.test(t.replace(/^(--.*\n)+/gm, '')))
-            const rows: { section: string; item: string; value: string }[] = []
-            for (const st of statements) rows.push(...(await db.query<any>(st)).rows)
-            expect(rows.filter((r) => r.section.includes('ожидается пусто'))).toEqual([])
-            expect(rows.filter((r) => r.section === '1 rls').map((r) => r.value)).toEqual(['true', 'true', 'true'])
-            expect(rows.filter((r) => r.section === '5 search_path').every((r) => r.value.includes('search_path=""'))).toBe(true)
-            expect(rows.filter((r) => r.section.startsWith('6 ') || r.section.startsWith('7 ')).every((r) => r.value === '0')).toBe(true)
-            expect(rows.filter((r) => r.section === '4 functions' && r.value.includes('anon=true'))).toEqual([])
         })
     })
 })

@@ -6,7 +6,7 @@ import { clearRecoveryHandoff, recoveryHandoff } from './auth/recovery'
 import { type AppRole, cleanNick, roleOf, techEmail } from '../../supabase/functions/_shared/accounts.ts'
 
 /**
- * Кто вошёл на сайт (docs/frnkness-accounts-update.md, разделы 2–5).
+ * Кто вошёл на сайт.
  *
  * Вход — ник + пароль: из ника считается технический адрес аккаунта
  * (supabase/functions/_shared/accounts.ts), дальше обычный вход Supabase.

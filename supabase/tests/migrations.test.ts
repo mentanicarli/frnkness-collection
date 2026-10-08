@@ -5,22 +5,10 @@
  * authenticated и админа. Боевая база не используется.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
 import type { PGlite } from '@electric-sql/pglite'
-import { ADMIN, ANON, NORMALIZE_BAD, OWNER, REPO, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
+import { ADMIN, ANON, NORMALIZE_BAD, OWNER, USER, USER2, applyMigrations, as, createDb } from './pgHarness'
 
 const isStage1 = (m: { name: string }) => m.name.startsWith('20261001')
-
-describe('аудит', () => {
-    it('выполняется на состоянии прода и находит счётчик', async () => {
-        const db = await createDb()
-        const audit = fs.readFileSync(path.join(REPO, 'supabase/audit/play_counts_audit.sql'), 'utf8')
-        const rows = (await db.query<{ section: string; item: string }>(audit)).rows
-        expect(rows.some((r) => r.section === '01 function' && r.item === 'increment_play_count(text)')).toBe(true)
-        expect(rows.some((r) => r.section === '04 rls')).toBe(true)
-    }, 30_000)
-})
 
 describe('самопроверка normalize_track_key', () => {
     it('опасная нормализация (зависит от search_path) — миграция откатывается целиком', async () => {

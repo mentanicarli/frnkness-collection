@@ -184,12 +184,3 @@ export function activeIndex(lines: LrcLine[], currentTime: number): number {
     }
     return idx
 }
-
-/**
- * Совмещает строки текста с готовым .lrc: если тексты совпадают по
- * порядку, время переносится; иначе берётся .lrc как есть.
- */
-export function mergeWithExisting(textLines: string[], lrc: LrcLine[]): { lines: LrcLine[]; matched: boolean } {
-    if (lrc.length === textLines.length && lrc.every((l, i) => l.text === textLines[i])) return { lines: lrc, matched: true }
-    return { lines: lrc, matched: false }
-}
