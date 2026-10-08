@@ -29,6 +29,8 @@ let privs: Map<string, AccountPrivate>
 let recovery: { nick: string; nick_key: string; user_id: string | null; contact: string; comment: string }[]
 let limits: Map<string, number>
 let signedOut: string[]
+let codes: Map<string, { hash: string; confirmed: boolean }>
+let failNextPasswordUpdate: boolean
 let avatarsRemoved: string[]
 let playlists: Map<string, Playlist>
 let coversRemoved: string[]
@@ -54,6 +56,8 @@ function setup() {
     recovery = []
     limits = new Map()
     signedOut = []
+    codes = new Map()
+    failNextPasswordUpdate = false
     avatarsRemoved = []
     playlists = new Map()
     coversRemoved = []
@@ -86,6 +90,10 @@ function setup() {
             },
             async updateUser(id, update) {
                 const u = users.get(id)!
+                if (failNextPasswordUpdate && update.password !== undefined) {
+                    failNextPasswordUpdate = false
+                    throw new Error('auth down')
+                }
                 if (update.email && [...users.values()].some((o) => o.id !== id && o.email === update.email)) throw new Error('exists')
                 if (update.role === 'admin' || update.role === 'user') {
                     if (u.app_metadata?.role === 'owner') throw new Error('Владельца нельзя понизить')
@@ -100,6 +108,7 @@ function setup() {
                 users.delete(id)
                 profiles.delete(id)
                 privs.delete(id)
+                codes.delete(id)
             },
             async verifyPassword(email, password) {
                 return [...users.values()].some((u) => u.email === email && u.password === password)
@@ -140,6 +149,23 @@ function setup() {
             },
             async signOutUser(id) {
                 signedOut.push(id)
+            },
+            async setRecoveryCode(userId, hash) {
+                codes.set(userId, { hash, confirmed: false })
+            },
+            async consumeRecoveryCode(userId, hash) {
+                const c = codes.get(userId)
+                if (!c || c.hash !== hash) return false
+                codes.delete(userId)
+                return true
+            },
+            async confirmRecoveryCode(userId) {
+                const c = codes.get(userId)
+                if (c) c.confirmed = true
+            },
+            async getRecoveryCodeState(userId) {
+                const c = codes.get(userId)
+                return c ? { confirmed: c.confirmed } : null
             },
             async playlistById(id) {
                 return playlists.get(id) ?? null
@@ -295,6 +321,173 @@ describe('recovery-request', () => {
         expect(recovery).toHaveLength(LIMITS.recoveryPerNickDay)
         for (let i = 0; i < 5; i++) await recover({ nick: `ник${i}`, contact: '@x' }, '8.8.8.8')
         expect(recovery.filter((r) => r.nick.startsWith('ник'))).toHaveLength(LIMITS.recoveryPerIpDay)
+    })
+})
+
+const recoverByCode = (body: Record<string, unknown>, ip?: string) => recover({ mode: 'code', ...body }, ip)
+const CODE_RE = /^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$/
+
+describe('код восстановления', () => {
+    async function registered(nick = 'забывчивый', password = 'password1') {
+        const res = await register({ nick, password })
+        expect(res.status).toBe(200)
+        const id = [...profiles.values()].find((p) => p.nick === nick)!.id
+        return { id, code: res.body.recoveryCode as string, password }
+    }
+
+    it('регистрация возвращает код один раз; в базе только хеш, открытого кода там нет', async () => {
+        const { id, code } = await registered()
+        expect(code).toMatch(CODE_RE)
+        const stored = codes.get(id)!
+        expect(stored.hash).toMatch(/^[0-9a-f]{64}$/)
+        expect(JSON.stringify([...codes.entries()])).not.toContain(code.replace(/-/g, ''))
+        expect(stored.confirmed).toBe(false)
+    })
+
+    it('если код выдать не удалось, регистрация всё равно проходит (код можно создать в настройках)', async () => {
+        deps.db.setRecoveryCode = async () => {
+            throw new Error('db down')
+        }
+        const res = await register({ nick: 'без_кода', password: 'password1' })
+        expect(res).toMatchObject({ status: 200, body: { ok: true, recoveryCode: null } })
+        expect(profiles.size).toBe(1)
+    })
+
+    it('вход по коду: пароль меняется, код сгорает, все сеансы завершаются, пароль можно проверить', async () => {
+        const { id, code } = await registered()
+        privs.set(id, { must_change_password: true, nick_changed_at: null })
+        const res = await recoverByCode({ nick: 'ЗАБЫВЧИВЫЙ', code, password: 'new-password-1' })
+        expect(res).toMatchObject({ status: 200, body: { ok: true } })
+        expect(users.get(id)!.password).toBe('new-password-1')
+        expect(signedOut).toEqual([id])
+        expect(privs.get(id)!.must_change_password).toBe(false)
+        expect(codes.has(id)).toBe(false)
+        // Заявок владельцу это не создаёт.
+        expect(recovery).toHaveLength(0)
+    })
+
+    it('одноразовость: тот же код второй раз не подходит', async () => {
+        const { code } = await registered()
+        expect((await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-1' })).status).toBe(200)
+        const again = await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-2' })
+        expect(again).toMatchObject({ status: 400, body: { error: { code: 'invalid_code', message: 'Неверный ник или код' } } })
+    })
+
+    it('код вводится как удобно: строчными, без дефисов, с пробелами', async () => {
+        const { code } = await registered()
+        const sloppy = ` ${code.replace(/-/g, ' ').toLowerCase()} `
+        expect((await recoverByCode({ nick: 'забывчивый', code: sloppy, password: 'new-password-1' })).status).toBe(200)
+    })
+
+    it('неверный ник и неверный код — одинаковый ответ; неверная попытка код не сжигает', async () => {
+        const { id, code } = await registered()
+        const wrongNick = await recoverByCode({ nick: 'нет_такого', code, password: 'new-password-1' }, '5.5.5.1')
+        const wrongCodeRes = await recoverByCode({ nick: 'забывчивый', code: 'AAAA-BBBB-CCCC-DDDD', password: 'new-password-1' }, '5.5.5.2')
+        const badFormat = await recoverByCode({ nick: 'забывчивый', code: 'мусор', password: 'new-password-1' }, '5.5.5.3')
+        for (const r of [wrongNick, wrongCodeRes, badFormat]) expect(r).toMatchObject({ status: 400, body: { error: { code: 'invalid_code', message: 'Неверный ник или код' } } })
+        expect(wrongNick.body).toEqual(wrongCodeRes.body)
+        expect(codes.has(id)).toBe(true)
+        expect(users.get(id)!.password).toBe('password1')
+        expect(signedOut).toEqual([])
+    })
+
+    it('код одного пользователя не подходит к нику другого', async () => {
+        const a = await registered('первый_ник')
+        const b = await registered('второй_ник')
+        const res = await recoverByCode({ nick: 'второй_ник', code: a.code, password: 'new-password-1' })
+        expect(res.status).toBe(400)
+        expect(codes.has(b.id)).toBe(true)
+        expect(codes.has(a.id)).toBe(true)
+    })
+
+    it('капча обязательна; новый пароль проверяется по правилам; поля обязательны', async () => {
+        const { id, code } = await registered()
+        expect((await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-1', captchaToken: 'bad' })).body.error.code).toBe('captcha')
+        expect((await recoverByCode({ nick: 'забывчивый', code, password: 'short' })).status).toBe(400)
+        expect((await recoverByCode({ nick: 'забывчивый', code, password: 'ЗАБЫВЧИВЫЙ' })).body.error.message).toContain('не должен совпадать')
+        expect((await recoverByCode({ nick: '', code, password: 'new-password-1' })).status).toBe(400)
+        expect((await recoverByCode({ nick: 'забывчивый', code: '', password: 'new-password-1' })).status).toBe(400)
+        // Ни одна из этих попыток код не сожгла.
+        expect(codes.has(id)).toBe(true)
+        expect(users.get(id)!.password).toBe('password1')
+    })
+
+    it(`перебор: ${LIMITS.recoveryCodePerNickHour} попыток в час на ник — дальше даже верный код отклоняется`, async () => {
+        const { id, code } = await registered()
+        for (let i = 0; i < LIMITS.recoveryCodePerNickHour; i++) {
+            expect((await recoverByCode({ nick: 'забывчивый', code: 'AAAA-BBBB-CCCC-DDDD', password: 'new-password-1' }, `6.6.6.${i}`)).status).toBe(400)
+        }
+        const blocked = await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-1' }, '6.6.7.1')
+        expect(blocked).toMatchObject({ status: 429, body: { error: { code: 'rate_limited' } } })
+        expect(codes.has(id)).toBe(true)
+    })
+
+    it(`перебор: ${LIMITS.recoveryCodePerIpHour} попыток в час с одного IP по любым никам`, async () => {
+        for (let i = 0; i < LIMITS.recoveryCodePerIpHour; i++) {
+            expect((await recoverByCode({ nick: `ник${i}`, code: 'AAAA-BBBB-CCCC-DDDD', password: 'new-password-1' }, '4.4.4.4')).status).toBe(400)
+        }
+        expect((await recoverByCode({ nick: 'другой_ник', code: 'AAAA-BBBB-CCCC-DDDD', password: 'new-password-1' }, '4.4.4.4')).status).toBe(429)
+    })
+
+    it('лимит одинаков для существующего и несуществующего ника — по нему ники не угадать', async () => {
+        await registered('есть_такой')
+        const statuses = async (nick: string, ip: string) => {
+            const out: number[] = []
+            for (let i = 0; i < LIMITS.recoveryCodePerNickHour + 2; i++) {
+                out.push((await recoverByCode({ nick, code: 'AAAA-BBBB-CCCC-DDDD', password: 'new-password-1' }, `${ip}.${i}`)).status)
+            }
+            return out
+        }
+        expect(await statuses('есть_такой', '3.3.1')).toEqual(await statuses('нет_такого', '3.3.2'))
+    })
+
+    it('сбой смены пароля после проверки не оставляет человека без кода: код возвращается', async () => {
+        const { id, code } = await registered()
+        failNextPasswordUpdate = true
+        const res = await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-1' })
+        expect(res.status).toBe(500)
+        expect(codes.has(id)).toBe(true)
+        expect(users.get(id)!.password).toBe('password1')
+        expect((await recoverByCode({ nick: 'забывчивый', code, password: 'new-password-1' })).status).toBe(200)
+    })
+
+    it('в настройках: код создаётся с текущим паролем, новый отменяет старый', async () => {
+        const id = await addUser('старожил', 'password1')
+        expect((await account(id, { action: 'recovery-code-create' })).body.error.code).toBe('wrong_password')
+        expect((await account(id, { action: 'recovery-code-create', password: 'неверный' })).body.error.code).toBe('wrong_password')
+        expect(codes.size).toBe(0)
+
+        const first = await account(id, { action: 'recovery-code-create', password: 'password1' })
+        expect(first.body.recoveryCode).toMatch(CODE_RE)
+        await account(id, { action: 'recovery-code-confirm' })
+        expect(codes.get(id)!.confirmed).toBe(true)
+
+        // Подтверждённый код заменить можно только с паролем.
+        expect((await account(id, { action: 'recovery-code-create' })).status).toBe(400)
+        const second = await account(id, { action: 'recovery-code-create', password: 'password1' })
+        expect(second.body.recoveryCode).not.toBe(first.body.recoveryCode)
+        expect(codes.size).toBe(1)
+        expect(codes.get(id)!.confirmed).toBe(false)
+
+        // Старый код больше не работает, новый — да.
+        expect((await recoverByCode({ nick: 'старожил', code: first.body.recoveryCode, password: 'new-password-1' }, '2.2.2.1')).status).toBe(400)
+        expect((await recoverByCode({ nick: 'старожил', code: second.body.recoveryCode, password: 'new-password-1' }, '2.2.2.2')).status).toBe(200)
+    })
+
+    it('пока код не подтверждён («Я сохранил»), заменить его можно без пароля — после перезагрузки экрана с кодом', async () => {
+        const { id, code } = await registered()
+        const again = await account(id, { action: 'recovery-code-create' })
+        expect(again.status).toBe(200)
+        expect(again.body.recoveryCode).not.toBe(code)
+        expect(codes.size).toBe(1)
+    })
+
+    it('без входа код создать и подтвердить нельзя; удаление аккаунта удаляет код', async () => {
+        const { id } = await registered()
+        const noAuth = await send(createAccountHandler(deps), request('account', { action: 'recovery-code-create' }))
+        expect(noAuth.status).toBe(401)
+        expect((await account(id, { action: 'delete-account', password: 'password1' })).status).toBe(200)
+        expect(codes.has(id)).toBe(false)
     })
 })
 

@@ -2,6 +2,7 @@ import { reactive, readonly } from 'vue'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '@/supabaseClient'
 import { functionUrl, SUPABASE_ANON_KEY } from '@/supabaseConfig'
+import { clearRecoveryHandoff, recoveryHandoff } from './auth/recovery'
 import { type AppRole, cleanNick, roleOf, techEmail } from '../../supabase/functions/_shared/accounts.ts'
 
 /**
@@ -26,6 +27,8 @@ const state = reactive({
     // Сессия проверена при загрузке (до этого роутер ждёт).
     ready: false,
     mustChangePassword: false,
+    // Есть код восстановления, который человек ещё не сохранил («Я сохранил»): до этого сайт не пускает дальше.
+    recoveryPending: false,
     nickChangedAt: null as string | null,
     // Сессия пропала без нажатия «Выйти» (истекла, аккаунт удалён или забанен).
     expired: false
@@ -67,6 +70,19 @@ async function loadAccount(s: Session): Promise<void> {
     }
     state.mustChangePassword = Boolean(a?.must_change_password)
     state.nickChangedAt = a?.nick_changed_at ?? null
+    state.recoveryPending = await readRecoveryPending()
+}
+
+/** Код создан, но не подтверждён. Сбой чтения не должен закрывать сайт: тогда считаем, что ждать нечего. */
+async function readRecoveryPending(): Promise<boolean> {
+    try {
+        const { data, error } = await supabase.rpc('my_recovery_code_state')
+        if (error || !data) return false
+        const s = data as { exists?: boolean; confirmed?: boolean }
+        return Boolean(s.exists) && !s.confirmed
+    } catch {
+        return false
+    }
 }
 
 async function applySession(s: Session | null): Promise<void> {
@@ -78,6 +94,7 @@ async function applySession(s: Session | null): Promise<void> {
         manualSignOut = false
         state.user = null
         state.mustChangePassword = false
+        state.recoveryPending = false
         state.nickChangedAt = null
         return
     }
@@ -193,10 +210,36 @@ export async function callFunction<T = Record<string, unknown>>(name: string, bo
 }
 
 export async function register(nick: string, password: string, captchaToken: string): Promise<string | null> {
-    const res = await callFunction('register', { nick: cleanNick(nick), password, captchaToken, agree: true }, false)
+    const res = await callFunction<{ recoveryCode?: string | null }>('register', { nick: cleanNick(nick), password, captchaToken, agree: true }, false)
     if (!res.ok) return res.error ?? 'Не удалось зарегистрироваться'
+    const code = res.data?.recoveryCode ?? null
+    recoveryHandoff.code = code
     const error = await signIn(nick, password)
-    return error ? `Аккаунт создан, но войти не удалось: ${error}` : null
+    if (error) {
+        clearRecoveryHandoff()
+        return `Аккаунт создан, но войти не удалось: ${error}`
+    }
+    // Код выдан — сайт покажет его до того, как пустит дальше.
+    if (code) state.recoveryPending = true
+    return null
+}
+
+/** «Я сохранил»: код подтверждён, сайт открывается. */
+export async function confirmRecoveryCode(): Promise<string | null> {
+    const res = await callFunction('account', { action: 'recovery-code-confirm' })
+    if (!res.ok) return res.error ?? 'Не удалось сохранить — попробуй ещё раз'
+    state.recoveryPending = false
+    clearRecoveryHandoff()
+    return null
+}
+
+/** Новый код: password нужен, когда прежний код уже подтверждён или кода нет. */
+export async function createRecoveryCode(password?: string): Promise<{ code?: string; error?: string }> {
+    const res = await callFunction<{ recoveryCode?: string }>('account', { action: 'recovery-code-create', ...(password ? { password } : {}) })
+    if (!res.ok || !res.data?.recoveryCode) return { error: res.error ?? 'Не удалось создать код' }
+    // Новый код ещё не подтверждён: пока человек не нажмёт «Я сохранил», сайт его не отпустит.
+    state.recoveryPending = true
+    return { code: res.data.recoveryCode }
 }
 
 // ── Профиль ────────────────────────────────────────────────────────────

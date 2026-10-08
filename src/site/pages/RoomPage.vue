@@ -13,7 +13,7 @@
       <p class="social-kicker">Комната</p>
       <h1 class="social-h1" data-testid="room-title">{{ room.title }}</h1>
       <p class="social-meta" data-testid="room-meta">
-        Хозяин: {{ ownerNick }} · {{ room.members.length }} из {{ ROOM_CAPACITY }}
+        Хозяин: {{ ownerNick }}<UserTag :user-id="ownerId" /> · {{ room.members.length }} из {{ ROOM_CAPACITY }}
       </p>
 
       <p v-if="room.linkDown" class="acc-hint" role="status" data-testid="room-link-down">Переподключаемся…</p>
@@ -100,7 +100,7 @@
     <template v-else>
       <p class="social-kicker">Комната</p>
       <h1 class="social-h1" data-testid="room-title">{{ previewTitle }}</h1>
-      <p v-if="preview && !preview.closed" class="social-meta">Хозяин: {{ preview.owner.nick }} · {{ preview.members }} из {{ preview.capacity }}</p>
+      <p v-if="preview && !preview.closed" class="social-meta">Хозяин: {{ preview.owner.nick }}<UserTag :user-id="preview.owner.id" /> · {{ preview.members }} из {{ preview.capacity }}</p>
 
       <p v-if="preview && !preview.closed && preview.kicked" class="acc-alert acc-alert-error" data-testid="room-kicked">Тебя выгнали из этой комнаты.</p>
       <p v-else-if="preview && !preview.closed && preview.full && !preview.is_member" class="acc-alert acc-alert-info" data-testid="room-full">В комнате уже {{ preview.capacity }} человек.</p>
@@ -130,6 +130,7 @@ import { room, rooms, roomLink } from '../rooms'
 import type { RoomInfo, RoomMember } from '../rooms/api'
 import { ROOM_CAPACITY, isRoomId } from '../rooms/sync'
 import UserRow from '../components/UserRow.vue'
+import UserTag from '../components/UserTag.vue'
 import ReactionBar from '../components/ReactionBar.vue'
 
 const route = useRoute()
@@ -147,6 +148,7 @@ const friends = ref<Profile[] | null>(null)
 const invited = ref(new Set<string>())
 
 const ownerNick = computed(() => room.members.find((m) => m.owner)?.nick ?? '')
+const ownerId = computed(() => room.members.find((m) => m.owner)?.id ?? null)
 const waitingForHost = computed(() => !room.isOwner && room.hostState === 'away')
 const previewTitle = computed(() => (preview.value && !preview.value.closed ? preview.value.title : room.roomId === id.value ? room.title : 'Комната'))
 

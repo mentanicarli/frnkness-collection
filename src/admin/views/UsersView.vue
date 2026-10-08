@@ -22,7 +22,7 @@
                     <button type="button" class="adm-user-row" :class="{ active: selectedId === u.id }" :data-testid="`user-row-${u.nick ?? u.id}`" @click="select(u.id)">
                         <UserAvatar :avatar="u.avatar" :nick="u.nick ?? '?'" :user-id="u.id" :size="2" />
                         <span class="adm-user-row-main">
-                            <span class="adm-user-row-nick">{{ u.nick ?? 'без профиля' }}</span>
+                            <span class="adm-user-row-nick">{{ u.nick ?? 'без профиля' }}<UserTag :user-id="u.id" /></span>
                             <span class="adm-faint adm-small">с {{ formatDate(u.created_at) }} · вход {{ u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—' }}</span>
                         </span>
                         <span v-if="u.role !== 'user'" class="adm-badge">{{ ROLE_LABEL[u.role] }}</span>
@@ -38,7 +38,7 @@
                 <div class="adm-row" style="align-items: flex-start">
                     <UserAvatar :avatar="card.avatar" :nick="card.nick ?? '?'" :user-id="card.id" :size="3.5" />
                     <div style="min-width: 0; flex: 1">
-                        <h2 class="adm-h2" style="margin: 0; word-break: break-word">{{ card.nick ?? 'без профиля' }}</h2>
+                        <h2 class="adm-h2" style="margin: 0; word-break: break-word">{{ card.nick ?? 'без профиля' }}<UserTag :user-id="card.id" /></h2>
                         <p class="adm-small adm-muted" style="margin: 0.25rem 0 0">
                             {{ ROLE_LABEL[card.role] }}<template v-if="card.banned_until"> · <b style="color: #ff8a80">забанен</b></template>
                             <template v-if="card.must_change_password"> · сменит пароль при входе</template>
@@ -133,6 +133,17 @@
                         </div>
                     </form>
 
+                    <!-- Тег: только владелец -->
+                    <div v-if="auth.isOwner.value && card.nick" class="adm-field" data-testid="user-tag-field">
+                        <span class="adm-label">Тег (значок рядом с ником, прав не даёт)</span>
+                        <div class="adm-row">
+                            <select class="adm-input" style="flex: 1; min-width: 10rem" aria-label="Тег пользователя" :value="currentTagId ?? ''" :disabled="busy" data-testid="user-tag-select" @change="chooseTag(($event.target as HTMLSelectElement).value)">
+                                <option value="">без тега</option>
+                                <option v-for="t in tagList" :key="t.id" :value="t.id">{{ t.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Ник -->
                     <form v-if="can('rename')" class="adm-field" @submit.prevent="rename">
                         <span class="adm-label">Ник</span>
@@ -181,6 +192,9 @@
 // действия. Ник, «о себе» и контакты выводятся только текстом.
 import { computed, onMounted, ref, watch } from 'vue'
 import UserAvatar from '@/site/components/UserAvatar.vue'
+import UserTag from '@/site/components/UserTag.vue'
+import { applyTags, tagOf, tagsStore } from '@/site/social/tags'
+import { fetchTagsPayload, setUserTag } from '../api/tags'
 import { parseTrackKey } from '@/utils/lyrics'
 import { useAuth } from '../composables/useAuth'
 import { useRepo } from '../composables/useRepo'
@@ -227,6 +241,32 @@ const tempPassword = ref(generateTempPassword())
 const newNick = ref('')
 const newBio = ref('')
 const deleteConfirm = ref('')
+
+const tagList = computed(() => [...tagsStore.tags.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+const currentTagId = computed(() => (card.value ? tagOf(card.value.id)?.id ?? null : null))
+async function refreshTags() {
+    try {
+        applyTags(await fetchTagsPayload())
+    } catch {
+        // Значки — украшение.
+    }
+}
+async function chooseTag(value: string) {
+    if (!card.value) return
+    busy.value = true
+    notice.value = ''
+    try {
+        await setUserTag(card.value.id, value === '' ? null : Number(value))
+        await refreshTags()
+        noticeOk.value = true
+        notice.value = value === '' ? 'Тег снят' : 'Тег назначен'
+    } catch (e) {
+        noticeOk.value = false
+        notice.value = message(e)
+    } finally {
+        busy.value = false
+    }
+}
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
 const pluralUsers = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'пользователь' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'пользователя' : 'пользователей')
@@ -413,6 +453,7 @@ async function deleteUser() {
 
 onMounted(() => {
     void load()
+    void refreshTags()
     repo.load().catch(() => undefined)
 })
 </script>

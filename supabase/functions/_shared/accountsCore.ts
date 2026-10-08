@@ -25,6 +25,7 @@ import {
     validatePlaylistTitle
 } from './accounts.ts'
 import { HttpError, bearer, clientIp, keyHash, serveJson, str, verifyTurnstile } from './http.ts'
+import { generateRecoveryCode, hashRecoveryCode, normalizeRecoveryCode } from './recoveryCode.ts'
 
 export interface AuthUser {
     id: string
@@ -91,6 +92,13 @@ export interface AccountsDeps {
         upsertPrivate(id: string, patch: Partial<AccountPrivate>): Promise<void>
         insertRecovery(r: { nick: string; nick_key: string; user_id: string | null; contact: string; comment: string }): Promise<void>
         signOutUser(id: string): Promise<void>
+        /** Код восстановления: в базе только хеш (supabase/migrations/20261012120000_recovery_tags.sql). */
+        setRecoveryCode(userId: string, hash: string): Promise<void>
+        /** true — хеш подошёл и код сгорел (удаление и проверка одним запросом). */
+        consumeRecoveryCode(userId: string, hash: string): Promise<boolean>
+        confirmRecoveryCode(userId: string): Promise<void>
+        /** null — кода нет. */
+        getRecoveryCodeState(userId: string): Promise<{ confirmed: boolean } | null>
         playlistById(id: string): Promise<Playlist | null>
         updatePlaylist(id: string, patch: { title?: string; cover_version?: null }): Promise<void>
         deletePlaylist(id: string): Promise<void>
@@ -109,6 +117,9 @@ export const LIMITS = {
     registerPerIpDay: 10,
     recoveryPerIpDay: 3,
     recoveryPerNickDay: 3,
+    // Вход по коду восстановления: считается каждая попытка, верная или нет.
+    recoveryCodePerIpHour: 10,
+    recoveryCodePerNickHour: 5,
     passwordChecksPerUserHour: 10
 } as const
 
@@ -177,6 +188,14 @@ async function deleteAccount(deps: AccountsDeps, userId: string): Promise<void> 
     await deps.auth.deleteUser(userId)
 }
 
+/** Новый код: старый отменяется, в базу уходит только хеш, открытый код — владельцу. */
+async function issueRecoveryCode(deps: AccountsDeps, userId: string): Promise<string> {
+    const code = generateRecoveryCode()
+    const hash = await hashRecoveryCode(deps.env.hashSecret, userId, code.replace(/-/g, ''))
+    await deps.db.setRecoveryCode(userId, hash)
+    return code
+}
+
 // ── register ────────────────────────────────────────────────────────────
 export function createRegisterHandler(deps: AccountsDeps) {
     return serveJson(async (req, body) => {
@@ -199,8 +218,55 @@ export function createRegisterHandler(deps: AccountsDeps) {
             throw conflictNick()
         }
         await deps.db.upsertPrivate(created.id, { must_change_password: false })
-        return { ok: true }
+        // Код восстановления выдаётся сразу и показывается один раз. Сбой здесь
+        // регистрацию не ломает: код можно создать позже в настройках.
+        const recoveryCode = await issueRecoveryCode(deps, created.id).catch((e) => {
+            deps.log?.(`recovery code issue failed: ${e}`)
+            return null
+        })
+        return { ok: true, recoveryCode }
     }, deps.log)
+}
+
+// ── Восстановление по коду ──────────────────────────────────────────────
+// Ответ при неверном нике и при неверном коде один и тот же, лимит считается
+// по ключу ника независимо от того, есть ли такой ник, и хеш считается всегда:
+// по ответу и по времени нельзя узнать, какие ники существуют.
+const NO_ACCOUNT_ID = '00000000-0000-0000-0000-000000000000'
+const wrongCode = () => new HttpError(400, 'invalid_code', 'Неверный ник или код')
+
+async function recoverWithCode(deps: AccountsDeps, req: Request, body: Record<string, unknown>): Promise<unknown> {
+    const nick = cleanNick(str(body, 'nick', 100))
+    const codeInput = str(body, 'code', 100)
+    const password = str(body, 'password', 1000)
+    if (!nick || [...nick].length > 40 || !codeInput.trim() || !password) {
+        throw new HttpError(400, 'invalid', 'Введи ник, код и новый пароль')
+    }
+    requireValid(validatePassword(password, nick))
+    const ip = await requireCaptcha(deps, req, body)
+
+    const key = nickKey(nick)
+    const ipOk = await deps.db.rateLimit('recovery-code-ip', await keyHash(deps.env.hashSecret, ip), LIMITS.recoveryCodePerIpHour, HOUR)
+    const nickOk = await deps.db.rateLimit('recovery-code-nick', await keyHash(deps.env.hashSecret, key), LIMITS.recoveryCodePerNickHour, HOUR)
+    if (!ipOk || !nickOk) throw new HttpError(429, 'rate_limited', 'Слишком много попыток — попробуй позже')
+
+    const profile = await deps.db.profileByKey(key)
+    const normalized = normalizeRecoveryCode(codeInput)
+    const hash = await hashRecoveryCode(deps.env.hashSecret, profile?.id ?? NO_ACCOUNT_ID, normalized ?? 'invalid-format')
+    const ok = profile && normalized ? await deps.db.consumeRecoveryCode(profile.id, hash) : false
+    if (!profile || !ok) throw wrongCode()
+
+    // Код уже сгорел. Если смена пароля не удалась, возвращаем его: человек не должен остаться и без кода, и без пароля.
+    try {
+        await deps.auth.updateUser(profile.id, { password })
+        await deps.db.upsertPrivate(profile.id, { must_change_password: false })
+        await deps.db.signOutUser(profile.id)
+    } catch (e) {
+        await deps.db.setRecoveryCode(profile.id, hash).catch(() => undefined)
+        await deps.db.confirmRecoveryCode(profile.id).catch(() => undefined)
+        throw e
+    }
+    return { ok: true }
 }
 
 // ── recovery-request ────────────────────────────────────────────────────
@@ -208,6 +274,7 @@ export function createRegisterHandler(deps: AccountsDeps) {
 // лимите — по форме нельзя узнать, какие ники есть.
 export function createRecoveryHandler(deps: AccountsDeps) {
     return serveJson(async (req, body) => {
+        if (body.mode === 'code') return recoverWithCode(deps, req, body)
         const nick = cleanNick(str(body, 'nick', 100))
         const contact = str(body, 'contact', 1000).trim()
         const comment = str(body, 'comment', 2000).trim()
@@ -247,6 +314,19 @@ export function createAccountHandler(deps: AccountsDeps) {
             }
             await deps.auth.updateUser(user.id, { password })
             await deps.db.upsertPrivate(user.id, { must_change_password: false })
+            return { ok: true }
+        }
+
+        if (action === 'recovery-code-create') {
+            // Пока прошлый код не подтверждён («Я сохранил»), заменить его можно без пароля:
+            // так продолжается регистрация после перезагрузки страницы.
+            const state = await deps.db.getRecoveryCodeState(user.id)
+            if (!state || state.confirmed) await checkPassword(deps, user, str(body, 'password', 1000))
+            return { ok: true, recoveryCode: await issueRecoveryCode(deps, user.id) }
+        }
+
+        if (action === 'recovery-code-confirm') {
+            await deps.db.confirmRecoveryCode(user.id)
             return { ok: true }
         }
 

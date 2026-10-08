@@ -24,6 +24,8 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/feed                             лента: что слушают друзья (только вошедшим)
  *   #/room/<id>                        комната: слушаем вместе
  *   #/recap/<год>                      итоги года (только когда открыты этому пользователю)
+ *   #/recovery-code                    код восстановления: после регистрации (блокирующий)
+ *                                      и предложение создать новый после входа по коду
  * Без входа («мягкая стена», раздел 2 плана):
  *   #/welcome  #/login  #/register  #/forgot  #/privacy
  *
@@ -73,6 +75,7 @@ const routes: RouteRecordRaw[] = [
     { path: '/feed', name: 'feed', component: () => import('./pages/FeedPage.vue') },
     { path: '/room/:id', name: 'room', component: () => import('./pages/RoomPage.vue') },
     { path: '/recap/:year(\\d{4})', name: 'recap', component: () => import('./recap/RecapPage.vue'), meta: { bare: true } },
+    { path: '/recovery-code', name: 'recovery-code', component: () => import('./pages/RecoveryCodePage.vue'), meta: { bare: true } },
     { path: '/change-password', name: 'change-password', component: () => import('./pages/ChangePasswordPage.vue'), meta: { bare: true } },
     { path: '/welcome', name: 'welcome', component: () => import('./pages/WelcomePage.vue'), meta: guest },
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: guest },
@@ -109,6 +112,15 @@ router.beforeEach(async (to) => {
     if (session.mustChangePassword && to.name !== 'change-password' && to.name !== 'privacy') {
         const next = sanitizeNext(to.fullPath)
         return { name: 'change-password', query: next && next !== '/' ? { next } : {}, replace: true }
+    }
+    // Код восстановления выдан, но не сохранён: пока человек не нажмёт «Я сохранил», дальше не пускаем.
+    if (session.recoveryPending && to.name !== 'recovery-code' && to.name !== 'change-password' && to.name !== 'privacy') {
+        const next = sanitizeNext(to.fullPath)
+        return { name: 'recovery-code', query: next && next !== '/' ? { next } : {}, replace: true }
+    }
+    // Экран кода без дела (нет несохранённого кода и это не предложение после восстановления) — на сайт.
+    if (to.name === 'recovery-code' && !session.recoveryPending && to.query.offer !== '1') {
+        return nextTarget(to.query.next) ?? { name: 'home', replace: true }
     }
     if (to.meta.guestOnly) return nextTarget(to.query.next) ?? { name: 'home', replace: true }
 

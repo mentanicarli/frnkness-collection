@@ -23,7 +23,7 @@
         </RouterLink>
         <div class="feed-body">
           <p class="feed-text">
-            <RouterLink class="feed-nick" :to="{ name: 'user', params: { nick: e.user.nick } }" data-testid="feed-nick">{{ e.user.nick }}</RouterLink>
+            <RouterLink class="feed-nick" :to="{ name: 'user', params: { nick: e.user.nick } }" data-testid="feed-nick">{{ e.user.nick }}</RouterLink><UserTag :user-id="e.user.id" />
             <template v-if="e.kind === 'listen'">
               слушал(а) <button class="feed-track" type="button" data-testid="feed-track" @click="play(e.trackId)">{{ info(e.trackId).title }}</button>
               <template v-if="e.more > 0"> <span class="feed-more" data-testid="feed-more">и ещё {{ e.more }}</span></template>
@@ -67,6 +67,7 @@ import { releases } from '@/config'
 import UserAvatar from '../components/UserAvatar.vue'
 import { playTrackByRef, startFlowMode } from '../player/engine'
 import EmptyHint from '../components/EmptyHint.vue'
+import UserTag from '../components/UserTag.vue'
 import { FEED_MIN_POLL_MS, formatAgo } from '../social/feed'
 import { feed } from '../social/feedStore'
 import { trackInfo } from '../social/tracks'

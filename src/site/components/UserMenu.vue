@@ -13,7 +13,7 @@
       <span v-if="pending" class="user-menu-badge" data-testid="friend-requests-badge">{{ pending > 9 ? '9+' : pending }}</span>
     </button>
     <div v-if="open" class="user-menu-list" role="menu" @click="open = false">
-      <p class="nick">{{ session.user.nick || 'Профиль' }}</p>
+      <p class="nick">{{ session.user.nick || 'Профиль' }}<UserTag :user-id="session.user.id" /></p>
       <RouterLink v-if="session.user.nick" role="menuitem" :to="{ name: 'user', params: { nick: session.user.nick } }">Мой профиль</RouterLink>
       <RouterLink v-if="recapStore.state" role="menuitem" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="menu-recap">Итоги {{ recapStore.state.year }}</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'favorites' }">Избранное</RouterLink>
@@ -42,6 +42,7 @@ import { recapStore } from '@/site/recap/store'
 import { openCreateRoom, room } from '@/site/rooms'
 import { openFeedback } from '@/site/feedback/store'
 import UserAvatar from './UserAvatar.vue'
+import UserTag from './UserTag.vue'
 import { isAdminRole } from '../../../supabase/functions/_shared/accounts.ts'
 
 const router = useRouter()

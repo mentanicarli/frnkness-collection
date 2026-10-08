@@ -131,3 +131,11 @@
 .privacy h2 { font-family: 'Unbounded'; font-weight: 600; font-size: 1rem; margin: 1.5rem 0 0.5rem; }
 .privacy p, .privacy li { color: var(--fg-muted); font-size: 0.875rem; line-height: 1.6; }
 .privacy ul { list-style: disc; padding-left: 1.25rem; }
+
+/* Код восстановления */
+.recovery-box { margin-top: 0.75rem; }
+.recovery-code {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.5rem; font-weight: 500; letter-spacing: 0.08em;
+  padding: 0.875rem 1rem; border: 1px dashed var(--line-2); border-radius: var(--r-sm, 0.5rem);
+  text-align: center; user-select: all; word-break: break-all; margin-bottom: 0.5rem;
+}
