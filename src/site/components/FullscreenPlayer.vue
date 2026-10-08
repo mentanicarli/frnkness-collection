@@ -41,7 +41,9 @@
         </div>
         <div class="fs-cover-meta">
           <h2 id="fs-cover-title">{{ currentTrack?.title ?? '—' }}</h2>
-          <p class="fs-cover-artist">frnk ness</p>
+          <button v-if="player.playback === 'tap'" type="button" class="tap-to-play" data-testid="tap-to-play" @click="togglePlay">Нажми, чтобы играть</button>
+          <p v-else-if="player.playback === 'retrying'" class="fs-cover-artist" data-testid="playback-retrying">Связь пропала, пробуем снова…</p>
+          <p v-else class="fs-cover-artist">frnk ness</p>
           <div class="fs-cover-progress" @click="seekByClick">
             <div id="fs-progress-bar" :style="{ width: `${player.progress}%` }"></div>
           </div>

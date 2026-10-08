@@ -47,6 +47,7 @@ beforeEach(() => {
     audio = document.createElement('audio')
     audio.play = vi.fn(() => Promise.resolve())
     audio.pause = vi.fn()
+    audio.load = vi.fn()
     setAudio(audio)
     Object.assign(player, {
         queue: null, shuffle: false, currentTrackId: null,
@@ -327,5 +328,50 @@ describe('громкость', () => {
         expect(player.sliderValue).toBe(0)
         engine.toggleMute()
         expect(player.sliderValue).toBeCloseTo(0.3)
+    })
+})
+
+describe('запуск звука на телефоне', () => {
+    it('нажатие на строку запускает play() сразу, без ожидания чего-либо', () => {
+        view.viewedReleaseId = 'a'
+        engine.handleTrackClick(1)
+        // Синхронно, в том же вызове: iOS не даёт звук, если перед play() был await.
+        expect(audio.play).toHaveBeenCalledTimes(1)
+        expect(player.currentTrackId).toBe('a/t2')
+    })
+
+    it('браузер не разрешил звук: статус «нажми, чтобы играть», а не «играет»', async () => {
+        audio.play = vi.fn(() => Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' })))
+        view.viewedReleaseId = 'a'
+        engine.handleTrackClick(0)
+        await new Promise((r) => setTimeout(r, 0))
+        expect(player.isPlaying).toBe(false)
+        expect(player.playback).toBe('tap')
+    })
+
+    it('нажатие на кнопку воспроизведения в состоянии «tap» запускает звук заново', async () => {
+        audio.play = vi.fn(() => Promise.resolve())
+        view.viewedReleaseId = 'a'
+        engine.handleTrackClick(0)
+        await new Promise((r) => setTimeout(r, 0))
+        player.playback = 'tap'
+        player.isPlaying = false
+        setPaused(false) // как при зависшей загрузке: элемент «играет», звука нет
+        engine.togglePlay()
+        await new Promise((r) => setTimeout(r, 0))
+        expect(audio.pause).not.toHaveBeenCalled()
+        expect(player.isPlaying).toBe(true)
+        expect(player.playback).toBe('ok')
+    })
+
+    it('«Играть следующим» ставит трек после текущего и не трогает очередь хозяина комнаты', () => {
+        view.viewedReleaseId = 'a'
+        engine.handleTrackClick(0)
+        expect(engine.canPlayNext()).toBe(true)
+        expect(engine.playNext('b/t2')).toBe(true)
+        engine.nextTrack()
+        expect(player.currentTrackId).toBe('b/t2')
+        player.queue = { ...player.queue!, controller: 'remote' }
+        expect(engine.playNext('b/t1')).toBe(false)
     })
 })
