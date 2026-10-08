@@ -278,7 +278,15 @@ export function socialStub(name: string): MockResponse | null {
             return { status: 200, body: { events: [], has_more: false } }
         case 'friend_requests_count':
         case 'room_invites_count':
+        case 'admin_feedback_new_count':
             return { status: 200, body: 0 }
+        case 'list_discoverable_users':
+            return { status: 200, body: { users: [], has_more: false, next: null } }
+        case 'admin_errors_list':
+        case 'admin_feedback_list':
+            return { status: 200, body: [] }
+        case 'log_client_error':
+            return { status: 200, body: null }
         case 'room_invites_list':
             return { status: 200, body: [] }
         case 'room_my':
