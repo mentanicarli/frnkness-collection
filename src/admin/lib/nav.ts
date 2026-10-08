@@ -31,7 +31,14 @@ export const NAV_GROUPS: NavGroup[] = [
             { id: 'new-release', label: 'Новый релиз' }
         ]
     },
-    { id: 'stats', title: 'Статистика', items: [{ id: 'stats', label: 'Статистика' }] },
+    {
+        id: 'stats',
+        title: 'Статистика',
+        items: [
+            { id: 'stats', label: 'Статистика' },
+            { id: 'recap', label: 'Итоги года' }
+        ]
+    },
     {
         id: 'people',
         title: 'Люди',

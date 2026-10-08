@@ -23,6 +23,7 @@ import TrackPage from './pages/TrackPage.vue'
  *   #/friends                          друзья и заявки
  *   #/feed                             лента: что слушают друзья (только вошедшим)
  *   #/room/<id>                        комната: слушаем вместе
+ *   #/recap/<год>                      итоги года (только когда открыты этому пользователю)
  * Без входа («мягкая стена», раздел 2 плана):
  *   #/welcome  #/login  #/register  #/forgot  #/privacy
  *
@@ -71,6 +72,7 @@ const routes: RouteRecordRaw[] = [
     { path: '/friends', name: 'friends', component: () => import('./pages/FriendsPage.vue') },
     { path: '/feed', name: 'feed', component: () => import('./pages/FeedPage.vue') },
     { path: '/room/:id', name: 'room', component: () => import('./pages/RoomPage.vue') },
+    { path: '/recap/:year(\\d{4})', name: 'recap', component: () => import('./recap/RecapPage.vue'), meta: { bare: true } },
     { path: '/change-password', name: 'change-password', component: () => import('./pages/ChangePasswordPage.vue'), meta: { bare: true } },
     { path: '/welcome', name: 'welcome', component: () => import('./pages/WelcomePage.vue'), meta: guest },
     { path: '/login', name: 'login', component: () => import('./pages/LoginPage.vue'), meta: guest },

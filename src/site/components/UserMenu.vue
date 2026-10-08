@@ -15,6 +15,7 @@
     <div v-if="open" class="user-menu-list" role="menu" @click="open = false">
       <p class="nick">{{ session.user.nick || 'Профиль' }}</p>
       <RouterLink v-if="session.user.nick" role="menuitem" :to="{ name: 'user', params: { nick: session.user.nick } }">Мой профиль</RouterLink>
+      <RouterLink v-if="recapStore.state" role="menuitem" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="menu-recap">Итоги {{ recapStore.state.year }}</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'favorites' }">Избранное</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'playlists' }">Мои плейлисты</RouterLink>
       <RouterLink role="menuitem" :to="{ name: 'friends' }">
@@ -36,6 +37,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { session, signOut } from '@/site/session'
 import { pendingCount } from '@/site/social/friends'
+import { recapStore } from '@/site/recap/store'
 import { openCreateRoom, room } from '@/site/rooms'
 import UserAvatar from './UserAvatar.vue'
 import { isAdminRole } from '../../../supabase/functions/_shared/accounts.ts'

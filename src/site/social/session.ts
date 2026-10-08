@@ -7,6 +7,7 @@ import { loadFavorites, resetFavorites } from './favorites'
 import { startFriendRequestsPolling, stopFriendRequestsPolling } from './friends'
 import { createNowPlayingReporter } from './nowPlaying'
 import { loadMyPlaylists, resetMyPlaylists } from './playlists'
+import { loadRecapState, resetRecap } from '../recap/store'
 
 /**
  * Связь «кто вошёл» ↔ сторы этапа «Музыка и друзья». Вызывается один раз
@@ -28,12 +29,14 @@ export function bindSocialToSession(): void {
             feed.reset()
             resetFavorites(id)
             resetMyPlaylists(id)
+            resetRecap()
             if (!id) {
                 stopFriendRequestsPolling()
                 return
             }
             void loadFavorites()
             void loadMyPlaylists()
+            void loadRecapState()
             startFriendRequestsPolling()
         },
         { immediate: true }

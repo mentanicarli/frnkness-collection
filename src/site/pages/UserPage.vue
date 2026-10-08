@@ -11,6 +11,7 @@
           <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
           <div class="social-actions" style="margin-top: 1rem;">
             <RouterLink v-if="profile.relation === 'self'" class="acc-btn acc-btn-sm" :to="{ name: 'me' }">Настройки профиля</RouterLink>
+            <RouterLink v-if="profile.relation === 'self' && recapStore.state" class="acc-btn acc-btn-primary acc-btn-sm" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="profile-recap">Итоги {{ recapStore.state.year }}</RouterLink>
             <button v-else-if="profile.relation === 'none'" class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy" @click="act(() => api.friendRequest(profile!.id))">Добавить в друзья</button>
             <template v-else-if="profile.relation === 'incoming'">
               <button class="acc-btn acc-btn-primary acc-btn-sm" type="button" :disabled="busy" @click="act(() => api.friendRespond(profile!.id, true))">Принять заявку</button>
@@ -79,6 +80,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { releases } from '@/config'
 import { supabase } from '@/supabaseClient'
 import UserAvatar from '@/site/components/UserAvatar.vue'
+import { recapStore } from '@/site/recap/store'
 import { api, errorText, type PlaylistSummary, type Top4Row, type UserPage } from '../social/api'
 import { refreshFriendRequests } from '../social/friends'
 import { showNotice } from '../social/notice'

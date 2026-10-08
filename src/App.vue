@@ -15,6 +15,7 @@
       <AddToPlaylistDialog />
       <CreateRoomDialog />
       <NoticeToast />
+      <RecapBanner />
     </template>
   </template>
 </template>
@@ -35,6 +36,7 @@ import MiniPlayer from '@/site/components/MiniPlayer.vue'
 import AddToPlaylistDialog from '@/site/components/AddToPlaylistDialog.vue'
 import CreateRoomDialog from '@/site/components/CreateRoomDialog.vue'
 import NoticeToast from '@/site/components/NoticeToast.vue'
+import RecapBanner from '@/site/recap/RecapBanner.vue'
 import { bindRoomsToSession } from '@/site/rooms'
 import { bindSocialToSession } from '@/site/social/session'
 import { resetPageAccent } from '@/site/services/colors'
