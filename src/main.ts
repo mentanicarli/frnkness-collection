@@ -6,11 +6,19 @@ import './assets/social.css'
 
 import { normalizeInitialHash, router } from './site/router'
 import { initSession } from './site/session'
+import { describeError, installErrorLogging } from './site/errorLog'
 
+installErrorLogging()
 normalizeInitialHash()
 // Проверка входа начинается сразу; роутер ждёт её перед первым экраном.
 void initSession()
-createApp(App).use(router).mount('#app')
+const app = createApp(App)
+// В продакшене Vue гасит ошибки компонентов в консоль и до window.onerror они не доходят.
+app.config.errorHandler = (err) => {
+    installErrorLogging().report(describeError(err))
+    console.error(err)
+}
+app.use(router).mount('#app')
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

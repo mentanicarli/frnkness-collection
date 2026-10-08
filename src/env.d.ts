@@ -28,3 +28,6 @@ declare module 'colorthief' {
         getPalette(img: HTMLImageElement, colorCount?: number, quality?: number): RGBColor[] | null
     }
 }
+
+/** Версия сборки (короткий хеш коммита или «dev»); подставляет vite.config.ts. */
+declare const __BUILD_ID__: string

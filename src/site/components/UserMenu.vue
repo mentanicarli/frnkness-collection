@@ -25,6 +25,7 @@
       <RouterLink v-if="room.roomId" role="menuitem" :to="{ name: 'room', params: { id: room.roomId } }" data-testid="menu-room">{{ room.isOwner ? 'Вернуться в комнату' : 'Комната' }} «{{ room.title }}»</RouterLink>
       <button v-if="!room.isOwner" role="menuitem" type="button" data-testid="menu-create-room" @click="openCreateRoom">Создать комнату</button>
       <RouterLink role="menuitem" :to="{ name: 'me' }">Настройки</RouterLink>
+      <button role="menuitem" type="button" data-testid="menu-feedback" @click="openFeedback">Сообщить о проблеме</button>
       <a v-if="isAdminRole(session.user.role)" role="menuitem" href="./admin.html">Админка</a>
       <button role="menuitem" type="button" @click="logout">Выйти</button>
     </div>
@@ -39,6 +40,7 @@ import { session, signOut } from '@/site/session'
 import { pendingCount } from '@/site/social/friends'
 import { recapStore } from '@/site/recap/store'
 import { openCreateRoom, room } from '@/site/rooms'
+import { openFeedback } from '@/site/feedback/store'
 import UserAvatar from './UserAvatar.vue'
 import { isAdminRole } from '../../../supabase/functions/_shared/accounts.ts'
 

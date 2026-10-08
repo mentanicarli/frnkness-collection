@@ -36,7 +36,8 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Статистика',
         items: [
             { id: 'stats', label: 'Статистика' },
-            { id: 'recap', label: 'Итоги года' }
+            { id: 'recap', label: 'Итоги года' },
+            { id: 'errors', label: 'Ошибки' }
         ]
     },
     {
@@ -44,7 +45,8 @@ export const NAV_GROUPS: NavGroup[] = [
         title: 'Люди',
         items: [
             { id: 'users', label: 'Пользователи' },
-            { id: 'recovery', label: 'Заявки', ownerOnly: true }
+            { id: 'recovery', label: 'Заявки', ownerOnly: true },
+            { id: 'feedback', label: 'Обращения' }
         ]
     }
 ]

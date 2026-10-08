@@ -6,6 +6,7 @@
 // Запускается после vite build (npm run build), падает с кодом 1.
 import fs from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
 
 const dist = path.resolve(process.argv[2] || 'dist')
 const errors = []
@@ -76,6 +77,36 @@ for (const page of ['index.html', 'admin.html']) {
         if (!/img-src [^;]*https:\/\/[^ ;]+\.supabase\.co/.test(csp)) errors.push(`${page}: CSP без хранилища Supabase в img-src`)
         if (/script-src [^;]*'unsafe-inline'/.test(csp)) errors.push(`${page}: CSP разрешает любые встроенные скрипты`)
     }
+}
+
+// Превью ссылок: у каждого релиза и трека из реестра есть своя страница с
+// og-тегами и перенаправлением по CSP-хешу; на главной есть общие og-теги.
+// Реестр здесь — просто то, что собрано; названия релизов скрипт не знает.
+{
+    const og = (html, prop) => html.match(new RegExp(`<meta property="${prop}" content="([^"]*)"`))?.[1]
+    const checkPage = (rel, label) => {
+        if (!fs.existsSync(path.join(dist, rel))) return errors.push(`нет страницы превью ${label}: ${rel}`)
+        const html = read(rel)
+        for (const prop of ['og:title', 'og:description', 'og:image', 'og:url']) if (!og(html, prop)) errors.push(`${rel}: нет ${prop}`)
+        if (!/^https:\/\/[^/]+\//.test(og(html, 'og:image') || '')) errors.push(`${rel}: og:image не абсолютный URL`)
+        if (!/<meta name="twitter:card" content="summary_large_image">/.test(html)) errors.push(`${rel}: нет twitter:card`)
+        const code = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]
+        const hash = code && `'sha256-${createHash('sha256').update(code, 'utf8').digest('base64')}'`
+        const csp = (html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)"/)?.[1] || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+        if (!code || !csp.includes(`script-src ${hash}`)) errors.push(`${rel}: хеш CSP не совпадает со скриптом перенаправления`)
+    }
+    const registry = JSON.parse(fs.readFileSync(path.resolve('src/content/releases.json'), 'utf8'))
+    for (const [id, release] of Object.entries(registry)) {
+        checkPage(`r/${id}/index.html`, `релиза ${id}`)
+        for (const track of release.tracks) {
+            const slug = String(track.lyricsFile || '').replace(/\.[^/.]+$/, '').replace(/^\d+-/, '') || String(track.num)
+            checkPage(`t/${id}/${slug}/index.html`, `трека ${id}/${slug}`)
+        }
+    }
+    const home = read('index.html')
+    for (const prop of ['og:title', 'og:description', 'og:image', 'og:url']) if (!og(home, prop)) errors.push(`index.html: нет ${prop}`)
+    if (!fs.existsSync(path.join(dist, 'og-default.png'))) errors.push('нет dist/og-default.png (общая картинка превью)')
+    for (const url of precache) if (/^(r|t)\//.test(url)) errors.push(`страница превью в precache: ${url}`)
 }
 
 if (!fs.existsSync(path.join(dist, 'admin.html'))) errors.push('нет dist/admin.html')
