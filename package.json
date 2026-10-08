@@ -23,7 +23,7 @@
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.6.0",
-    "@vitejs/plugin-vue": "^5.0.0",
+    "@vitejs/plugin-vue": "^6.0.9",
     "jsdom": "^29.1.1",
     "sharp": "^0.33.5",
     "tailwindcss": "^4.0.0",
