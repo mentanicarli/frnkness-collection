@@ -54,7 +54,13 @@ export const SOCIAL_RPCS = [
     'room_invites_count',
     'room_invite_dismiss',
     'admin_user_room',
-    'admin_room_close'
+    'admin_room_close',
+    // Итоги года
+    'my_recap_state',
+    'year_recap',
+    'admin_recap_overview',
+    'admin_recap_status',
+    'admin_recap_set'
 ] as const
 
 const COVERS = 'playlist-covers'
@@ -123,7 +129,7 @@ export class SocialBackend {
         return this.run(async (db) => {
             const keys = Object.keys(args)
             const params = keys.map((k) => args[k])
-            const named = keys.map((k, i) => `${k} => $${i + 1}${Array.isArray(args[k]) ? '::text[]' : ''}`).join(', ')
+            const named = keys.map((k, i) => `${k} => $${i + 1}${Array.isArray(args[k]) ? (k === 'p_users' ? '::uuid[]' : '::text[]') : ''}`).join(', ')
             try {
                 const { rows } = await this.asUser(db, userId, () => db.query<{ r: unknown }>(`select public.${name}(${named}) as r`, params))
                 const value = rows[0]?.r ?? null
@@ -275,6 +281,7 @@ export function socialStub(name: string): MockResponse | null {
             return { status: 200, body: Date.now() }
         case 'now_playing_set':
         case 'profile_by_nick':
+        case 'my_recap_state': // итоги не открыты — на сайте нет и следа
             return { status: 200, body: null }
         default:
             return { status: 400, body: { code: '22023', message: 'В этом тесте база «Музыки и друзей» не подключена' } }

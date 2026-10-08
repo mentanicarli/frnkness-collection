@@ -9,7 +9,7 @@ import type { IsoDate } from '../lib/dates'
  * RPC (права проверяет база), изменения — функция admin-users.
  */
 
-async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
+export async function rpc<T>(name: string, args?: Record<string, unknown>): Promise<T> {
     const { data, error, status } = await supabase.rpc(name, args)
     if (error) {
         if (status === 401 || error.code === 'PGRST301' || error.code === 'PGRST303') {

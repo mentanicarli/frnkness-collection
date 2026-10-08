@@ -6,6 +6,7 @@
         <h1 class="profile-nick">{{ me.nick || 'Без ника' }}</h1>
         <p class="profile-meta">С нами с {{ formatDate(me.createdAt) }}<template v-if="friendsCount !== null"> · {{ friendsCount }} {{ plural(friendsCount, 'друг', 'друга', 'друзей') }}</template><template v-if="me.role !== 'user'"> · {{ me.role === 'owner' ? 'владелец' : 'админ' }}</template></p>
         <RouterLink v-if="me.nick" class="acc-link" :to="{ name: 'user', params: { nick: me.nick } }">Мой профиль — как его видят другие</RouterLink>
+        <RouterLink v-if="recapStore.state" class="acc-link" :to="{ name: 'recap', params: { year: recapStore.state.year } }" data-testid="me-recap">Итоги {{ recapStore.state.year }}</RouterLink>
         <p v-if="me.bio" class="profile-bio">{{ me.bio }}</p>
       </div>
     </div>
@@ -140,6 +141,7 @@ import { supabase } from '@/supabaseClient'
 import { callFunction, refreshAccount, session, signOut, updateOwnProfile } from '@/site/session'
 import { EMOJIS, INITIALS_COLORS, checkAvatarSource } from '@/site/auth/avatars'
 import UserAvatar from '@/site/components/UserAvatar.vue'
+import { recapStore } from '@/site/recap/store'
 import AvatarCropper from '@/site/components/AvatarCropper.vue'
 import { BIO_MAX, NICK_CHANGE_INTERVAL_DAYS, cleanBio, nextNickChangeAt, validateBio, validateNick, validatePassword } from '../../../supabase/functions/_shared/accounts.ts'
 

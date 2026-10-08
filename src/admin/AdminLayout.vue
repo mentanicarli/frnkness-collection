@@ -77,6 +77,7 @@ const VIEWS: Record<string, Component> = {
     users: defineAsyncComponent(() => import('./views/UsersView.vue')),
     recovery: defineAsyncComponent(() => import('./views/RecoveryView.vue')),
     stats: defineAsyncComponent(() => import('./views/StatsView.vue')),
+    recap: defineAsyncComponent(() => import('./views/RecapView.vue')),
     lyrics: defineAsyncComponent(() => import('./views/LyricsView.vue')),
     lrc: defineAsyncComponent(() => import('./views/LrcView.vue')),
     promo: defineAsyncComponent(() => import('./views/PromoView.vue')),
