@@ -299,6 +299,7 @@
         "audioPath": "audio/album4/",
         "lyricsPath": "lyrics/album4/",
         "lyricsBookPath": "lyrics-books/zlaya-nostalgia.pdf",
+        "videoUrl": "https://www.youtube.com/embed/3IHuZ6xA27g",
         "tracks": [
             {
                 "num": 1,
